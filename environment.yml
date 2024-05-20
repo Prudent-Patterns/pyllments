@@ -1,0 +1,17 @@
+name: RAGular
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - python-dotenv
+  - bokeh
+  - panel
+  - langchain
+  - langchain-openai
+  - sentence-transformers
+  - openai
+  - jsonlines
+  - pip==24.0
+  - pip:
+    - tiktoken
+    - chromadb
