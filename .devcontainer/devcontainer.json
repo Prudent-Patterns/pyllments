@@ -17,6 +17,7 @@
 				"VisualStudioExptTeam.vscodeintellicode",
 				"ritwickdey.LiveServer",
 				"ms-vscode-remote.remote-wsl",
+				"Gruntfuggly.todo-tree"
 			]
 		}
 	},

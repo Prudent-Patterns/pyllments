@@ -11,7 +11,14 @@ dependencies:
   - sentence-transformers
   - openai
   - jsonlines
+  - opencv
+  - pdfminer.six
+  - pikepdf
   - pip==24.0
   - pip:
     - tiktoken
     - chromadb
+    - unstructured
+    - pillow-heif
+    - pytesseract
+    - langchain-chroma
