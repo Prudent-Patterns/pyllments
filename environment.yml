@@ -22,3 +22,4 @@ dependencies:
     - pillow-heif
     - pytesseract
     - langchain-chroma
+    - ruamel.yaml
