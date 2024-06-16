@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/universal
 {
-	"name": "pyRAG",
+	"name": "xrag",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"build": {
 		"dockerfile": "./Dockerfile",
@@ -31,7 +31,7 @@
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": {
 		"dev_bin": "apt-get install nano",
-		"panel": "conda install -y -n pyrag jupyter_bokeh ipykernel ipython"
+		"panel": "conda install -y -n xrag jupyter_bokeh ipykernel ipython"
 	}
 
 	// Configure tool-specific properties.

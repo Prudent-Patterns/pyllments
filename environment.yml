@@ -1,4 +1,4 @@
-name: RAGular
+name: xrag
 channels:
   - conda-forge
 dependencies:

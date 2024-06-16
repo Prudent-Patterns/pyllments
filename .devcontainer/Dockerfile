@@ -12,7 +12,7 @@ RUN apt-get -y update && \
     rm -rf ~/miniconda3/miniconda.sh && \
     ~/miniconda3/bin/conda update conda && \
     ~/miniconda3/bin/conda init bash && \
-    echo "conda activate pyrag" >> ~/.bashrc && \
+    echo "conda activate xrag" >> ~/.bashrc && \
     ~/miniconda3/bin/conda env update --file /environment.yml
 
 ENV PATH=$PATH:~/miniconda3/bin
