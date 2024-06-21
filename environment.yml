@@ -1,4 +1,4 @@
-name: xrag
+name: pyllments
 channels:
   - conda-forge
 dependencies:
@@ -21,6 +21,7 @@ dependencies:
     - unstructured
     - pillow-heif
     - pytesseract
+    - langchain-community
     - langchain-chroma
     - langchain-anthropic
     - ruamel.yaml

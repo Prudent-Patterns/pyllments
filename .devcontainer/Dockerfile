@@ -19,7 +19,7 @@ RUN mkdir -p ~/miniconda3 && \
 # Configure Conda
 RUN ~/miniconda3/bin/conda update conda && \
     ~/miniconda3/bin/conda init bash && \
-    echo "conda activate xrag" >> ~/.bashrc
+    echo "conda activate pyllments" >> ~/.bashrc
 
 # Create Conda environment from yml file
 RUN ~/miniconda3/bin/conda env update --file /environment.yml
