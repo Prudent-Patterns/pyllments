@@ -1,6 +1,6 @@
 import param
 
-from ..ports import InputPorts, OutputPorts
+from pyllments.ports import InputPorts, OutputPorts
 
 class Element(param.Parameterized):
     inputs = param.ClassSelector(class_=InputPorts, is_instance=True, default=InputPorts())
