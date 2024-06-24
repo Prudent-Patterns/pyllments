@@ -1,4 +1,7 @@
+import param
+
 from langchain_core.language_models import BaseLanguageModel
+from langchain_openai import ChatOpenAI
 
 from pyllments.base import Model
 

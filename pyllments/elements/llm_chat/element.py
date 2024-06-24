@@ -1,7 +1,8 @@
+import param
 import panel as pn
 
 from pyllments.base import Element
-from pyllments.models import LLMChatModel
+from pyllments.models.element_models import LLMChatModel
 
 class LLMChatElement(Element):
     model = param.ClassSelector(class_=LLMChatModel)
