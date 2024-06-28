@@ -3,8 +3,9 @@ import param
 from pyllments.ports import InputPorts, OutputPorts
 
 class Element(param.Parameterized):
-    inputs = param.ClassSelector(class_=InputPorts, is_instance=True, default=InputPorts())
-    outputs = param.ClassSelector(class_=OutputPorts, is_instance=True, default=OutputPorts())
+    model = param.ClassSelector(class_=Model, default=None)
+    ports = param.ClassSelector(class_=Ports)
 
     def __init__(self, **params):
         super().__init__(**params)
+        self.ports = Ports(containing_element=self)
