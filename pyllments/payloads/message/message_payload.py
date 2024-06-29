@@ -1,7 +1,7 @@
 import param
 import panel as pn
 
-from pyllments.base import Payload
+from pyllments.base.payload_base import Payload
 from pyllments.payloads.message.message_model import MessageModel
 
 class MessagePayload(Payload):

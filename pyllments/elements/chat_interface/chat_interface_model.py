@@ -1,6 +1,6 @@
 import param
 
-from pyllments.base import Model
+from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
 
 class ChatInterfaceModel(Model):

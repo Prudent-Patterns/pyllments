@@ -3,7 +3,7 @@ import param
 from langchain_core.language_models import BaseLanguageModel
 from langchain_openai import ChatOpenAI
 
-from pyllments.base import Model
+from pyllments.base.model_base import Model
 
 class LLMChatModel(Model):
     model_class = param.ClassSelector(

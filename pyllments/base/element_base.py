@@ -1,8 +1,11 @@
 import param
 
-from pyllments.ports import InputPorts, OutputPorts
+from .model_base import Model
+from ..ports import Ports
 
 class Element(param.Parameterized):
+
+    """Base class for all elements in the framework"""
     model = param.ClassSelector(class_=Model, default=None)
     ports = param.ClassSelector(class_=Ports)
 

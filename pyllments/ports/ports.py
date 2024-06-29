@@ -1,12 +1,15 @@
 from typing import TYPE_CHECKING, Union, List
 import inspect
+import warnings
 
 import param
 
-from pyllments.base import Payload
+from pyllments.base.payload_base import Payload
 
 
 class Port(param.Parameterized):
+    """Base implementation of Port - InputPort and OutputPort inherit from this"""
+
     payload = param.ClassSelector(class_=Payload)
     containing_element = param.Parameter(default=None, precedence=-1)
     connected_elements = param.List()
@@ -20,14 +23,16 @@ class Port(param.Parameterized):
 
 class InputPort(Port):
     subject_ports = param.List(item_type=Port)
-    unpack_payload_callback = param.Callable(default=None)
+
+    unpack_payload_callback = param.Callable(doc="""
+        The callback used to unpack the payload - has payload as its only argument.
+        Unpacks the payload and connects it to the element's model""")
 
     def receive(self, payload):
-        ### Just TESTING
         self.payload = payload
-
-    def unpack_payload(self, payload):
-        pass
+        if not self.unpack_payload_callback:
+            raise ValueError('unpack_payload_callback must be set')
+        self.unpack_payload_callback(payload)
 
 class OutputPort(Port):
     """
@@ -54,7 +59,8 @@ class OutputPort(Port):
     pack_payload_callback = param.Callable(default=None, doc="""
         The callback used to create the payload. When used in conjunction with
         infer_required_items == True, an annotated callback can replace passing in
-        a payload and required_items - and it enables type-checking""")
+        a payload and required_items while enabling type-checking.
+        Kwargs, their types, and the return type are required annotations.""")
         
     staged_items = param.List(item_type=str, doc="""
         The items that have been staged and are awaiting emission""")
@@ -67,6 +73,15 @@ class OutputPort(Port):
 
         # In the case when pack_payload_callback is passed and so is infer_from_callback
         if self.pack_payload_callback and self.infer_from_callback:
+            if (self.infer_from_callback and
+                not inspect.getfullargspec(self.pack_payload_callback).annotations):
+
+                raise ValueError("""
+                    pack_payload_callback must have annotations if infer_from_callback
+                    is False""")
+            if self.payload is not None:
+                warnings.warn("""payload will be overridden with the return type of 
+                    pack_payload_callback""")
             self.type_checking = True
             annotations = inspect.getfullargspec(self.pack_payload_callback).annotations
             self.param.payload.class_ = annotations.pop('return')
@@ -136,7 +151,7 @@ class OutputPort(Port):
     def pack_payload(self):
         if self.pack_payload_callback:
             staged_dict = {}
-            for item in self.staged_items:L
+            for item in self.staged_items:
                 staged_dict[item] = getattr(self, item)
             return self.pack_payload_callback(**staged_dict)
         else:
@@ -156,9 +171,9 @@ class InputPorts(param.Parameterized):
         self._containing_element = self.containing_element
         self.containing_element = None
 
-    def add(self, name, payload_type, **kwargs):
+    def add(self, name, payload_type, **kwargs): 
         input_port = InputPort(
-            payload=payload_type(),
+            payload=payload_type(), # Overridden if pack_payload_callback is passed
             **kwargs
             )
 
@@ -172,11 +187,14 @@ class OutputPorts(param.Parameterized):
         self._containing_element = self.containing_element
         self.containing_element = None
 
-    def add(self, name, payload_type, **kwargs):
-        output_port = OutputPort(
-            payload=payload_type(),
-            **kwargs
-            )
+    def add(self, name, payload_type=None, **kwargs):
+        if payload_type:
+            if kwargs.get('payload'):
+                warnings.warn(
+                    "payload_type will override the payload argument if both are provided." 
+                )
+            kwargs['payload'] = payload_type()
+        output_port = OutputPort(**kwargs)
         self.param.add_parameter(name, param.Parameter(output_port))
         return output_port
 
@@ -191,7 +209,7 @@ class Ports(param.Parameterized):
         self._containing_element = self.containing_element
         self.containing_element = None
 
-    def add_input(self, **kwargs):
+    def add_input(self, **kwargs): 
         self.input.add(
             containing_element=self._containing_element,
             **kwargs

@@ -1,7 +1,8 @@
 import panel as pn
 import param
 
-from pyllments.base import Element, Model
+from pyllments.base.element_base import Element
+from pyllments.base.model_base import Model
 from pyllments.elements.chat_interface import ChatInterfaceModel
 
 class ChatInterfaceElement(Element):

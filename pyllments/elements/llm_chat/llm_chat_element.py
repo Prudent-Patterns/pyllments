@@ -1,7 +1,7 @@
 import param
 import panel as pn
 
-from pyllments.base import Element
+from pyllments.base.element_base import Element
 from pyllments.elements.llm_chat import LLMChatModel
 
 class LLMChatElement(Element):

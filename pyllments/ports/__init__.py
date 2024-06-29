@@ -1,1 +1,1 @@
-from .ports import InputPorts, OutputPorts
+from .ports import Ports, InputPorts, OutputPorts, Port, InputPort, OutputPort

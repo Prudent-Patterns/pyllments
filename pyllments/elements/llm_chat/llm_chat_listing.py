@@ -3,7 +3,7 @@ import panel as pn
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 
-from pyllments.base import Listing
+from pyllments.base.listing_base import Listing
 from pyllments.elements.llm_chat import LLMChatElement, LLMChatModel
 
 class LLMChatListing(Listing):

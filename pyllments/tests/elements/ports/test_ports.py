@@ -1,3 +1,6 @@
+from pyllments.base.element_base import Element
+from pyllments.base.payload_base import Payload
+
 def test_port_connection():
     """
     Connects the output port of one element to the input port of another
