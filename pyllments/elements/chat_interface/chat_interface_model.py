@@ -8,5 +8,8 @@ class ChatInterfaceModel(Model):
     
     def __init__(self, **params):
         super().__init__(**params)
-        self.param.add_parameter('created_message', param.ClassSelector(class_=MessagePayload))
+        self.param.add_parameter(
+            'created_message',
+            param.ClassSelector(class_=MessagePayload)
+        )
         self.message_list.append(('human', 'what is the capital of the moon?'))

@@ -149,6 +149,10 @@ class OutputPort(Port):
         self.emit()
 
     def pack_payload(self):
+        """
+        Called to pack the payload - 
+        Only after all of the required items have been staged
+        """
         if self.pack_payload_callback:
             staged_dict = {}
             for item in self.staged_items:
@@ -209,7 +213,8 @@ class Ports(param.Parameterized):
         self._containing_element = self.containing_element
         self.containing_element = None
 
-    def add_input(self, **kwargs): 
+    def add_input(self, **kwargs):
+        # TODO: Needs better autocompletion - explicit kwargs over **kwargs 
         self.input.add(
             containing_element=self._containing_element,
             **kwargs

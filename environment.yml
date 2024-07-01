@@ -16,6 +16,7 @@ dependencies:
   - pikepdf
   - pip==24.0
   - pip:
+    - nbconvert
     - tiktoken
     - chromadb
     - unstructured
