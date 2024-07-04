@@ -1,4 +1,6 @@
 import param
 
 class Payload(param.Parameterized):
-    pass
+    
+    def __init__(self, **params):
+        super().__init__(**params)

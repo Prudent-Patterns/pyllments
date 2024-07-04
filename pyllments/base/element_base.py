@@ -1,3 +1,5 @@
+import warnings
+
 import param
 
 from .model_base import Model
@@ -12,3 +14,8 @@ class Element(param.Parameterized):
     def __init__(self, **params):
         super().__init__(**params)
         self.ports = Ports(containing_element=self)
+
+    def _view_exists(self, view):
+        if view:
+            warnings.warn(f'{view} already exists. Returning existing view.')
+            return True
