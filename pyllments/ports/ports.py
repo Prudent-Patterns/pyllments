@@ -34,6 +34,7 @@ class InputPort(Port):
             raise ValueError('unpack_payload_callback must be set')
         self.unpack_payload_callback(payload)
 
+
 class OutputPort(Port):
     """
     Handles the intake of data and packing into a payload and
@@ -143,7 +144,7 @@ class OutputPort(Port):
         # For returning the payload to the caller 
         return self.payload
     
-    def stage_and_emit(self, **kwargs):
+    def stage_emit(self, **kwargs):
         """Stages the payload and emits it - All required params need be present"""
         self.stage(**kwargs)
         self.emit()
@@ -219,9 +220,11 @@ class Ports(param.Parameterized):
             containing_element=self._containing_element,
             **kwargs
             )
+        self.port_names.append(kwargs['name'])
     
     def add_output(self, **kwargs):
         self.output.add(
             containing_element=self._containing_element,
             **kwargs
             )
+        self.port_names.append(kwargs['name'])
