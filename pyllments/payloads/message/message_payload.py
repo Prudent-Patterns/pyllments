@@ -8,7 +8,7 @@ class MessagePayload(Payload):
     model = param.ClassSelector(class_=MessageModel, is_instance=True)
     message_view = param.ClassSelector(class_=pn.Row, is_instance=True)
 
-    def __init__(self, message_type=None, message_text='', mode='atomic', **params):
+    def __init__(self, message_type=None, message_text='', mode='stream', **params):
         super().__init__(**params)
         # self.model = self.model.class_(
         self.model = MessageModel(

@@ -10,7 +10,7 @@ from pyllments.base.payload_base import Payload
 class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
 
-    payload = param.ClassSelector(class_=Payload)
+    payload = param.ClassSelector(class_=Payload, allow_None=True)
     containing_element = param.Parameter(default=None, precedence=-1)
     connected_elements = param.List()
 
@@ -22,7 +22,7 @@ class Port(param.Parameterized):
 
 
 class InputPort(Port):
-    subject_ports = param.List(item_type=Port)
+    output_ports = param.List(item_type=Port)
 
     unpack_payload_callback = param.Callable(doc="""
         The callback used to unpack the payload - has payload as its only argument.
@@ -41,7 +41,7 @@ class OutputPort(Port):
     is meant to connect to an InputPort in order to emit the packed payload
     """
     # Add a watcher IF updating of required_items becomes necessary
-    required_items = param.List(item_type=Union[str, tuple[str, type]], doc="""
+    required_items = param.List(doc="""
         Type checking automatically enabled if (name, type) tuple is passed""")
 
     emit_when_ready = param.Boolean(default=True, doc="""
@@ -54,7 +54,7 @@ class OutputPort(Port):
         If true, infers the required items from pack_payload_callback
         and required_items is set to None""")
 
-    observer_ports = param.List(item_type=Port, doc="""
+    input_ports = param.List(item_type=Port, doc="""
         The connected InputPorts which emit() will contact""")
 
     pack_payload_callback = param.Callable(default=None, doc="""
@@ -76,7 +76,6 @@ class OutputPort(Port):
         if self.pack_payload_callback and self.infer_from_callback:
             if (self.infer_from_callback and
                 not inspect.getfullargspec(self.pack_payload_callback).annotations):
-
                 raise ValueError("""
                     pack_payload_callback must have annotations if infer_from_callback
                     is False""")
@@ -86,8 +85,8 @@ class OutputPort(Port):
             self.type_checking = True
             annotations = inspect.getfullargspec(self.pack_payload_callback).annotations
             self.param.payload.class_ = annotations.pop('return')
-            self.required_items =  tuple(annotations.items())
-        # In the case of desired type-checking
+            self.required_items =  list(annotations.items())
+        # In the case of desired type-checking - enabled when required items are tuples
         elif self.required_items and (isinstance(self.required_items[0], tuple)):
             self.type_checking = True
             for item in self.required_items:
@@ -96,11 +95,9 @@ class OutputPort(Port):
                     param.ClassSelector(class_=[item[1]])
                     )
         # In case of no type-checking but required_items specified
-        elif str and (not self.required_items):
+        elif self.required_items:
             for item in self.required_items:
                 self.param.add_parameter(item, param.Parameter())
-        elif not self.required_items:
-            self.type_checking = False
 
     def connect(self, other: InputPort):
         """Connects self and the other InputPort"""
@@ -109,18 +106,20 @@ class OutputPort(Port):
         if not isinstance(other.payload, type(self.payload)):
             raise ValueError('InputPort and OutputPort payload types must match')
         
-        self.observer_ports.append(other)
+        self.input_ports.append(other)
         self.connected_elements.append(other._containing_element)
         other.connected_elements.append(self._containing_element)
+        other.output_ports.append(self)
     
     def stage(self, **kwargs: param.Parameter):
         """Stages the values within the port before packing"""
         if self.type_checking:
             for name, value in kwargs.items():
                 class_ = self.param[name].class_
-                if isinstance(value, class_):
-                    self.staged_items.append(name)
-                    self.param[name] = value
+                if not isinstance(value, class_):
+                    raise ValueError(f'{value} is not an instance of {class_}')
+                self.staged_items.append(name)
+                self.param[name] = value
             # Compare equality of staged_items and required_items
             if set(self.staged_items) == set(item[0] for item in self.required_items):
                 self.emit_ready = True
@@ -139,7 +138,7 @@ class OutputPort(Port):
             raise Exception('Staged items do not match required items')
         else:
             self.payload = self.pack_payload()
-        for port in self.observer_ports:
+        for port in self.input_ports:
             port.receive(self.payload)
         # For returning the payload to the caller 
         return self.payload
@@ -176,9 +175,8 @@ class InputPorts(param.Parameterized):
         self._containing_element = self.containing_element
         self.containing_element = None
 
-    def add(self, name, payload_type, **kwargs): 
+    def add(self, name, **kwargs): 
         input_port = InputPort(
-            payload=payload_type(), # Overridden if pack_payload_callback is passed
             **kwargs
             )
 
@@ -192,13 +190,7 @@ class OutputPorts(param.Parameterized):
         self._containing_element = self.containing_element
         self.containing_element = None
 
-    def add(self, name, payload_type=None, **kwargs):
-        if payload_type:
-            if kwargs.get('payload'):
-                warnings.warn(
-                    "payload_type will override the payload argument if both are provided." 
-                )
-            kwargs['payload'] = payload_type()
+    def add(self, name, **kwargs):
         output_port = OutputPort(**kwargs)
         self.param.add_parameter(name, param.Parameter(output_port))
         return output_port
@@ -220,11 +212,9 @@ class Ports(param.Parameterized):
             containing_element=self._containing_element,
             **kwargs
             )
-        self.port_names.append(kwargs['name'])
     
     def add_output(self, **kwargs):
         self.output.add(
             containing_element=self._containing_element,
             **kwargs
             )
-        self.port_names.append(kwargs['name'])
