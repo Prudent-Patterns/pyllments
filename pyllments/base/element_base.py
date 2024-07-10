@@ -8,7 +8,7 @@ from ..ports import Ports
 class Element(param.Parameterized):
 
     """Base class for all elements in the framework"""
-    model = param.ClassSelector(class_=Model, default=None)
+    model = param.ClassSelector(class_=Model)
     ports = param.ClassSelector(class_=Ports)
 
     def __init__(self, **params):
@@ -21,7 +21,7 @@ class Element(param.Parameterized):
             return True
     
     @staticmethod
-    def port_emit_if_exists(port_name):
+    def port_emit_if_exists(port_name: str):
         """
         Used to decorate a watch method so that when it runs, it emits
         the port labelled with the port_name if the port is established. 
@@ -29,16 +29,16 @@ class Element(param.Parameterized):
         def decorator(func):
             def wrapper(self, *args, **kwargs):
                 func(self, *args, **kwargs)
-                if (input_port := getattr(self.ports.input, port_name, None)):
-                    input_port.emit()
-                elif (output_port := getattr(self.ports.output, port_name, None)):
-                    output_port.emit()
+                if port_name in self.ports.input:
+                    self.ports.input[port_name].emit()
+                elif port_name in self.ports.output:
+                    self.ports.output[port_name].emit()
                 return
             return wrapper
         return decorator
 
     @staticmethod
-    def port_stage_if_exists(port_name, model_param_name):
+    def port_stage_if_exists(port_name: str, model_param_name: str):
         """
         Used to decorate a watch method so that when it runs, it stages a
         model parameter on a port if both are established
@@ -47,16 +47,16 @@ class Element(param.Parameterized):
             def wrapper(self, *args, **kwargs):
                 func(self, *args, **kwargs)
                 if (model_param := getattr(self.model, model_param_name)):
-                    if (input_port := getattr(self.ports.input, port_name, None)):
-                        input_port.stage(model_param_name=model_param)
-                    elif (output_port := getattr(self.ports.output, port_name, None)):
-                        output_port.stage(model_param_name=model_param)
+                    if port_name in self.ports.input:
+                        self.ports.input[port_name].stage(**{model_param_name: model_param})
+                    elif port_name in self.ports.output:
+                        self.ports.output[port_name].stage(**{model_param_name: model_param})
                 return
             return wrapper
         return decorator
     
     @staticmethod
-    def port_stage_emit_if_exists(port_name, model_param_name):
+    def port_stage_emit_if_exists(port_name: str, model_param_name: str):
         """
         Used to decorate a watch method and emit the port labelled with the
         port_name if the port is established. 
@@ -65,10 +65,10 @@ class Element(param.Parameterized):
             def wrapper(self, *args, **kwargs):
                 func(self, *args, **kwargs)
                 if (model_param := getattr(self.model, model_param_name)):
-                    if (input_port := getattr(self.ports.input, port_name, None)):
-                        input_port.stage(model_param_name=model_param)
-                    elif (output_port := getattr(self.ports.output, port_name, None)):
-                        output_port.stage_emit(model_param_name=model_param)
+                    if port_name in self.ports.input:
+                        self.ports.input[port_name].stage(**{model_param_name: model_param})
+                    elif port_name in self.ports.output:
+                        self.ports.output[port_name].stage_emit(**{model_param_name: model_param})
                 return
             return wrapper
         return decorator
