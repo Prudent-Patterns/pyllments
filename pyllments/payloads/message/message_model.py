@@ -30,7 +30,7 @@ class MessageModel(Model):
         # TODO Needs async implementation
         if self.mode != 'stream':
             raise ValueError("Cannot stream: Mode is not set to 'stream'")
-        self.message = AIMessage('')
+        self.message = AIMessage(' ') # TODO: REMOVE WHITESPACE
         for chunk in self.message_stream:
             self.message.content += chunk.content
             self.param.trigger('message')
