@@ -1,58 +1,80 @@
-"""
-Demonstrates how to use OpenAI's GPT-3.5 API with Panel's ChatInterface.
-
-Highlights:
-
-- Uses `PasswordInput` to set the API key, or uses the `OPENAI_API_KEY` environment variable.
-- Uses `serialize` to get chat history from the `ChatInterface`.
-- Uses `yield` to continuously concatenate the parts of the response
-"""
-
 import panel as pn
-from openai import AsyncOpenAI
-from dotenv import load_dotenv
+import time
 
-load_dotenv()
-pn.extension()
+pn.config.global_css = [
+    """
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+body {
+    background-color: #0C1314;
+}
+"""
+]
+
+chat_column = pn.Column(height=200, width=400, scroll=True)
+
+stylesheet = """
+.bk-input-group {
+    font-family: 'Ubuntu', sans-serif;
+}
+.bk-input {
+    background-color: #111926;
+    border: 1px solid #4B586C;
+    color: #F4F6F8;
+}
+.bk-input::placeholder {
+    color: #F4F6F890;
+}
+"""
+style = {
+    "--border-radius": "9px",
+  #  "border": "1px solid",
+    # "stroke": "4B586C",
+}
+chat_input = pn.chat.ChatAreaInput(
+    placeholder='Type your message here...',
+    stylesheets=[stylesheet],
+    styles=style,
+    rows=2,
+    auto_grow=True)
+
+button_stylesheet = """
+.bk-btn {
+    border-radius: 8px;
+    background-color: #D33A4B;
+    font-size: 20px;
+}
+.bk-btn.bk-btn-default {
+    background-color: #D33A4B;
+}
+
+.bk-btn.bk-btn-default {
+    background-color: #D33A4B;
+}
+/*
+:host(.solid) .bk-btn.bk-btn-default {
+    background-color: #D33A4B;
+*/
+    }
 
 
-async def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
-    if api_key_input.value:
-        # use api_key_input.value if set, otherwise use OPENAI_API_KEY
-        aclient.api_key = api_key_input.value
-
-    # memory is a list of messages
-    messages = instance.serialize()
-
-    response = await aclient.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        stream=True,
-    )
-
-    message = ""
-    async for chunk in response:
-        part = chunk.choices[0].delta.content
-        if part is not None:
-            message += part
-            yield message
+"""
+button_style = {'--surface-color': '#D33A4B', '--surface-text-color': '#F4F6F8'}
 
 
-aclient = AsyncOpenAI()
-api_key_input = pn.widgets.PasswordInput(
-    placeholder="sk-... uses $OPENAI_API_KEY if not set",
-    sizing_mode="stretch_width",
-    styles={"color": "black"},
-)
-chat_interface = pn.chat.ChatInterface(
-    callback=callback,
-    callback_user="GPT-3.5",
-    help_text="Send a message to get a reply from GPT-3.5 Turbo!",
-)
-template = pn.template.FastListTemplate(
-    title="OpenAI GPT-3.5",
-    header_background="#212121",
-    main=[chat_interface],
-    header=[api_key_input],
-)
-template.servable()
+send_button = pn.widgets.Button(icon='send-2',
+                                stylesheets=[button_stylesheet],
+                                styles=button_style)
+
+def send_message(event):
+    message = chat_input.value_input
+    if message:
+        message_pane = pn.Row(pn.pane.Markdown(message))
+        chat_column.append(message_pane)
+        time.sleep(0.25)
+        for word in message.split():
+            message_pane[0].object += word + " "
+            time.sleep(0.01)  
+        chat_input.value_input = ''  
+
+send_button.on_click(send_message)
+pn.Column(chat_column, pn.Row(chat_input, send_button)).servable()
