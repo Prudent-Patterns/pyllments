@@ -164,3 +164,7 @@ corpus_local/*
 !corpus_local/simple_rag/
 !corpus_local/default_directory2/
 !corpus_local/default_directory3/
+
+# Other
+**/.ignore
+

@@ -10,7 +10,17 @@ body {
 """
 ]
 
-chat_column = pn.Column(height=200, width=400, scroll=True)
+chat_column = pn.Column(
+    height=400,
+    width=400, 
+    scroll=True, 
+    styles={'background-color': '#111926',
+            'border-radius': '9px',
+            'border': '1px solid #4B586C',
+            'scrollbar-width': 'thin',
+            'scrollbar-color': '#4B586C #111926',
+            }
+    )
 
 stylesheet = """
 .bk-input-group {
@@ -21,13 +31,19 @@ stylesheet = """
     border: 1px solid #4B586C;
     color: #F4F6F8;
 }
+.bk-input:focus {
+    border-color: #12B86C;
+}
+ 
 .bk-input::placeholder {
     color: #F4F6F890;
 }
 """
 style = {
     "--border-radius": "9px",
-  #  "border": "1px solid",
+    # "background-color": "#111926",
+    # "border": "1px solid #4B586C",
+    # "color": "#F4F6F8",
     # "stroke": "4B586C",
 }
 chat_input = pn.chat.ChatAreaInput(
@@ -39,7 +55,6 @@ chat_input = pn.chat.ChatAreaInput(
 
 button_stylesheet = """
 .bk-btn {
-    border-radius: 8px;
     background-color: #D33A4B;
     font-size: 20px;
 }
@@ -65,12 +80,43 @@ send_button = pn.widgets.Button(icon='send-2',
                                 stylesheets=[button_stylesheet],
                                 styles=button_style)
 
+row_style = {
+    "border-radius": "9px",
+    "background-color": '#0C1314'
+}
+row_stylesheet = """
+"""
+counter = 0
 def send_message(event):
+    global counter
     message = chat_input.value_input
     if message:
-        message_pane = pn.Row(pn.pane.Markdown(message))
+        if counter % 2 == 0:
+            message_pane = pn.Row(
+                pn.pane.Markdown(
+                '',
+                styles={'font-family': 'Ubuntu', 'color': '#F4F6F8', 'font-weight': '300'}
+                
+                ),
+            styles={'max-height': 'none',
+                    'background-color': '#0C1314',
+                    'border-right': '2px solid #12B86C',
+                    },
+            sizing_mode='stretch_width'
+            )
+        else:
+            message_pane = pn.Row(
+                pn.pane.Markdown(
+                '',
+                styles={'font-family': 'Ubuntu', 'color': '#F4F6F8', 'width': '80%', 'margin': 'auto'}
+                ),
+                styles={'max-height': 'none', 'align-items': 'center', 'justify-content': 'center'},
+                sizing_mode='stretch_width'
+            )
         chat_column.append(message_pane)
         time.sleep(0.25)
+        counter += 1
+        
         for word in message.split():
             message_pane[0].object += word + " "
             time.sleep(0.01)  
