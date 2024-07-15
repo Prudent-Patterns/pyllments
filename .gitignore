@@ -166,5 +166,5 @@ corpus_local/*
 !corpus_local/default_directory3/
 
 # Other
-**/.ignore
+.ignore*
 
