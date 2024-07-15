@@ -1,4 +1,4 @@
-import param
+from pyllments.base.component_base import Component
 
-class Payload(param.Parameterized):
+class Payload(Component):
     pass

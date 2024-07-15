@@ -1,4 +1,6 @@
 import warnings
+import sys
+from pathlib import Path
 
 import param
 
@@ -6,35 +8,15 @@ from .model_base import Model
 from ..ports import Ports
 from ..common.style_helpers import get_method_name
 
-class Element(param.Parameterized):
 
+class Element(param.Parameterized):
     """Base class for all elements in the framework"""
-    model = param.ClassSelector(class_=Model)
     ports = param.ClassSelector(class_=Ports)
 
     def __init__(self, **params):
         super().__init__(**params)
         self.ports = Ports(containing_element=self)
     
-    @classmethod
-    def get_base_path(cls):
-        # Get the module where the class is defined
-        module = sys.modules[cls.__module__]
-        # Return the parent directory of the module's file
-        return Path(module.__file__)
-    
-    def load_css(self):
-        css = get_method_name(prefix='create_', suffix='_view', level=2)
-        if css not in type(self)._css_cache:
-
-            with 
-            self._css_cache[css] = self._load_css(css_filename)
-        return self._css_cache[css_filename]
-
-    def _view_exists(self, view):
-        if view:
-            warnings.warn(f'{view} already exists. Returning existing view.')
-            return True
     
     @staticmethod
     def port_emit_if_exists(port_name: str):
