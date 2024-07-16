@@ -27,6 +27,20 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "module": "pyllments.${fileBasenameNoExtension}"
+        },
+        {
+            "name": "panel serve",
+            "type": "python",
+            "request": "launch",
+            "program": "-m",
+            "args": [
+                "panel",
+                "serve",
+                "${relativeFile}",
+                "--show"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

@@ -8,8 +8,8 @@ from pyllments.base.payload_base import Payload
 from pyllments.payloads.message.message_model import MessageModel
 
 class MessagePayload(Payload):
-    model = param.ClassSelector(class_=MessageModel, is_instance=True)
-    message_view = param.ClassSelector(class_=pn.Row, is_instance=True)
+    model = param.ClassSelector(class_=MessageModel)
+    message_view = param.ClassSelector(class_=pn.Row)
     
     def __init__(
             self,
@@ -29,11 +29,13 @@ class MessagePayload(Payload):
     @Component.view
     def create_message_view(
         self,
-        human_markdown_css: Optional[str] = None,
-        human_row_css: Optional[str] = None,
-        ai_markdown_css: Optional[str] = None,
-        ai_row_css: Optional[str] = None) -> pn.Row:
+        human_markdown_css: str = '',
+        human_row_css: str = '',
+        ai_markdown_css: str = '',
+        ai_row_css: str = '') -> pn.Row:
         """Creates a message container"""
+        # FUTURE: Split into individual methods for each message type
+        # and use this method to call them to avoid premature CSS imports
         match self.model.message_type:
             case 'human':
                 markdown_css = human_markdown_css

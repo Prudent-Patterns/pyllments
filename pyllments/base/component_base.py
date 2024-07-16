@@ -34,7 +34,8 @@ class Component(param.Parameterized):
             warnings.warn(f'{view} already exists. Returning existing view.')
             return True   
 
-    def view(self, func):
+    @classmethod
+    def view(cls, func):
         """
         Handles the CSS loading logic for view creation within components.
         Reliant on the existence of a CSS folder in the module's directory.
@@ -58,7 +59,7 @@ class Component(param.Parameterized):
             Component._css_cache['some_panel_css'] = '...'
         """
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(self, *args, **kwargs):
             return_kwargs = {}
             # Get the function's parameter names
             sig = inspect.signature(func)
@@ -71,15 +72,15 @@ class Component(param.Parameterized):
                 # Check CSS cache, if it's not in the cache, load it
                 elif (key in css_kwargs) and (not val): 
                     if key not in self.css_cache:
-                        module_path = type(self)._get_module_path()
+                        module_path = cls._get_module_path()
                         css_filename = Path(
                             module_path, 'css',
-                            f'{key.replace("_css", "")}.css')
+                            f'{key.replace("_css", ".css")}')
                         with open(css_filename, 'r') as f:
                             self.css_cache[key] = f.read()
                             return_kwargs[key] = self.css_cache[key]
                     else:
                         return_kwargs[key] = self.css_cache[key]
         
-            return func(**return_kwargs)
+            return func(self, *args, **return_kwargs)
         return wrapper

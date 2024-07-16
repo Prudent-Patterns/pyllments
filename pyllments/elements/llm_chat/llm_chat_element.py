@@ -5,6 +5,7 @@ import panel as pn
 from langchain_core.messages import AIMessage
 
 from pyllments.base.element_base import Element
+from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.llm_chat import LLMChatModel
 
