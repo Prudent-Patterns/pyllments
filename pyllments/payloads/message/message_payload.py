@@ -29,9 +29,18 @@ class MessagePayload(Payload):
     @Component.view
     def create_message_view(
         self,
-        markdown_css: Optional[str] = None,
-        row_css: Optional[str] = None) -> pn.Row:
+        human_markdown_css: Optional[str] = None,
+        human_row_css: Optional[str] = None,
+        ai_markdown_css: Optional[str] = None,
+        ai_row_css: Optional[str] = None) -> pn.Row:
         """Creates a message container"""
+        match self.model.message_type:
+            case 'human':
+                markdown_css = human_markdown_css
+                row_css = human_row_css
+            case 'ai':
+                markdown_css = ai_markdown_css
+                row_css = ai_row_css
         markdown = pn.pane.Markdown(
             self.model.message.content,
             stylesheets=[markdown_css])

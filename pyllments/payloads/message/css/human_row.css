@@ -1,0 +1,6 @@
+:host {
+    max-height: none; /* Fixes streaming issue in Panel */
+    background-color: #0C1314;
+    border-right: 2px solid #12B86C;
+    width: 100%;
+}

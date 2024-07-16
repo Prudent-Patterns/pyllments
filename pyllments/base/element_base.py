@@ -6,10 +6,9 @@ import param
 
 from .model_base import Model
 from ..ports import Ports
-from ..common.style_helpers import get_method_name
+from .component_base import Component
 
-
-class Element(param.Parameterized):
+class Element(Component):
     """Base class for all elements in the framework"""
     ports = param.ClassSelector(class_=Ports)
 
