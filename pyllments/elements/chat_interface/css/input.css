@@ -1,0 +1,19 @@
+:host {
+    --border-radius: 9px;
+}
+
+.bk-input-group {
+    font-family: 'Ubuntu', sans-serif;
+}
+.bk-input {
+    background-color: #111926;
+    border: 1px solid #4B586C;
+    color: #F4F6F8;
+}
+.bk-input:focus {
+    border-color: #12B86C;
+}
+ 
+.bk-input::placeholder {
+    color: #F4F6F890;
+}

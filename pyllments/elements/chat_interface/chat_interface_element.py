@@ -3,6 +3,7 @@ import param
 
 from pyllments.base.element_base import Element
 from pyllments.base.model_base import Model
+from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
 from pyllments.payloads.message import MessagePayload
 from langchain_core.messages.human import HumanMessage
@@ -64,15 +65,18 @@ class ChatInterfaceElement(Element):
             name='message_input',
             unpack_payload_callback=unpack)
 
-    def create_chatfeed_view(self, **kwargs):
+    @Component.view
+    def create_chatfeed_view(self, column_css: str = '', **kwargs):
         """
-        Creates and returns a new instance of the chatfeed whichi
+        Creates and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
         """
         if self._view_exists(self.chatfeed_view):
             return self.chatfeed_view
         # When first loaded
-        self.chatfeed_view = pn.Column(**kwargs)
+        self.chatfeed_view = pn.Column(
+            stylesheets=[column_css],
+            **kwargs)
         message_views = [
             message.create_message_view() 
             for message in self.model.message_list
@@ -85,8 +89,8 @@ class ChatInterfaceElement(Element):
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
 
-
-    def create_chat_input_view(self, **kwargs):
+    @Component.view
+    def create_chat_input_view(self, input_css: str = '', **kwargs):
         """
         Creates and returns a new instance of ChatAreaInput view.
         """
@@ -95,19 +99,30 @@ class ChatInterfaceElement(Element):
 
         self.chat_input_view = pn.chat.ChatAreaInput(
             placeholder='Enter your message',
+            rows=3,
+            auto_grow=True,
+            stylesheets=[input_css],
             **kwargs)
         self.chat_input_view.param.watch(self._on_send, 'value')
         return self.chat_input_view
     
-
-    def create_send_button_view(self, **kwargs):
+    @Component.view
+    def create_send_button_view(
+            self,
+            button_css: str = '', 
+            name: str = 'Send',
+            **kwargs):
         """
         Creates and returns a new instance of Button view for sending messages.
         """
         if self._view_exists(self.send_button_view):
             return self.send_button_view
 
-        self.send_button_view = pn.widgets.Button(name='send', **kwargs)
+        self.send_button_view = pn.widgets.Button(
+            name='',
+            icon='send-2',
+            stylesheets=[button_css],
+            **kwargs)
         self.send_button_view.on_click(self._on_send)
 
         return self.send_button_view

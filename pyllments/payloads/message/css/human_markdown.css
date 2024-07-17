@@ -1,5 +1,9 @@
 :host {
-  font-family: 'Ubuntu', sans-serif;
+  --base-font: 'Hanken Grotesk', sans-serif;
   color: #F4F6F8;
   font-weight: 300;
+}
+
+p {
+  font-family: var(--base-font);
 }
