@@ -30,15 +30,8 @@ class ChatInterfaceElement(Element):
     model_params = param.Dict(default={})
 
     chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
-    chatfeed_css = param.String(default='', )
-
     chat_input_view = param.ClassSelector(class_=pn.chat.ChatAreaInput, is_instance=True)
-    chat_input_css = param.String(default='', )
-    
     send_button_view = param.ClassSelector(class_=pn.widgets.Button, is_instance=True)
-    send_button_css = param.String(default='', )
-
-    _css_cache = {}
 
     def __init__(self, persist=False, **params):
         super().__init__(**params)

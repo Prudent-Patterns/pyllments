@@ -1,4 +1,5 @@
 from typing import Generator, AsyncGenerator
+from uuid import uuid4
 
 import param
 from langchain_core.messages.base import BaseMessage
@@ -25,7 +26,13 @@ class MessageModel(Model):
         Used with stream mode, assumes AI message created from stream""")
     message_batch = param.List(default=None, item_type=BaseMessage, doc="""
         Used with batch mode, consists of BaseMessages from LangChain""")
+    id = param.String(doc="""
+        Used to identify message""")
 
+    def __init__(self, **params):
+        super().__init__(**params)
+        self.id = str(uuid4())
+        
     def stream(self):
         # TODO Needs async implementation
         if self.mode != 'stream':
