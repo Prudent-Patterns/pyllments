@@ -5,6 +5,7 @@ from langchain_core.messages.base import BaseMessage
 
 from pyllments.base.model_base import Model
 
+
 class LLMChatModel(Model):
     chat_model = param.ClassSelector(class_=BaseLanguageModel, doc="""
         Instance of active chat model.""")

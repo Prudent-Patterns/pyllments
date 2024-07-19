@@ -7,6 +7,7 @@ from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
 from pyllments.payloads.message.message_model import MessageModel
 
+
 class MessagePayload(Payload):
     model = param.ClassSelector(class_=MessageModel)
     message_view = param.ClassSelector(class_=pn.Row)

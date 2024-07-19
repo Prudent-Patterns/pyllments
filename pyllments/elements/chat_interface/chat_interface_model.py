@@ -3,6 +3,7 @@ import param
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
 
+
 class ChatInterfaceModel(Model):
     # TODO: Implement batch interface for messages - populating message_list > iterating
     message_list = param.List(instantiate=True)

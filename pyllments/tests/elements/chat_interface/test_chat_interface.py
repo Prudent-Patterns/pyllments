@@ -1,6 +1,7 @@
 from pyllments.elements.chat_interface.chat_interface_element import ChatInterfaceElement
 from pyllments.payloads.message import MessagePayload
 
+
 def stream_chat_interface_test():
     chat_interface_element = ChatInterfaceElement()
 

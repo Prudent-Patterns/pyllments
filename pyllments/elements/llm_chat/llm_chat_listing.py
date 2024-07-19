@@ -6,6 +6,7 @@ from langchain_anthropic import ChatAnthropic
 from pyllments.base.listing_base import Listing
 from pyllments.elements.llm_chat import LLMChatElement, LLMChatModel
 
+
 class LLMChatListing(Listing):
     selector = param.ClassSelector(class_=pn.widgets.Select, is_instance=True)
     llm_chat_element = param.ClassSelector(class_=LLMChatElement, is_instance=True)

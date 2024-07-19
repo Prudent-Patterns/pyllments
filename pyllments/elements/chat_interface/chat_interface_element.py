@@ -8,6 +8,7 @@ from pyllments.elements.chat_interface import ChatInterfaceModel
 from pyllments.payloads.message import MessagePayload
 from langchain_core.messages.human import HumanMessage
 
+
 class ChatInterfaceElement(Element):
     """
     Model:

@@ -7,6 +7,7 @@ from langchain_core.messages.ai import AIMessage
 
 from pyllments.base.model_base import Model
 
+
 class MessageModel(Model):
     # TODO: Finalize if atomic mode should be with message_type and message_text
     # Or with langchain Messages
@@ -32,7 +33,7 @@ class MessageModel(Model):
     def __init__(self, **params):
         super().__init__(**params)
         self.id = str(uuid4())
-        
+
     def stream(self):
         # TODO Needs async implementation
         if self.mode != 'stream':
