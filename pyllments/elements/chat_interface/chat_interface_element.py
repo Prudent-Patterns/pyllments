@@ -11,6 +11,8 @@ from langchain_core.messages.human import HumanMessage
 
 class ChatInterfaceElement(Element):
     """
+    Handles the chat GUI, including the message history, chat input, and send button.
+    *****
     Model:
     - messages in the chat
     - message input
@@ -24,11 +26,6 @@ class ChatInterfaceElement(Element):
     - output port
         - message_output: MessagePayload
     """
-    model = param.ClassSelector(
-        class_=Model,
-        is_instance=True
-    )
-    model_params = param.Dict(default={})
 
     chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
     chat_input_view = param.ClassSelector(class_=pn.chat.ChatAreaInput, is_instance=True)
@@ -36,12 +33,12 @@ class ChatInterfaceElement(Element):
 
     def __init__(self, persist=False, **params):
         super().__init__(**params)
-        self.model = ChatInterfaceModel(**self.model_params)
+        self.model = ChatInterfaceModel(persist=persist)
         
-        self.message_output_setup()
-        self.message_input_setup()
+        self._message_output_setup()
+        self._message_input_setup()
 
-    def message_output_setup(self):
+    def _message_output_setup(self):
         """Sets up the output message port"""
         def pack(new_message: MessagePayload) -> MessagePayload:
             return new_message
@@ -50,7 +47,7 @@ class ChatInterfaceElement(Element):
             name='message_output',
             pack_payload_callback=pack)
     
-    def message_input_setup(self):
+    def _message_input_setup(self):
         """Sets up the input message port"""
         def unpack(payload: MessagePayload):
             self.model.new_message = payload

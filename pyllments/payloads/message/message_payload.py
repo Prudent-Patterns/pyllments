@@ -17,7 +17,7 @@ class MessagePayload(Payload):
             message_type: Literal['human', 'system', 'ai'] = 'human',
             message: BaseMessage = BaseMessage(content=' '*10, type='placeholder'),
             message_stream: Optional[Generator | AsyncGenerator] = None,
-            mode: Literal['stream', 'atomic'] = 'stream',
+            mode: Literal['stream', 'atomic', 'batch'] = 'stream',
             **params):
         super().__init__(**params)
         # self.model = self.model.class_(

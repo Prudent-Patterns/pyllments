@@ -17,7 +17,7 @@ class LLMChatModel(Model):
         with all values set to None.""") # TODO Allow nested dict for model_name: model_args format
     
     provider_name = param.String(default='openai', doc='Provider of the model')
-    model_name = param.String(default='gpt-3.5-turbo', doc='Name of the model')
+    model_name = param.String(default='gpt-4o-mini', doc='Name of the model')
     incoming_messages = param.List(item_type=BaseMessage)
     output_mode = param.Selector(
         objects=['atomic', 'stream'],
@@ -29,8 +29,9 @@ class LLMChatModel(Model):
 
     def __init__(self, **params):
         super().__init__(**params)
-        self._initialize_provider()
-        self._initialize_model()
+        if not self.chat_model:
+            self._initialize_provider()
+            self._initialize_model()
         # self._set_params()
     #     self._create_watchers()
 

@@ -29,6 +29,8 @@ class MessageModel(Model):
         Used with batch mode, consists of BaseMessages from LangChain""")
     id = param.String(doc="""
         Used to identify message""")
+    is_multimodal = param.Boolean(default=False, doc="""
+        Used to identify if the message(s) is multimodal""")
 
     def __init__(self, **params):
         super().__init__(**params)
