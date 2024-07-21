@@ -6,6 +6,7 @@ from langchain_core.messages.base import BaseMessage
 from langchain_core.messages.ai import AIMessage
 
 from pyllments.base.model_base import Model
+from pyllments.common.tokenizers import get_token_len
 
 
 class MessageModel(Model):
@@ -46,3 +47,12 @@ class MessageModel(Model):
             self.param.trigger('message')
         self.message.response_metadata = chunk.response_metadata
         self.message.id = chunk.id
+
+    def get_token_len(self, model=None):
+        match self.mode:
+            case 'atomic':
+                return get_token_len(self.message.content, model)
+            case 'batch':
+                return sum(get_token_len(msg.content, model) for msg in self.message_batch)
+            case _:
+                raise ValueError("Invalid mode: must be 'atomic' or 'batch'")

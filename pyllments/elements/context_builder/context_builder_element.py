@@ -25,15 +25,24 @@ class ContextBuilderElement(Element):
         super().__init__(**params)
         self.model = ContextBuilderModel()
         
-        self.input_ports['message_input'] = self.message_input
-        self.output_ports['messages_output'] = self.messages_output
+        self._message_input_setup()
+        self.messages_output_setup()
 
-    def message_input(self, payload: MessagePayload):
-        context = self.model.add_message(payload.model)
-        self.messages_output(MessagePayload(message_batch=context))
+    def _message_input_setup(self):
+        def unpack(payload: MessagePayload):
+            self.model.add_message(payload.message)
+        self.ports.add_input(
+            name='message_input',
+            unpack_payload_callback=unpack
+        )
 
-    def messages_output(self, payload: MessagePayload):
-        self.trigger('messages_output', payload)
+    def _message_output_setup(self):
+        def pack(self):
+            return MessagePayload(message_batch=self.model.context)
+        self.ports.add_output(
+            name='messages_output',
+            
+        )
 
     @param.depends('model.context', watch=True)
     def view(self):

@@ -1,36 +1,75 @@
-import param
 from typing import List
+from collections import deque
 
+import param
+from langchain_core.messages import BaseMessage
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message.message_model import MessageModel
 from pyllments.common.tokenizers import get_token_len
 
 class ContextBuilderModel(Model):
-    max_tokens = param.Integer(default=4096, bounds=(1, None), doc="""
+
+    history_token_limit = param.Integer(default=4096, bounds=(1, None), doc="""
         The max amount of tokens to keep in the history""")
-    tokens = param.Integer(default=0, bounds=(0, None), doc="""
+    history = param.ClassSelector(class_=deque)
+    history_token_count = param.Integer(default=0, bounds=(0, None), doc="""
+        The amount of tokens in the history""")
+
+    context_tokens_limit = param.Integer(default=0, bounds=(0, None), doc="""
         The amount of tokens to keep in the context window""")
-    context = param.List(item_type=MessageModel, default=[])
+    context = param.ClassSelector(class_=deque)
+    context_token_count = param.Integer(default=0, bounds=(0, None), doc="""
+        The amount of tokens in the context window""")
+
     tokenizer_model = param.String(default="gpt-4o-mini")
-    new_message = param.ClassSelector(class_=MessageModel)
+    new_message = param.ClassSelector(class_=BaseMessage)
+    new_message_token_estimate = param.Integer(default=0, bounds=(0, None), doc="""
+        The estimated token length of the new message""")
 
     def __init__(self, **params):
         super().__init__(**params)
 
-    def add_message(self, message: MessageModel) -> List[MessageModel]:
-        self.context.append(message)
-        return self.get_context_within_token_limit()
+    @param.depends('new_message', watch=True)
+    def load_message(self) -> None:
+        self.new_message_token_estimate = (
+            self.new_message.response_metadata["context_estimate_token_len"]
+            )
+        self.update_history()
+        self.update_context()
 
-    def get_context_within_token_limit(self) -> List[MessageModel]:
-        total_tokens = 0
-        context_within_limit = []
+    def update_history(self) -> None:
+        while (
+            self.history_token_count + self.new_message_token_estimate >
+            self.history_token_limit
+        ):
+            popped_message_token_est = (
+                self.history.popleft()
+                .popped_message
+                .response_metadata["context_estimate_token_len"]
+                )
+            self.history_token_count -= popped_message_token_est
+        self.history.append(self.new_message)
+        self.history_token_count += self.new_message_token_estimate
+        if self.history_token_count > self.history_token_limit:
+            raise ValueError(
+                f"The token count - {self.history_token_count} - of an individual message exceeds the limit - {self.history_token_limit}."
+                )
 
-        for message in reversed(self.context):
-            message_tokens = len(self.tokenizer.encode(message.message.content))
-            if total_tokens + message_tokens > self.max_tokens:
-                break
-            total_tokens += message_tokens
-            context_within_limit.insert(0, message)
-
-        return context_within_limit
+    def update_context(self) -> None:
+        while (
+            self.context_token_count + self.new_message_token_estimate >
+            self.context_tokens_limit
+        ):
+            popped_message_token_est = (
+                self.context.popleft()
+                .popped_message
+                .response_metadata["context_estimate_token_len"]
+            )
+            self.context_token_count -= popped_message_token_est
+        self.context.append(self.new_message)
+        self.context_token_count += self.new_message_token_estimate
+        if self.context_token_count > self.context_tokens_limit:
+            raise ValueError(
+                f"The token count - {self.context_token_count} - of an individual message exceeds the limit - {self.context_tokens_limit}."
+            )
