@@ -26,10 +26,10 @@ class Element(Component):
         def decorator(func):
             def wrapper(self, *args, **kwargs):
                 func(self, *args, **kwargs)
-                if port_name in self.ports.input:
-                    self.ports.input[port_name].emit()
-                elif port_name in self.ports.output:
+                if port_name in self.ports.output:
                     self.ports.output[port_name].emit()
+                else:
+                    raise ValueError(f"Port {port_name} not found")
                 return
             return wrapper
         return decorator
@@ -38,16 +38,19 @@ class Element(Component):
     def port_stage_if_exists(port_name: str, model_param_name: str):
         """
         Used to decorate a watch method so that when it runs, it stages a
-        model parameter on a port if both are established
+        model parameter on a port if both are established.
+        model_param_name must match the name of the staged 
         """
         def decorator(func):
             def wrapper(self, *args, **kwargs):
                 func(self, *args, **kwargs)
                 if (model_param := getattr(self.model, model_param_name)):
-                    if port_name in self.ports.input:
-                        self.ports.input[port_name].stage(**{model_param_name: model_param})
-                    elif port_name in self.ports.output:
+                    if port_name in self.ports.output:
                         self.ports.output[port_name].stage(**{model_param_name: model_param})
+                    else:
+                        raise ValueError(f"Port {port_name} not found")
+                else:
+                    raise ValueError(f"Model parameter {model_param_name} not found")
                 return
             return wrapper
         return decorator
@@ -62,10 +65,12 @@ class Element(Component):
             def wrapper(self, *args, **kwargs):
                 func(self, *args, **kwargs)
                 if (model_param := getattr(self.model, model_param_name)):
-                    if port_name in self.ports.input:
-                        self.ports.input[port_name].stage(**{model_param_name: model_param})
-                    elif port_name in self.ports.output:
+                    if port_name in self.ports.output:
                         self.ports.output[port_name].stage_emit(**{model_param_name: model_param})
+                    else:
+                        raise ValueError(f"Port {port_name} not found")
+                else:
+                    raise ValueError(f"Model parameter {model_param_name} not found")
                 return
             return wrapper
         return decorator

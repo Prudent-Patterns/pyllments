@@ -158,7 +158,7 @@ class OutputPort(Port):
             #TODO Implement default callback based on the payload type
 
     def __gt__(self, other):
-        """Implements self.connect(other) through el1.some_input > el2.some_output"""
+        """Implements self.connect(other) through el1.some_output > el2.some_input"""
         self.connect(other)
 
     def _emit_ready_check(self):

@@ -1,3 +1,6 @@
+from collections import deque
+from typing import List
+
 import param
 import panel as pn
 
@@ -26,28 +29,33 @@ class ContextBuilderElement(Element):
         self.model = ContextBuilderModel()
         
         self._message_input_setup()
-        self.messages_output_setup()
+        self._messages_output_setup()
 
     def _message_input_setup(self):
-        def unpack(payload: MessagePayload):
-            self.model.add_message(payload.message)
+        def unpack(payload: List[MessagePayload]):
+            for message in payload:
+                self.model.add_message(message.message)
+
         self.ports.add_input(
             name='message_input',
             unpack_payload_callback=unpack
         )
 
     def _message_output_setup(self):
-        def pack(self):
-            return MessagePayload(message_batch=self.model.context)
+        def pack(self, context: deque):
+            payload = MessagePayload(context=context)
+            return payload
+        
         self.ports.add_output(
             name='messages_output',
-            
+            pack_payload_callback=pack
         )
 
     @param.depends('model.context', watch=True)
-    def view(self):
-        context_view = pn.Column(
-            pn.pane.Markdown("## Current Context"),
-            *[pn.pane.Markdown(msg.message.content) for msg in self.model.context]
-        )
-        return context_view
+    def create_context_view(self):
+        pass
+        # context_view = pn.Column(
+        #     pn.pane.Markdown("## Current Context"),
+        #     *[pn.pane.Markdown(msg.message.content) for msg in self.model.context]
+        # )
+        # return context_view

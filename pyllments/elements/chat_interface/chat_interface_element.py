@@ -2,7 +2,6 @@ import panel as pn
 import param
 
 from pyllments.base.element_base import Element
-from pyllments.base.model_base import Model
 from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
 from pyllments.payloads.message import MessagePayload
@@ -110,7 +109,7 @@ class ChatInterfaceElement(Element):
             return self.send_button_view
 
         self.send_button_view = pn.widgets.Button(
-            name='',
+            name=name,
             icon='send-2',
             stylesheets=[button_css],
             **kwargs)

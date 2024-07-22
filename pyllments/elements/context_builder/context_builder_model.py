@@ -18,7 +18,7 @@ class ContextBuilderModel(Model):
 
     context_tokens_limit = param.Integer(default=0, bounds=(0, None), doc="""
         The amount of tokens to keep in the context window""")
-    context = param.ClassSelector(class_=deque)
+    context = param.ClassSelector(class_=deque, default=deque(), instantiate=True)
     context_token_count = param.Integer(default=0, bounds=(0, None), doc="""
         The amount of tokens in the context window""")
 
@@ -30,13 +30,15 @@ class ContextBuilderModel(Model):
     def __init__(self, **params):
         super().__init__(**params)
 
+
     @param.depends('new_message', watch=True)
     def load_message(self) -> None:
         self.new_message_token_estimate = (
             self.new_message.response_metadata["context_estimate_token_len"]
-            )
+        )
         self.update_history()
         self.update_context()
+        self.param.trigger('context') 
 
     def update_history(self) -> None:
         while (
