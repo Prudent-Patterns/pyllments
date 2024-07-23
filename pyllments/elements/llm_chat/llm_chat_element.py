@@ -12,10 +12,14 @@ from pyllments.elements.llm_chat import LLMChatModel
 
 class LLMChatElement(Element):
   
-    def __init__(self, provider_name='openai', model_name='gpt-4o-mini', **params):
+    def __init__(
+            self, chat_model=None, provider_name='openai',
+            model_name='gpt-4o-mini', model_args={}, output_mode='stream', **params):
         super().__init__(**params)
-        self.model = LLMChatModel(provider_name=provider_name, model_name=model_name)
-
+        
+        self.model = LLMChatModel(
+            chat_model=chat_model, provider_name=provider_name, model_name=model_name,
+            model_args=model_args, output_mode=output_mode)
         self._message_output_setup()
         self._messages_input_setup()
 
