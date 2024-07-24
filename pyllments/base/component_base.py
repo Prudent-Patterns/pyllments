@@ -12,7 +12,7 @@ from pyllments.base.model_base import Model
 class Component(param.Parameterized):
     """Base class for all components(Elements and Payloads)"""
     model = param.ClassSelector(class_=Model)
-    css_cache = param.Dict(default={})
+    css_cache = param.Dict(default={}, doc="Cache for CSS files - Set on the Class Level")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -47,11 +47,9 @@ class LLMChatElement(Element):
         def unpack(payload: Union[List[MessagePayload], MessagePayload]):
             messages = []
             if isinstance(payload, list):
-                # Handle List[MessagePayload]
                 for msg_payload in payload:
                     messages.append(msg_payload.model.message)
             else:
-                # Handle single MessagePayload
                 messages = [payload.model.message]
 
             if self.model.output_mode == 'atomic':

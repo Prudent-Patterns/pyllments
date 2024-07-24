@@ -14,11 +14,11 @@ class MessageModel(Model):
     # Or with langchain Messages
     message_type = param.Selector(
         default=None, objects=['system', 'ai', 'human'],
-        doc="Useful for streams. Inferred when LangChain message is passed.")
+        doc="Useful to set for streams. Inferred when LangChain message is passed.")
     message = param.ClassSelector(
         class_=BaseMessage,
         default=BaseMessage(content='', type='placeholder'),
-        doc="""Used with atomic mode""")
+        doc="""Message to be populated""")
     mode = param.Selector(
         objects=['atomic', 'stream'],
         default='stream')
@@ -40,6 +40,9 @@ class MessageModel(Model):
     def __init__(self, **params):
         super().__init__(**params)
         self.id = str(uuid4())
+        
+        if self.message.type != 'placeholder':
+            self.message_type = self.message.type
 
     def stream(self):
         # TODO Needs async implementation
@@ -52,6 +55,10 @@ class MessageModel(Model):
         self.message.response_metadata = chunk.response_metadata
         self.message.id = chunk.id
         self.streamed = True
+        # Remove watchers that may have been using streamed
+        if (streamed_watchers := self.param.watchers.get('streamed')) is not None:
+            for watcher in streamed_watchers['value']:
+                self.param.unwatch(watcher)
 
     def get_token_len(self, model=None, push_stream=False):
         if model in self.tokenization_map:

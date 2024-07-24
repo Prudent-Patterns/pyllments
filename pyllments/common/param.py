@@ -26,11 +26,11 @@ class PayloadSelector(param.ClassSelector):
     def __init__(self, class_=None, **params):
         if class_ is not None:
             if not (issubclass(class_, Payload) or
-                    (get_origin(class_) is list and
-                     issubclass(get_args(class_)[0], Payload))):
+                    (get_origin(class_) in (list, Union) and
+                     all(issubclass(arg, Payload) for arg in get_args(class_)))):
                 raise ValueError(
                     "class_ must be a Payload subclass, "
-                    "List[PayloadSubclass], or None"
+                    "List[PayloadSubclass], Union[PayloadSubclass, ...], or None"
                 )
         super().__init__(class_=class_, **params)
 
@@ -68,17 +68,34 @@ class PayloadSelector(param.ClassSelector):
                     f"Expected a list of {get_args(self.class_)[0]}, "
                     f"got {type(val)}"
                 )
-            if not all(isinstance(item, get_args(self.class_)[0]) 
-                       for item in val):
+            item_type = get_args(self.class_)[0]
+            if not all(self._is_instance(item, item_type) for item in val):
                 raise ValueError(
                     f"All items in the list must be instances of "
-                    f"{get_args(self.class_)[0]}"
+                    f"{item_type}"
+                )
+        elif get_origin(self.class_) is Union:
+            if not any(self._is_instance(val, arg) for arg in get_args(self.class_)):
+                raise ValueError(
+                    f"Expected an instance of one of {get_args(self.class_)}, "
+                    f"got {type(val)}"
                 )
         else:
-            if not isinstance(val, self.class_):
+            if not self._is_instance(val, self.class_):
                 raise ValueError(
                     f"Expected an instance of {self.class_}, "
                     f"got {type(val)}"
                 )
 
         return val
+
+    def _is_instance(self, obj, class_or_tuple):
+        """
+        A custom implementation of isinstance that can handle generic types.
+        """
+        if get_origin(class_or_tuple) is Union:
+            return any(self._is_instance(obj, arg) for arg in get_args(class_or_tuple))
+        elif get_origin(class_or_tuple) is list:
+            return isinstance(obj, list) and all(self._is_instance(item, get_args(class_or_tuple)[0]) for item in obj)
+        else:
+            return isinstance(obj, class_or_tuple)

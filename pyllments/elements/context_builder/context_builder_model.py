@@ -8,13 +8,13 @@ from pyllments.payloads.message import MessagePayload
 
 class ContextBuilderModel(Model):
 
-    history_token_limit = param.Integer(default=4096, bounds=(1, None), doc="""
+    history_token_limit = param.Integer(default=32000, bounds=(1, None), doc="""
         The max amount of tokens to keep in the history""")
-    history = param.ClassSelector(class_=deque)
+    history = param.ClassSelector(class_=deque, default=deque())
     history_token_count = param.Integer(default=0, bounds=(0, None), doc="""
         The amount of tokens in the history""")
 
-    context_tokens_limit = param.Integer(default=0, bounds=(0, None), doc="""
+    context_tokens_limit = param.Integer(default=16000, bounds=(0, None), doc="""
         The amount of tokens to keep in the context window""")
     context = param.ClassSelector(class_=deque, default=deque(), instantiate=True)
     context_token_count = param.Integer(default=0, bounds=(0, None), doc="""
@@ -31,13 +31,17 @@ class ContextBuilderModel(Model):
     @param.depends('new_message', watch=True)
     def load_message(self) -> None:
         self.new_message_token_estimate = (
-            self.new_message.get_token_len(self.tokenizer_model)
+            self.new_message.model.get_token_len(self.tokenizer_model)
         )
         self.update_history()
         self.update_context()
         self.param.trigger('context') 
 
     def update_history(self) -> None:
+        if self.new_message_token_estimate > self.history_token_limit:
+            raise ValueError(
+                f"The token count ({self.new_message_token_estimate}) of the new message exceeds the history limit ({self.history_token_limit})."
+            )
         while (
             self.history_token_count + self.new_message_token_estimate >
             self.history_token_limit
@@ -46,16 +50,17 @@ class ContextBuilderModel(Model):
                 self.history.popleft()
                 .popped_message
                 .response_metadata["context_estimate_token_len"]
-                )
+            )
             self.history_token_count -= popped_message_token_est
+
         self.history.append(self.new_message)
         self.history_token_count += self.new_message_token_estimate
-        if self.history_token_count > self.history_token_limit:
-            raise ValueError(
-                f"The token count - {self.history_token_count} - of an individual message exceeds the limit - {self.history_token_limit}."
-                )
 
     def update_context(self) -> None:
+        if self.new_message_token_estimate > self.context_tokens_limit:
+            raise ValueError(
+                f"The token count ({self.new_message_token_estimate}) of the new message exceeds the context limit ({self.context_tokens_limit})."
+            )
         while (
             self.context_token_count + self.new_message_token_estimate >
             self.context_tokens_limit
@@ -66,9 +71,6 @@ class ContextBuilderModel(Model):
                 .response_metadata["context_estimate_token_len"]
             )
             self.context_token_count -= popped_message_token_est
+
         self.context.append(self.new_message)
         self.context_token_count += self.new_message_token_estimate
-        if self.context_token_count > self.context_tokens_limit:
-            raise ValueError(
-                f"The token count - {self.context_token_count} - of an individual message exceeds the limit - {self.context_tokens_limit}."
-            )

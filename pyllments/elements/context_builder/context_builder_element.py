@@ -20,11 +20,12 @@ class ContextBuilderElement(Element):
     - current context column
     Ports:
     - input:
-        - message_input: MessagePayload
+        - message_input: MessagePayload - Human and AI messages handled
     - output:
         - messages_output: List[MessagePayload]
     """
     context_view = param.ClassSelector(class_=pn.Column)
+    expect_ai_stream = param.Boolean(default=True)
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -35,7 +36,14 @@ class ContextBuilderElement(Element):
 
     def _message_input_setup(self):
         def unpack(payload: MessagePayload):
-            self.model.load_message(payload.model.message)
+            # Wait for stream to complete before adding to context
+            if self.expect_ai_stream and payload.model.message_type == 'ai':
+                def stream_callback(event):
+                    self.model.new_message = payload
+
+                payload.model.param.watch(stream_callback, 'streamed')
+            else:
+                self.model.new_message = payload
 
         self.ports.add_input(
             name='message_input',
@@ -67,12 +75,12 @@ class ContextBuilderElement(Element):
             return self.context_view
         self.context_view = pn.Column(
             pn.pane.Markdown("## Current Context"),
-            *[pn.pane.Markdown(msg.message.content) for msg in self.model.context]
+            *[pn.pane.Markdown(msg.model.message.content) for msg in self.model.context]
         )
-        def _update_chatfeed(self, event):
+        def _update_context_view(event):
             self.context_view.objects = [
-                pn.pane.Markdown(msg.message.content) for msg in self.model.context
+                pn.pane.Markdown(msg.model.message.content) for msg in self.model.context
             ]
-        self.model.param.watch(_update_chatfeed, 'context')
-        
+        self.model.param.watch(_update_context_view, 'context')
+
         return self.context_view

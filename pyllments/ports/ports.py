@@ -116,25 +116,33 @@ class OutputPort(Port):
         elif self.required_items:
             self.required_items = {item: {'value': None, 'type': None} for item in self.required_items}
 
-    def connect(self, other: InputPort):
-        """Connects self and the other InputPort"""
-        if not isinstance(other, InputPort):
+    def connect(self, other: Union[InputPort, tuple[InputPort]]):
+        """Connects self and the other InputPort(s)"""
+        
+        # Ensure 'other' is a single InputPort or a tuple of InputPorts
+        if isinstance(other, tuple):
+            ports_to_connect = other
+        elif isinstance(other, InputPort):
+            ports_to_connect = (other,)
+        else:
             raise ValueError(f"Can only connect OutputPorts to InputPorts. "
                              f"Attempted to connect '{self.name}' ({type(self).__name__}) "
                              f"to '{other.name}' ({type(other).__name__})")
-        
-        # Check payload compatibility
-        if not self._check_payload_compatibility(other):
-            raise ValueError(f"""InputPort and OutputPort payload types are not compatible:
-                OutputPort '{self.name}' in element '{self._containing_element.__class__.__name__}' 
-                with payload type {self.param.payload.class_}
-                InputPort '{other.name}' in element '{other._containing_element.__class__.__name__}' 
-                with payload type {other.param.payload.class_}""")
-        
-        self.input_ports.append(other)
-        self.connected_elements.append(other._containing_element)
-        other.connected_elements.append(self._containing_element)
-        other.output_ports.append(self)
+
+        # Connect each InputPort in the tuple
+        for port in ports_to_connect:
+            # Check payload compatibility
+            if not self._check_payload_compatibility(port):
+                raise ValueError(f"""InputPort and OutputPort payload types are not compatible:
+                    OutputPort '{self.name}' in element '{self._containing_element.__class__.__name__}' 
+                    with payload type {self.param.payload.class_}
+                    InputPort '{port.name}' in element '{port._containing_element.__class__.__name__}' 
+                    with payload type {port.param.payload.class_}""")
+            
+            self.input_ports.append(port)
+            self.connected_elements.append(port._containing_element)
+            port.connected_elements.append(self._containing_element)
+            port.output_ports.append(self)
 
     
     def _check_payload_compatibility(self, other: InputPort) -> bool:
@@ -153,19 +161,22 @@ class OutputPort(Port):
             if get_origin(output_type) is List and get_origin(input_type) is List:
                 return is_compatible(get_args(output_type)[0], get_args(input_type)[0])
             
-            # Handle case where output is List but input accepts single or List
-            if get_origin(output_type) is List:
-                if get_origin(input_type) is List:
-                    return is_compatible(get_args(output_type)[0], get_args(input_type)[0])
-                else:
-                    return is_compatible(get_args(output_type)[0], input_type)
-            
-            # Handle case where input is List but output is single
+            # Handle case where output is single but input accepts List
             if get_origin(input_type) is List:
                 return is_compatible(output_type, get_args(input_type)[0])
             
-            # Check for subclass relationship for Payload types
-            return issubclass(output_type, input_type)
+            # Handle case where input is Union[List[T], T]
+            if get_origin(input_type) is Union:
+                return any(is_compatible(output_type, t) for t in get_args(input_type))
+            
+            # Check for subclass relationship for non-generic types
+            if not (get_origin(output_type) or get_origin(input_type)):
+                return issubclass(output_type, input_type)
+            
+            # For generic types, check if their origins are compatible
+            output_origin = get_origin(output_type) or output_type
+            input_origin = get_origin(input_type) or input_type
+            return issubclass(output_origin, input_origin)
 
         output_type = self.param.payload.class_
         input_type = other.param.payload.class_
