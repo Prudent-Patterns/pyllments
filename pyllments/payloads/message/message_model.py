@@ -15,23 +15,27 @@ class MessageModel(Model):
     message_type = param.Selector(
         default=None, objects=['system', 'ai', 'human'],
         doc="Useful for streams. Inferred when LangChain message is passed.")
-    # message_text = param.String(doc="""
-    #     Used with atomic mode""")
     message = param.ClassSelector(
         class_=BaseMessage,
         default=BaseMessage(content='', type='placeholder'),
         doc="""Used with atomic mode""")
-    mode = param.Selector( # TODO: Remove batch
-        objects=['atomic', 'stream', 'batch'],
+    mode = param.Selector(
+        objects=['atomic', 'stream'],
         default='stream')
     message_stream = param.ClassSelector(class_=(Generator, AsyncGenerator), doc="""
         Used with stream mode, assumes AI message created from stream""")
-    message_batch = param.List(default=None, item_type=BaseMessage, doc="""
-        Used with batch mode, consists of BaseMessages from LangChain""")
+    streamed = param.Boolean(default=False, doc="""
+        Used to identify if the message has been streamed""")
     id = param.String(doc="""
         Used to identify message""")
     is_multimodal = param.Boolean(doc="""
         Used to identify if the message(s) is multimodal""")
+    estimated_token_len = param.Integer(doc="""
+        Used to estimate the token length of the message(s)""")
+    tokenizer_model = param.String(default='gpt-4o-mini',doc="""
+        Used to estimate the token length of the message(s)""")
+    tokenization_map = param.Dict(default={},doc="""
+        Used to map the model tokenizer to the token len""")
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -47,12 +51,23 @@ class MessageModel(Model):
             self.param.trigger('message')
         self.message.response_metadata = chunk.response_metadata
         self.message.id = chunk.id
+        self.streamed = True
 
-    def get_token_len(self, model=None):
+    def get_token_len(self, model=None, push_stream=False):
+        if model in self.tokenization_map:
+            return self.tokenization_map[model]
         match self.mode:
             case 'atomic':
-                return get_token_len(self.message.content, model)
-            case 'batch':
-                return sum(get_token_len(msg.content, model) for msg in self.message_batch)
+                token_length = get_token_len(self.message.content, model)
+            case 'stream':
+                if push_stream:
+                    self.stream() 
+                if self.streamed:
+                    token_length = get_token_len(self.message.content, model)
+                else:
+                    raise ValueError("Message has not been streamed")
             case _:
-                raise ValueError("Invalid mode: must be 'atomic' or 'batch'")
+                raise ValueError("Invalid mode: must be 'atomic' or 'stream'")
+        
+        self.tokenization_map[model] = token_length
+        return token_length

@@ -2,11 +2,9 @@ from typing import List
 from collections import deque
 
 import param
-from langchain_core.messages import BaseMessage
 
 from pyllments.base.model_base import Model
-from pyllments.payloads.message.message_model import MessageModel
-from pyllments.common.tokenizers import get_token_len
+from pyllments.payloads.message import MessagePayload
 
 class ContextBuilderModel(Model):
 
@@ -23,18 +21,17 @@ class ContextBuilderModel(Model):
         The amount of tokens in the context window""")
 
     tokenizer_model = param.String(default="gpt-4o-mini")
-    new_message = param.ClassSelector(class_=BaseMessage)
+    new_message = param.ClassSelector(class_=MessagePayload)
     new_message_token_estimate = param.Integer(default=0, bounds=(0, None), doc="""
         The estimated token length of the new message""")
 
     def __init__(self, **params):
         super().__init__(**params)
 
-
     @param.depends('new_message', watch=True)
     def load_message(self) -> None:
         self.new_message_token_estimate = (
-            self.new_message.response_metadata["context_estimate_token_len"]
+            self.new_message.get_token_len(self.tokenizer_model)
         )
         self.update_history()
         self.update_context()

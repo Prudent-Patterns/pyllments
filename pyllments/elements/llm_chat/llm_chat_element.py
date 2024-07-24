@@ -1,22 +1,21 @@
 from typing import AsyncGenerator, Generator
+from typing import List, Union
 
-import param
 import panel as pn
 from langchain_core.messages import AIMessage
 
 from pyllments.base.element_base import Element
-from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.llm_chat import LLMChatModel
 
 
 class LLMChatElement(Element):
-  
+    """Responsible for using LLMs to respond to messages and sets of messages"""
     def __init__(
             self, chat_model=None, provider_name='openai',
             model_name='gpt-4o-mini', model_args={}, output_mode='stream', **params):
         super().__init__(**params)
-        
+
         self.model = LLMChatModel(
             chat_model=chat_model, provider_name=provider_name, model_name=model_name,
             model_args=model_args, output_mode=output_mode)
@@ -45,25 +44,21 @@ class LLMChatElement(Element):
         self.ports.add_output(name='message_output', pack_payload_callback=pack)
 
     def _messages_input_setup(self):
-        def unpack(payload: MessagePayload):
-            if payload.model.mode == 'atomic':
-                if self.model.output_mode == 'atomic':
-                    self.model.outgoing_message = self.model.chat_model.invoke(
-                        [payload.model.message]
-                    )
-                elif self.model.output_mode == 'stream':
-                    self.model.outgoing_message = self.model.chat_model.stream(
-                        [payload.model.message]
-                    )
-            elif payload.model.mode == 'batch':
-                if self.model.output_mode == 'atomic':
-                    self.model.outgoing_message = self.model.chat_model.invoke(
-                        payload.model.messages_batch
-                    )
-                elif self.model.output_mode == 'stream':
-                    self.model.outgoing_message = self.model.chat_model.stream(
-                        payload.model.messages_batch
-                    )
+        def unpack(payload: Union[List[MessagePayload], MessagePayload]):
+            messages = []
+            if isinstance(payload, list):
+                # Handle List[MessagePayload]
+                for msg_payload in payload:
+                    messages.append(msg_payload.model.message)
+            else:
+                # Handle single MessagePayload
+                messages = [payload.model.message]
+
+            if self.model.output_mode == 'atomic':
+                self.model.outgoing_message = self.model.chat_model.invoke(messages)
+            elif self.model.output_mode == 'stream':
+                self.model.outgoing_message = self.model.chat_model.stream(messages)
+
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
     def _create_watchers(self):

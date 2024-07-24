@@ -18,7 +18,6 @@ class MessagePayload(Payload):
             message: BaseMessage = BaseMessage(content='', type='placeholder'),
             mode: Literal['stream', 'atomic', 'batch'] = 'stream',
             message_stream: Optional[Generator | AsyncGenerator] = None,
-            message_batch: Optional[list[BaseMessage]] = None,
             is_multimodal: bool = False,
             **params):
         super().__init__(**params)
@@ -27,7 +26,8 @@ class MessagePayload(Payload):
             message_type=message_type,
             message=message,
             message_stream=message_stream,
-            mode=mode)
+            mode=mode,
+            is_multimodal=is_multimodal)
 
     @Component.view
     def create_message_view(
