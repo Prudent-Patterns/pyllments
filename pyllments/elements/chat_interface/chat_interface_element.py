@@ -117,7 +117,7 @@ class ChatInterfaceElement(Element):
 
         return self.send_button_view
     
-    @Element.port_stage_emit_if_exists('message_output', 'new_message')
+    @Element.port_stage_emit('message_output', 'new_message')
     def _on_send(self, event):
         """
         Handles the send button event by appending the user's message to the chat model,

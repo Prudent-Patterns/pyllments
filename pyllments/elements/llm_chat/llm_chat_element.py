@@ -28,7 +28,7 @@ class LLMChatElement(Element):
         if self.model.output_mode == 'stream':
             def pack(outgoing_message: AsyncGenerator | Generator) -> MessagePayload:
                 payload = MessagePayload(
-                    message_type='ai',
+                    role='ai',
                     message_stream=outgoing_message,
                     mode='stream'
                 )
@@ -62,6 +62,6 @@ class LLMChatElement(Element):
     def _create_watchers(self):
         self.model.param.watch(self._outgoing_message_updated, 'outgoing_message')
     
-    @Element.port_stage_emit_if_exists('message_output', 'outgoing_message')
+    @Element.port_stage_emit('message_output', 'outgoing_message')
     def _outgoing_message_updated(self, event):
         pass

@@ -16,7 +16,9 @@ class ChatInterfaceModel(Model):
         self._create_watchers()
 
     def _create_watchers(self):
-        self.param.watch(self._new_message_updated, 'new_message', precedence=10)
+        self.param.watch(
+            self._new_message_updated, 'new_message', precedence=10
+            )
 
     def _new_message_updated(self, event):
         if self.new_message.model.mode == 'stream':

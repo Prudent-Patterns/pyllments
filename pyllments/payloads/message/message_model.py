@@ -10,9 +10,9 @@ from pyllments.common.tokenizers import get_token_len
 
 
 class MessageModel(Model):
-    # TODO: Finalize if atomic mode should be with message_type and message_text
+    # TODO: Finalize if atomic mode should be with role and message_text
     # Or with langchain Messages
-    message_type = param.Selector(
+    role = param.Selector(
         default=None, objects=['system', 'ai', 'human'],
         doc="Useful to set for streams. Inferred when LangChain message is passed.")
     message = param.ClassSelector(
@@ -42,7 +42,7 @@ class MessageModel(Model):
         self.id = str(uuid4())
         
         if self.message.type != 'placeholder':
-            self.message_type = self.message.type
+            self.role = self.message.type
 
     def stream(self):
         # TODO Needs async implementation

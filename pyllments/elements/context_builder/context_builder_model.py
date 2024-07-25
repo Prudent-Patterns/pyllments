@@ -35,7 +35,7 @@ class ContextBuilderModel(Model):
         )
         self.update_history()
         self.update_context()
-        self.param.trigger('context') 
+        self.param.trigger('context')
 
     def update_history(self) -> None:
         if self.new_message_token_estimate > self.history_token_limit:

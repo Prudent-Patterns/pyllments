@@ -14,7 +14,7 @@ class MessagePayload(Payload):
     
     def __init__(
             self,
-            message_type: Literal['human', 'system', 'ai'] = 'human',
+            role: Literal['human', 'system', 'ai'] = 'human',
             message: BaseMessage = BaseMessage(content='', type='placeholder'),
             mode: Literal['stream', 'atomic', 'batch'] = 'stream',
             message_stream: Optional[Generator | AsyncGenerator] = None,
@@ -23,7 +23,7 @@ class MessagePayload(Payload):
         super().__init__(**params)
         # self.model = self.model.class_(
         self.model = MessageModel(
-            message_type=message_type,
+            role=role,
             message=message,
             message_stream=message_stream,
             mode=mode,
@@ -39,7 +39,7 @@ class MessagePayload(Payload):
         """Creates a message container"""
         # FUTURE: Split into individual methods for each message type
         # and use this method to call them to avoid premature CSS imports
-        match self.model.message_type:
+        match self.model.role:
             case 'human':
                 markdown_css = human_markdown_css
                 row_css = human_row_css

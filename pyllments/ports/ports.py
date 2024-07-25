@@ -1,25 +1,22 @@
 from typing import TYPE_CHECKING, Union, List, Dict, get_origin, get_args
 import inspect
-import warnings
 
 import param
+from loguru import logger
 
+from pyllments.logging import log_staging, log_emit, log_receive
 from pyllments.common.param import PayloadSelector
 
 
 class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
-
-    name = param.String(doc="The name of the port")
+    # Name is set by the containing element
     payload = PayloadSelector(allow_None=True)
-    containing_element = param.Parameter(default=None, precedence=-1)
     connected_elements = param.List()
 
-    def __init__(self, name, **params):
-        super().__init__(name=name, **params)
-        # Set as attribute and clear parameter to avoid circular param __repl__
-        self._containing_element = self.containing_element
-        self.containing_element = None
+    def __init__(self, containing_element=None,**params):
+        super().__init__(**params)
+        self.containing_element = containing_element
 
 
 class InputPort(Port):
@@ -51,7 +48,10 @@ class InputPort(Port):
         self.payload = payload  # This will use the _validate method of PayloadSelector
         if not self.unpack_payload_callback:
             raise ValueError(f"unpack_payload_callback must be set for port '{self.name}'")
+        
+        log_receive(self.containing_element, self.name, payload)
         self.unpack_payload_callback(payload)
+
 
 
 class OutputPort(Port):
@@ -134,14 +134,14 @@ class OutputPort(Port):
             # Check payload compatibility
             if not self._check_payload_compatibility(port):
                 raise ValueError(f"""InputPort and OutputPort payload types are not compatible:
-                    OutputPort '{self.name}' in element '{self._containing_element.__class__.__name__}' 
+                    OutputPort '{self.name}' in element '{self.containing_element.__class__.__name__}' 
                     with payload type {self.param.payload.class_}
-                    InputPort '{port.name}' in element '{port._containing_element.__class__.__name__}' 
+                    InputPort '{port.name}' in element '{port.containing_element.__class__.__name__}' 
                     with payload type {port.param.payload.class_}""")
             
             self.input_ports.append(port)
-            self.connected_elements.append(port._containing_element)
-            port.connected_elements.append(self._containing_element)
+            self.connected_elements.append(port.containing_element)
+            port.connected_elements.append(self.containing_element)
             port.output_ports.append(self)
 
     
@@ -197,8 +197,10 @@ class OutputPort(Port):
                     raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
                                      f"is not an instance of {expected_type}")
             self.required_items[name]['value'] = value
-            self.staged_items.append(name)
-        
+            
+            # Log each individual staged item
+            log_staging(self.containing_element, self.name, name, value)
+
         if self._emit_ready_check():
             self.emit_ready = True
         
@@ -212,9 +214,14 @@ class OutputPort(Port):
         else:
             packed_payload = self.pack_payload()
             self.payload = packed_payload  # This will use the _validate method of PayloadSelector
+        
+        # Log the element name, port name, and type of payload being emitted
+        log_emit(self.containing_element, self.name, self.payload)
         for port in self.input_ports:
             port.receive(self.payload)
         
+
+
         # Reset emit_ready and staged_items after emission
         self.emit_ready = False
         self.staged_items = []
@@ -266,19 +273,18 @@ class Ports(param.Parameterized):
     """Keeps track of InputPorts and OutputPorts and handles their creation"""
     input = param.Dict(default={}, doc="Dictionary to store input ports")
     output = param.Dict(default={}, doc="Dictionary to store output ports")
-    containing_element = param.Parameter(precedence=-1)
+    # containing_element = param.Parameter(precedence=-1)
 
-    def __init__(self, **params):
+    def __init__(self, containing_element=None,**params):
         super().__init__(**params)
-        self._containing_element = self.containing_element
-        self.containing_element = None
+        self.containing_element = containing_element
 
     def add_input(self, name, **kwargs):
-        input_port = InputPort(name=name, containing_element=self._containing_element, **kwargs)
+        input_port = InputPort(name=name, containing_element=self.containing_element, **kwargs)
         self.input[name] = input_port
         return input_port
     
     def add_output(self, name, **kwargs):
-        output_port = OutputPort(name=name, containing_element=self._containing_element, **kwargs)
+        output_port = OutputPort(name=name, containing_element=self.containing_element, **kwargs)
         self.output[name] = output_port
         return output_port

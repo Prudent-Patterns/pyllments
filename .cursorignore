@@ -1,3 +1,4 @@
+# Start of Selection
 # Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
 __pycache__
 .env
@@ -6,3 +7,7 @@ LICENSE
 projects
 examples/
 .ignore*
+# Log files to ignore
+*.log
+logs/
+# End of Selection

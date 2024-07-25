@@ -17,8 +17,9 @@ class Element(Component):
         self.ports = Ports(containing_element=self)
     
     
+    
     @staticmethod
-    def port_emit_if_exists(port_name: str):
+    def port_emit(port_name: str):
         """
         Used to decorate a watch method so that when it runs, it emits
         the port labelled with the port_name if the port is established. 
@@ -35,7 +36,7 @@ class Element(Component):
         return decorator
 
     @staticmethod
-    def port_stage_if_exists(port_name: str, model_param_name: str):
+    def port_stage(port_name: str, model_param_name: str):
         """
         Used to decorate a watch method so that when it runs, it stages a
         model parameter on a port if both are established.
@@ -56,7 +57,7 @@ class Element(Component):
         return decorator
     
     @staticmethod
-    def port_stage_emit_if_exists(port_name: str, model_param_name: str):
+    def port_stage_emit(port_name: str, model_param_name: str):
         """
         Used to decorate a watch method and emit the port labelled with the
         port_name if the port is established. 
