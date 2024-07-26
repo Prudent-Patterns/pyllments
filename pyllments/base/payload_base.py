@@ -2,13 +2,22 @@ from functools import wraps
 from inspect import signature
 from pathlib import Path
 import warnings
+import re
 
 import param
 
 from pyllments.base.component_base import Component
 
 class Payload(Component):
-    element_view_map = param.Dict(default={})
+    element_view_map = param.Dict(
+        default={'default': {}}, per_instance=False, instantiate=True, doc="""
+        A dictionary that stores the views for each element in the payload.
+        The keys are the elements, and the values are dictionaries with the
+        CSS for each individual Panel pane or widget defined in the Payload's
+        create_*_view methods.
+        Default key holds the default view and CSS when no element is passed.
+        """
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,27 +57,37 @@ class Payload(Component):
                 if param.endswith('_css')
             ]
             
-            if element is not None:
-                if element not in cls.element_view_map:
-                    cls.element_view_map[element] = {}
-
             for key in css_kwargs:
+                if key not in self.element_view_map['default']:
+                    payload_css = self._load_css(key[:-4], self._get_module_path())
+                    self.element_view_map['default'][key] = payload_css
+
                 if key not in kwargs or not kwargs[key]:
-                    payload_css = cls._load_css(key[:-4], self._get_module_path())
-                    
                     if element is not None:
-                        element_css = cls._load_css(
-                            f"{cls.__name__.lower()}_{key[:-4]}", 
+                        if element not in self.element_view_map:
+                            self.element_view_map[element] = {}
+                        
+                        element_css = self._load_css(
+                            f"{self.__class__.__name__.lower()}_{key[:-4]}", 
                             element._get_module_path()
                         )
-                        kwargs[key] = [payload_css, element_css]
-                        cls.element_view_map[element][key] = kwargs[key]
+                        self.element_view_map[element][key] = element_css
+                        kwargs[key] = [self.element_view_map['default'][key], element_css]
                     else:
-                        kwargs[key] = [payload_css]
+                        kwargs[key] = [self.element_view_map['default'][key]]
 
             # Remove 'element' from kwargs to avoid passing it twice
             kwargs.pop('element', None)
-            return func(self, *args, **kwargs)
+            
+            # Call the original function and get the view
+            view = func(self, *args, **kwargs)
+            
+            # Store the view in the element_view_map
+            if element is not None:
+                view_name = re.search(r'create_(.+)_view', func.__name__).group(1)
+                self.element_view_map[element]['view'] = view
+            
+            return view
         return wrapper
 
     @staticmethod
@@ -82,4 +101,4 @@ class Payload(Component):
             warnings.warn(f"CSS file not found: {css_path}")
         except Exception as e:
             warnings.warn(f"Error loading CSS: {str(e)}")
-        return ''
+        return ''   

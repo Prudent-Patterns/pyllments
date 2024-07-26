@@ -10,7 +10,7 @@ from pyllments.payloads.message.message_model import MessageModel
 
 class MessagePayload(Payload):
     model = param.ClassSelector(class_=MessageModel)
-    message_view = param.ClassSelector(class_=pn.Row)
+    # message_view = param.ClassSelector(class_=pn.Row)
     
     def __init__(
             self,
@@ -50,7 +50,9 @@ class MessagePayload(Payload):
         markdown = pn.pane.Markdown(
             self.model.message.content,
             stylesheets=markdown_css)
-        self.message_view = pn.Row(markdown, stylesheets=row_css)
+        # TODO remove the view parameter, as it's kept in the map
+        # And should be handled by the element after it's created
+        # self.message_view = pn.Row(markdown, stylesheets=row_css)
         self.model.param.watch(self._update_message_view, 'message')
         return self.message_view
     
