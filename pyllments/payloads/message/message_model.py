@@ -39,7 +39,7 @@ class MessageModel(Model):
 
     def __init__(self, **params):
         super().__init__(**params)
-        self.id = str(uuid4())
+        # self.id = str(uuid4()) # TODO: Why? Remove if no udk
         
         if self.message.type != 'placeholder':
             self.role = self.message.type

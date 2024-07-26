@@ -29,13 +29,14 @@ class MessagePayload(Payload):
             mode=mode,
             is_multimodal=is_multimodal)
 
-    @Component.view
+    @Payload.view
     def create_message_view(
         self,
-        human_markdown_css: str = '',
-        human_row_css: str = '',
-        ai_markdown_css: str = '',
-        ai_row_css: str = '') -> pn.Row:
+        human_markdown_css: list = [],
+        human_row_css: list = [],
+        ai_markdown_css: list = [],
+        ai_row_css: list = []
+        ) -> pn.Row:
         """Creates a message container"""
         # FUTURE: Split into individual methods for each message type
         # and use this method to call them to avoid premature CSS imports
@@ -48,8 +49,8 @@ class MessagePayload(Payload):
                 row_css = ai_row_css
         markdown = pn.pane.Markdown(
             self.model.message.content,
-            stylesheets=[markdown_css])
-        self.message_view = pn.Row(markdown, stylesheets=[row_css])
+            stylesheets=markdown_css)
+        self.message_view = pn.Row(markdown, stylesheets=row_css)
         self.model.param.watch(self._update_message_view, 'message')
         return self.message_view
     
