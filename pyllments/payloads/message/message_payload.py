@@ -10,7 +10,6 @@ from pyllments.payloads.message.message_model import MessageModel
 
 class MessagePayload(Payload):
     model = param.ClassSelector(class_=MessageModel)
-    # message_view = param.ClassSelector(class_=pn.Row)
     
     def __init__(
             self,
@@ -21,7 +20,6 @@ class MessagePayload(Payload):
             is_multimodal: bool = False,
             **params):
         super().__init__(**params)
-        # self.model = self.model.class_(
         self.model = MessageModel(
             role=role,
             message=message,
@@ -38,8 +36,6 @@ class MessagePayload(Payload):
         ai_row_css: list = []
         ) -> pn.Row:
         """Creates a message container"""
-        # FUTURE: Split into individual methods for each message type
-        # and use this method to call them to avoid premature CSS imports
         match self.model.role:
             case 'human':
                 markdown_css = human_markdown_css
@@ -50,13 +46,8 @@ class MessagePayload(Payload):
         markdown = pn.pane.Markdown(
             self.model.message.content,
             stylesheets=markdown_css)
-        # TODO remove the view parameter, as it's kept in the map
-        # And should be handled by the element after it's created
-        # self.message_view = pn.Row(markdown, stylesheets=row_css)
-        self.model.param.watch(self._update_message_view, 'message')
-        return self.message_view
-    
-    def _update_message_view(self, event):
-        # Changes the text of the markdown object directly within the message
-        self.message_view[0].object = self.model.message.content
-        
+        def _update_message_view(event):
+            view[0].object = self.model.message.content
+        self.model.param.watch(_update_message_view, 'message')
+        view = pn.Row(markdown, stylesheets=row_css)
+        return view

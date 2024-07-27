@@ -55,7 +55,7 @@ class ChatInterfaceElement(Element):
             name='message_input',
             unpack_payload_callback=unpack)
 
-    @Component.view
+    @Element.view
     def create_chatfeed_view(self, column_css: str = '', **kwargs):
         """
         Creates and returns a new instance of the chatfeed which
@@ -79,7 +79,7 @@ class ChatInterfaceElement(Element):
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
 
-    @Component.view
+    @Element.view
     def create_chat_input_view(self, input_css: str = '', **kwargs):
         """
         Creates and returns a new instance of ChatAreaInput view.
@@ -96,7 +96,7 @@ class ChatInterfaceElement(Element):
         self.chat_input_view.param.watch(self._on_send, 'value')
         return self.chat_input_view
     
-    @Component.view
+    @Element.view
     def create_send_button_view(
             self,
             button_css: str = '', 
