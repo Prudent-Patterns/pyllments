@@ -27,7 +27,7 @@ class MessagePayload(Payload):
             mode=mode,
             is_multimodal=is_multimodal)
 
-    @Payload.view
+    @Component.view
     def create_message_view(
         self,
         human_markdown_css: list = [],

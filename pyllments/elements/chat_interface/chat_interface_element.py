@@ -55,8 +55,8 @@ class ChatInterfaceElement(Element):
             name='message_input',
             unpack_payload_callback=unpack)
 
-    @Element.view
-    def create_chatfeed_view(self, column_css: str = '', **kwargs):
+    @Component.view
+    def create_chatfeed_view(self, column_css: list = [], **kwargs):
         """
         Creates and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
@@ -65,7 +65,7 @@ class ChatInterfaceElement(Element):
             return self.chatfeed_view
         # When first loaded
         self.chatfeed_view = pn.Column(
-            stylesheets=[column_css],
+            stylesheets=column_css,
             **kwargs)
         message_views = [
             message.create_message_view() 
@@ -79,8 +79,8 @@ class ChatInterfaceElement(Element):
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
 
-    @Element.view
-    def create_chat_input_view(self, input_css: str = '', **kwargs):
+    @Component.view
+    def create_chat_input_view(self, input_css: list = [], **kwargs):
         """
         Creates and returns a new instance of ChatAreaInput view.
         """
@@ -91,15 +91,15 @@ class ChatInterfaceElement(Element):
             placeholder='Enter your message',
             rows=3,
             auto_grow=True,
-            stylesheets=[input_css],
+            stylesheets=input_css,
             **kwargs)
         self.chat_input_view.param.watch(self._on_send, 'value')
         return self.chat_input_view
     
-    @Element.view
+    @Component.view
     def create_send_button_view(
             self,
-            button_css: str = '', 
+            button_css: list = [], 
             name: str = 'Send',
             **kwargs):
         """
@@ -111,7 +111,7 @@ class ChatInterfaceElement(Element):
         self.send_button_view = pn.widgets.Button(
             name=name,
             icon='send-2',
-            stylesheets=[button_css],
+            stylesheets=button_css,
             **kwargs)
         self.send_button_view.on_click(self._on_send)
 
