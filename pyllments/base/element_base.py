@@ -106,35 +106,37 @@ class Element(Component):
         sig = inspect.signature(create_view_method)
         css_kwargs = [param for param in sig.parameters if param.endswith('_css')]
 
-        # Initialize payload_css_cache on the instance level
-        if not hasattr(self, 'payload_css_cache'):
-            self.payload_css_cache = {}
-
         cache_key = name or 'default'
         if cache_key not in self.payload_css_cache:
             self.payload_css_cache[cache_key] = {}
 
+        # Extract view name from the method name
+        view_name = create_view_method.__name__.split('create_')[1]
+        if view_name not in self.payload_css_cache[cache_key]:
+            self.payload_css_cache[cache_key][view_name] = {}
+
         for key in css_kwargs:
-            css_name = key[:-4]  # Remove '_css' from the end
-            if css_name not in self.payload_css_cache[cache_key]:
+            if key not in self.payload_css_cache[cache_key][view_name]:
                 module_path = type(self)._get_module_path()
-                css_filename = f"payload_{name+'_' if name else ''}{css_name}.css"
+                css_filename = f"payload_{name+'_' if name else ''}{key[:-4]}.css"
                 css_path = Path(module_path, 'css', css_filename)
                 try:
                     with open(css_path, 'r') as f:
-                        self.payload_css_cache[cache_key][css_name] = [f.read()]
+                        self.payload_css_cache[cache_key][view_name][key] = f.read()
                 except FileNotFoundError:
                     logger.warning(f"CSS file not found: {css_path}")
-                    self.payload_css_cache[cache_key][css_name] = ['']
+                    self.payload_css_cache[cache_key][view_name][key] = ''
                 except Exception as e:
                     logger.warning(f"Error loading CSS: {str(e)}")
-                    self.payload_css_cache[cache_key][css_name] = ['']
+                    self.payload_css_cache[cache_key][view_name][key] = ''
 
         # Prepare the kwargs with the loaded CSS
         for key in css_kwargs:
-            if key not in kwargs or not kwargs[key]:
-                css_name = key[:-4]
-                kwargs[key] = self.payload_css_cache[cache_key][css_name]
+            existing_css = kwargs.get(key, [])
+            if not isinstance(existing_css, list):
+                existing_css = [existing_css]
+            cached_css = self.payload_css_cache[cache_key][view_name][key]
+            kwargs[key] = existing_css + [cached_css] if cached_css else existing_css
 
         # Call the create_view_method and return the view
         return create_view_method(**kwargs)

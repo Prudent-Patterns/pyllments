@@ -68,13 +68,19 @@ class ChatInterfaceElement(Element):
             stylesheets=column_css,
             **kwargs)
         message_views = [
-            message.create_message_view() 
+            self.inject_payload_css(
+                message.create_message_view
+                ) 
             for message in self.model.message_list
         ]
         self.chatfeed_view.extend(message_views)
 
         def _update_chatfeed(event):
-            self.chatfeed_view.append(event.new.create_message_view())
+            self.chatfeed_view.append(
+                self.inject_payload_css(
+                    event.new.create_message_view
+                )
+            )
         # This watcher should be called before the payload starts streaming.
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
