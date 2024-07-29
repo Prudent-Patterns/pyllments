@@ -132,11 +132,14 @@ class Element(Component):
 
         # Prepare the kwargs with the loaded CSS
         for key in css_kwargs:
-            existing_css = kwargs.get(key, [])
-            if not isinstance(existing_css, list):
-                existing_css = [existing_css]
             cached_css = self.payload_css_cache[cache_key][view_name][key]
-            kwargs[key] = existing_css + [cached_css] if cached_css else existing_css
+            if key in kwargs:
+                # If CSS kwarg is explicitly provided
+                existing_css = kwargs[key] if isinstance(kwargs[key], list) else [kwargs[key]]
+                kwargs[key] = [cached_css] + existing_css if cached_css else existing_css
+            else:
+                # If CSS kwarg is not provided, use only the cached CSS
+                kwargs[key] = [cached_css] if cached_css else []
 
         # Call the create_view_method and return the view
         return create_view_method(**kwargs)

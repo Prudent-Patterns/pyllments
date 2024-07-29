@@ -49,6 +49,7 @@ class Component(param.Parameterized):
         if not isinstance(other, Component):
             return NotImplemented
         return self.id == other.id
+
     @classmethod
     def view(cls, func):
         """Load CSS from the function signature, cache it, and cache the view."""
@@ -72,17 +73,20 @@ class Component(param.Parameterized):
 
             for key in css_kwargs:
                 # Extract the CSS name by removing the '_css' suffix
-                # Example: 'button_css' becomes 'button'
-                css_name = key[:-4]  
+                # Example: 'button_css' becomes '{view_name}_button'
+                css_name = key[:-4]
+                # Create the new CSS filename structure
+                css_filename = f"{view_name}_{css_name}.css"
+                
                 if css_name not in self.css_cache[view_name]:
                     module_path = self._get_module_path()
-                    css_filename = Path(module_path, 'css', f'{css_name}.css')
+                    css_file_path = Path(module_path, 'css', css_filename)
                     try:
-                        with open(css_filename, 'r') as f:
+                        with open(css_file_path, 'r') as f:
                             # Store the loaded CSS in the cache
                             self.css_cache[view_name][css_name] = f.read()
                     except FileNotFoundError:
-                        logger.warning(f"CSS file not found: {css_filename}")
+                        logger.warning(f"CSS file not found: {css_file_path}")
                         self.css_cache[view_name][css_name] = ''
                     except Exception as e:
                         logger.warning(f"Error loading CSS: {str(e)}")
