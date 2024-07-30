@@ -56,7 +56,10 @@ class ChatInterfaceElement(Element):
             unpack_payload_callback=unpack)
 
     @Component.view
-    def create_chatfeed_view(self, column_css: list = [], **kwargs):
+    def create_chatfeed_view(
+        self, column_css: list = [],
+        height: int = None, width: int = None, **kwargs
+        ):
         """
         Creates and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
@@ -66,10 +69,16 @@ class ChatInterfaceElement(Element):
         # When first loaded
         self.chatfeed_view = pn.Column(
             stylesheets=column_css,
+            height=height,
+            width=width,
+            scroll=True,
+            view_latest=True,
+            auto_scroll_limit=1,
             **kwargs)
         message_views = [
             self.inject_payload_css(
-                message.create_message_view
+                message.create_message_view,
+                show_role=True
                 ) 
             for message in self.model.message_list
         ]
@@ -78,7 +87,8 @@ class ChatInterfaceElement(Element):
         def _update_chatfeed(event):
             self.chatfeed_view.append(
                 self.inject_payload_css(
-                    event.new.create_message_view
+                    event.new.create_message_view,
+                    show_role=True
                 )
             )
         # This watcher should be called before the payload starts streaming.

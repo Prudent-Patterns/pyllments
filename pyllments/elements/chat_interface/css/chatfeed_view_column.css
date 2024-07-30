@@ -1,6 +1,6 @@
 :host {
-    background-color: #111926;
-    border: 1px solid #4B586C;
+    background-color: var(--secondary-background-color);
+    border: 1px solid var(--light-outline-color);
     scrollbar-width: thin;
     scrollbar-color: #4B586C #111926;
     border-radius: 9px;

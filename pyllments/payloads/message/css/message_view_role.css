@@ -1,0 +1,15 @@
+:host {
+    position: absolute; /* Make the element absolute */
+    top: 4px; /* Position the element at the top */
+    right: 6px; /* Position the element on the left */
+    margin: 0; /* Remove margins */
+    border: 1px solid var(--light-outline-color);
+    border-radius: 15px;
+    padding: 0px 7px 0px 7px;
+}
+
+:host p {
+    color: var(--faded-text-color);
+    line-height: 0; /* Set the paragraph element within the :host to have a 0 line-height */
+    font-size: .8em;
+}

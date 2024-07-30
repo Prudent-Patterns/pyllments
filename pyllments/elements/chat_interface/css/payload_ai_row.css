@@ -1,0 +1,4 @@
+:host {
+    padding: 0 min(10%, 79px) 0 min(10%, 79px);
+    justify-content: left;
+}

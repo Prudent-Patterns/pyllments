@@ -33,21 +33,33 @@ class MessagePayload(Payload):
         human_markdown_css: list = [],
         human_row_css: list = [],
         ai_markdown_css: list = [],
-        ai_row_css: list = []
+        ai_row_css: list = [],
+        role_css: list = [],
+        show_role: bool = True
         ) -> pn.Row:
         """Creates a message container"""
         match self.model.role:
             case 'human':
                 markdown_css = human_markdown_css
                 row_css = human_row_css
+                role_str = 'Human'
             case 'ai':
                 markdown_css = ai_markdown_css
                 row_css = ai_row_css
+                role_str = 'AI'
         markdown = pn.pane.Markdown(
             self.model.message.content,
             stylesheets=markdown_css)
+ 
+
         def _update_message_view(event):
             view[0].object = self.model.message.content
         self.model.param.watch(_update_message_view, 'message')
-        view = pn.Row(markdown, stylesheets=row_css)
+        if show_role:
+            role_md = pn.pane.Markdown(
+                role_str,
+                stylesheets=role_css)
+            view = pn.Row(markdown, role_md, stylesheets=row_css)
+        else:
+            view = pn.Row(markdown, stylesheets=row_css)
         return view
