@@ -1,19 +1,23 @@
-:host {
+/* :host {
     --border-radius: 9px;
-}
+} */
 
-.bk-input-group {
+/* .bk-input-group {
     font-family: 'Ubuntu', sans-serif;
-}
+} */
 .bk-input {
-    background-color: #111926;
-    border: 1px solid #4B586C;
-    color: #F4F6F8;
+    background-color: var(--secondary-background-color);
+    border: 1px solid var(--light-outline-color);
+    color: var(--white);
 }
 .bk-input:focus {
-    border-color: #12B86C;
+    border-color: var(--tertiary-accent-color);
 }
  
 .bk-input::placeholder {
-    color: #F4F6F890;
+    color: var(--light-outline-color);
+}
+
+select[multiple].bk-input, select[size].bk-input, textarea.bk-input {
+    font-size: var(--bokeh-font-size);
 }

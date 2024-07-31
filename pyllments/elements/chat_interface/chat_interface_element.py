@@ -58,7 +58,7 @@ class ChatInterfaceElement(Element):
     @Component.view
     def create_chatfeed_view(
         self, column_css: list = [],
-        height: int = None, width: int = None, **kwargs
+        height: int = 800, width: int = 660, **kwargs
         ):
         """
         Creates and returns a new instance of the chatfeed which

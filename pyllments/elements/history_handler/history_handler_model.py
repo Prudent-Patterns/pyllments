@@ -6,7 +6,7 @@ import param
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
 
-class ContextBuilderModel(Model):
+class HistoryHandlerModel(Model):
 
     history_token_limit = param.Integer(default=32000, bounds=(1, None), doc="""
         The max amount of tokens to keep in the history""")
@@ -42,14 +42,15 @@ class ContextBuilderModel(Model):
             raise ValueError(
                 f"The token count ({self.new_message_token_estimate}) of the new message exceeds the history limit ({self.history_token_limit})."
             )
+        # Remove messages from history until the new message will fit
         while (
             self.history_token_count + self.new_message_token_estimate >
             self.history_token_limit
         ):
-            popped_message_token_est = (
-                self.history.popleft()
-                .popped_message
-                .response_metadata["context_estimate_token_len"]
+            popped_message = self.history.popleft()
+            popped_message_token_est = popped_message.model.tokenization_map.get(
+                self.tokenizer_model,
+                popped_message.model.get_token_len(self.tokenizer_model)
             )
             self.history_token_count -= popped_message_token_est
 
@@ -65,10 +66,9 @@ class ContextBuilderModel(Model):
             self.context_token_count + self.new_message_token_estimate >
             self.context_tokens_limit
         ):
-            popped_message_token_est = (
-                self.context.popleft()
-                .popped_message
-                .response_metadata["context_estimate_token_len"]
+            popped_message = self.context.popleft()
+            popped_message_token_est = popped_message.model.get_token_len(
+                self.tokenizer_model
             )
             self.context_token_count -= popped_message_token_est
 

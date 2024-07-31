@@ -7,9 +7,9 @@ import panel as pn
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads.message.message_payload import MessagePayload
-from .context_builder_model import ContextBuilderModel
+from .history_handler_model import HistoryHandlerModel
 
-class ContextBuilderElement(Element):
+class HistoryHandlerElement(Element):
     """
     Responsible for building the context that is sent to the LLM
     Model:
@@ -28,7 +28,7 @@ class ContextBuilderElement(Element):
 
     def __init__(self, **params):
         super().__init__(**params)
-        self.model = ContextBuilderModel()
+        self.model = HistoryHandlerModel()
         
         self._message_input_setup()
         self._messages_output_setup()
@@ -70,16 +70,35 @@ class ContextBuilderElement(Element):
         if self.model.new_message.model.role != 'ai':
             self.ports.output['messages_output'].stage_emit(context=self.model.context)
 
-    def create_context_view(self):
+    def create_context_view(
+        self, 
+        column_css: list = [], 
+        title_css: list = [],
+        width: int = 450,
+        height: int = 800,
+        title_visible: bool = True,
+        
+    ):
         if self._view_exists(self.context_view):
             return self.context_view
         self.context_view = pn.Column(
-            pn.pane.Markdown("## Current Context"),
-            *[pn.pane.Markdown(msg.model.message.content) for msg in self.model.context]
+            pn.pane.Markdown(
+                "## Current History", 
+                visible=title_visible,
+                stylesheets=title_css
+            ),
+            *[
+                msg.create_message_view()
+                for msg in self.model.context
+            ],
+            stylesheets=column_css,
+            width=width,
+            height=height
         )
         def _update_context_view(event):
             self.context_view.objects = [
-                pn.pane.Markdown(msg.model.message.content) for msg in self.model.context
+                msg.create_message_view()
+                for msg in self.model.context
             ]
         self.model.param.watch(_update_context_view, 'context')
 

@@ -52,7 +52,7 @@ class Component(param.Parameterized):
 
     @classmethod
     def view(cls, func):
-        """Load CSS from the function signature, cache it, and cache the view."""
+        """Load CSS from the component's own CSS folder, cache it, and use it appropriately."""
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             # Derive the view name from the function name by removing 'create_' prefix
@@ -71,6 +71,9 @@ class Component(param.Parameterized):
             if view_name not in self.css_cache:
                 self.css_cache[view_name] = {}
 
+            # Determine the CSS folder for the component
+            css_folder = Path(self._get_module_path(), 'css')
+
             for key in css_kwargs:
                 # Extract the CSS name by removing the '_css' suffix
                 # Example: 'button_css' becomes '{view_name}_button'
@@ -78,9 +81,9 @@ class Component(param.Parameterized):
                 # Create the new CSS filename structure
                 css_filename = f"{view_name}_{css_name}.css"
                 
+                # Load CSS from file if not in cache
                 if css_name not in self.css_cache[view_name]:
-                    module_path = self._get_module_path()
-                    css_file_path = Path(module_path, 'css', css_filename)
+                    css_file_path = css_folder / css_filename
                     try:
                         with open(css_file_path, 'r') as f:
                             # Store the loaded CSS in the cache
@@ -92,18 +95,21 @@ class Component(param.Parameterized):
                         logger.warning(f"Error loading CSS: {str(e)}")
                         self.css_cache[view_name][css_name] = ''
 
-                # Ensure the CSS kwarg is a list and the default CSS is the first item
-                if key not in kwargs or not kwargs[key]:
-                    kwargs[key] = [self.css_cache[view_name][css_name]]
-                elif isinstance(kwargs[key], list):
-                    kwargs[key].insert(0, self.css_cache[view_name][css_name])
-                else:
-                    kwargs[key] = [self.css_cache[view_name][css_name], kwargs[key]]
+                # Get the cached CSS (which might be an empty string if no file was found)
+                cached_css = self.css_cache[view_name][css_name]
 
-            # Create the view using the original function and cache it
+                # Combine cached CSS with provided CSS
+                if key in kwargs:
+                    if isinstance(kwargs[key], list):
+                        if cached_css:
+                            kwargs[key] = [cached_css] + kwargs[key]
+                    else:
+                        kwargs[key] = [cached_css, kwargs[key]] if cached_css else [kwargs[key]]
+                elif cached_css:
+                    kwargs[key] = [cached_css]
+
             view = func(self, *args, **kwargs)
-            # Store the created view in the view_cache using the view_name
-            self.view_cache[view_name] = view  # Store the view object directly
+            self.view_cache[view_name] = view
             return view
 
         return wrapper
