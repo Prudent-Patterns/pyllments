@@ -1,7 +1,6 @@
 :host {
     max-height: none; /* Fixes streaming issue in Panel */
-    background-color: var(--primary-background-color);
     justify-content: left;
     padding-right: 66px;
     align-items: center;
-}
+  }

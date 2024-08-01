@@ -17,8 +17,6 @@ class Component(param.Parameterized):
     id = param.String()
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
-    view_cache = param.Dict(default={}, doc="""
-        Cache for views - Set on the Instance Level""")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,12 +54,7 @@ class Component(param.Parameterized):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             # Derive the view name from the function name by removing 'create_' prefix
-            # Example: 'create_chat_view' becomes 'chat_view'
             view_name = func.__name__.replace('create_', '')
-
-            # Check if the view is already cached using the derived view name
-            if view_name in self.view_cache:
-                return self.view_cache[view_name]
 
             sig = inspect.signature(func)
             # Identify parameters that end with '_css' to load corresponding CSS files
@@ -108,8 +101,6 @@ class Component(param.Parameterized):
                 elif cached_css:
                     kwargs[key] = [cached_css]
 
-            view = func(self, *args, **kwargs)
-            self.view_cache[view_name] = view
-            return view
+            return func(self, *args, **kwargs)
 
         return wrapper

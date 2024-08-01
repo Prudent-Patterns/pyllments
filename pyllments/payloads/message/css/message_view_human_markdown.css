@@ -1,9 +1,10 @@
-/* :host {
-  --base-font: 'Hanken Grotesk', sans-serif;
-  color: #F4F6F8;
-  font-weight: 300;
+:host {
+  line-height: var(--line-height);
+  flex: 0 1 auto; /* Used to fix row's padding being ignored */
 }
 
-p {
-  font-family: var(--base-font);
-} */
+:host p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+

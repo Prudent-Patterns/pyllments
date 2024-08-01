@@ -1,5 +1,7 @@
 :host {
-    max-height: none; /* Fixes streaming issue in Panel */
     background-color: var(--primary-background-color);
-    border-left: 2px solid var(--faded-text-color);
+    border-left: 4px solid var(--faded-text-color);
+    padding-top: 11px;
+    padding-left: 10px;
+    padding-bottom: 11px;
 } 
