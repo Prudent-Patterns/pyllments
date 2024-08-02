@@ -6,16 +6,19 @@
     font-family: 'Ubuntu', sans-serif;
 } */
 .bk-input {
-    background-color: var(--secondary-background-color);
-    border: 1px solid var(--light-outline-color);
+    background-color: var(--light-outline-color);
+    border: 1px solid var(--faded-text-color);
     color: var(--white);
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-accent-color) transparent;
 }
 .bk-input:focus {
     border-color: var(--tertiary-accent-color);
 }
  
 .bk-input::placeholder {
-    color: var(--light-outline-color);
+    color: var(--primary-background-color);
+    font-size: 1.6em;
 }
 
 select[multiple].bk-input, select[size].bk-input, textarea.bk-input {

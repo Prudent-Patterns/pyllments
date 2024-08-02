@@ -1,12 +1,17 @@
 :host {
-    --surface-color: #D33A4B;
-    --surface-text-color: #F4F6F8;
+    --surface-color: var(--primary-accent-color);
+    --surface-text-color: var(--white);
 }
 
 .bk-btn {
-    background-color: #D33A4B;
     font-size: 20px;
 }
+
 .bk-btn.bk-btn-default {
-    background-color: #D33A4B;
+    padding: 6px 3px 6px 3px
+}
+
+.bk-btn:hover {
+    background-color: var(--primary-accent-color);
+    color: var(--primary-background-color);
 }

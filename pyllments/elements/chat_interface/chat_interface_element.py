@@ -1,3 +1,5 @@
+from typing import Optional
+
 import panel as pn
 import param
 
@@ -57,8 +59,12 @@ class ChatInterfaceElement(Element):
 
     @Component.view
     def create_chatfeed_view(
-        self, column_css: list = [],
-        height: int = 800, width: int = 660, **kwargs
+        self,
+        column_css: list[str] = [],
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        sizing_mode: str = 'stretch_both',
+        **kwargs
         ):
         """
         Creates and returns a new instance of the chatfeed which
@@ -71,6 +77,7 @@ class ChatInterfaceElement(Element):
             stylesheets=column_css,
             height=height,
             width=width,
+            sizing_mode=sizing_mode,
             scroll=True,
             view_latest=True,
             auto_scroll_limit=1,
@@ -96,7 +103,14 @@ class ChatInterfaceElement(Element):
         return self.chatfeed_view
 
     @Component.view
-    def create_chat_input_view(self, input_css: list = [], **kwargs):
+    def create_chat_input_view(
+        self,
+        input_css: list[str] = [],
+        sizing_mode: str = 'stretch_both',
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        margin: Optional[tuple[int, int, int, int]] = None,
+        **kwargs):
         """
         Creates and returns a new instance of ChatAreaInput view.
         """
@@ -104,10 +118,13 @@ class ChatInterfaceElement(Element):
             return self.chat_input_view
 
         self.chat_input_view = pn.chat.ChatAreaInput(
-            placeholder='Enter your message',
-            rows=3,
+            placeholder='Yap Here',
             auto_grow=True,
             stylesheets=input_css,
+            sizing_mode=sizing_mode,
+            height=height,
+            width=width,
+            margin=margin,
             **kwargs)
         self.chat_input_view.param.watch(self._on_send, 'value')
         return self.chat_input_view
@@ -116,7 +133,10 @@ class ChatInterfaceElement(Element):
     def create_send_button_view(
             self,
             button_css: list = [], 
-            name: str = 'Send',
+            sizing_mode: str = 'stretch_height',
+            width: Optional[int] = 38,
+            height: Optional[int] = None,
+            margin: Optional[tuple[int, int, int, int]] = None,
             **kwargs):
         """
         Creates and returns a new instance of Button view for sending messages.
@@ -125,13 +145,55 @@ class ChatInterfaceElement(Element):
             return self.send_button_view
 
         self.send_button_view = pn.widgets.Button(
-            name=name,
             icon='send-2',
             stylesheets=button_css,
+            sizing_mode=sizing_mode,
+            width=width,
+            height=height,
+            margin=margin,
+            icon_size='1.3em',
             **kwargs)
         self.send_button_view.on_click(self._on_send)
 
         return self.send_button_view
+    
+    def create_chat_input_row_view(
+        self,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        margin: Optional[tuple[int, int, int, int]] = None,
+        **kwargs):
+        """Creates a row containing the chat area input and send button"""
+        return pn.Row(
+            self.create_chat_input_view(margin=(0, 0, 0, 0)),
+            self.create_send_button_view(margin=(0, 0, 0, 10)),
+            sizing_mode='stretch_width',
+            width=width,
+            height=height,
+            margin=margin,
+            **kwargs)
+        
+    def create_interface_view(
+        self,
+        feed_height: Optional[int] = None,
+        input_height: Optional[int] = None,
+        width: Optional[int] = None,
+        margin: Optional[tuple[int, int, int, int]] = None,
+        **kwargs):
+        """Creates a column containing the chat feed and chat input row"""
+        return pn.Column(
+            self.create_chatfeed_view(
+                height=feed_height,
+                sizing_mode='stretch_width',
+                
+            ),
+            self.create_chat_input_row_view(
+                height=input_height,
+                margin=(10, 0, 0, 0)
+            ),
+            width=width,
+            margin=margin,
+            **kwargs)
     
     @Element.port_stage_emit('message_output', 'new_message')
     def _on_send(self, event):
