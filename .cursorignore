@@ -7,6 +7,7 @@ LICENSE
 projects
 examples/
 .ignore*
+assets/
 # Log files to ignore
 *.log
 logs/

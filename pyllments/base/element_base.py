@@ -15,8 +15,8 @@ class Element(Component):
         Handles the Port interface for the Element""")
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
-    view_cache = param.Dict(default={}, doc="""
-        Cache for views - Set on the Instance Level""")
+    # view_cache = param.Dict(default={}, doc=""" TODO: Removeif no interference
+    #     Cache for views - Set on the Instance Level""")
     payload_css_cache = param.Dict(default={}, doc="""
         Cache for CSS files - Set on the Class Level
         Structure: payload_name: {}""")

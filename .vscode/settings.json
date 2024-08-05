@@ -17,6 +17,7 @@
         "${workspaceFolder}"
     ],
     "files.exclude": {
-        "**/__pycache__": true
+        "**/__pycache__": true,
+        "**/assets/**": true
       }
 }

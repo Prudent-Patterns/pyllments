@@ -65,14 +65,11 @@ class ChatInterfaceElement(Element):
         width: Optional[int] = None,
         sizing_mode: str = 'stretch_both',
         **kwargs
-        ):
+        ) -> pn.Column:
         """
         Creates and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
         """
-        if self._view_exists(self.chatfeed_view):
-            return self.chatfeed_view
-        # When first loaded
         self.chatfeed_view = pn.Column(
             stylesheets=column_css,
             height=height,
@@ -114,9 +111,6 @@ class ChatInterfaceElement(Element):
         """
         Creates and returns a new instance of ChatAreaInput view.
         """
-        if self._view_exists(self.chat_input_view):
-            return self.chat_input_view
-
         self.chat_input_view = pn.chat.ChatAreaInput(
             placeholder='Yap Here',
             auto_grow=True,
@@ -137,13 +131,9 @@ class ChatInterfaceElement(Element):
             width: Optional[int] = 38,
             height: Optional[int] = None,
             margin: Optional[tuple[int, int, int, int]] = None,
-            **kwargs):
-        """
-        Creates and returns a new instance of Button view for sending messages.
-        """
-        if self._view_exists(self.send_button_view):
-            return self.send_button_view
-
+            **kwargs
+            ) -> pn.widgets.Button:
+        """Creates and returns a new instance of Button view for sending messages."""
         self.send_button_view = pn.widgets.Button(
             icon='send-2',
             stylesheets=button_css,
@@ -162,7 +152,8 @@ class ChatInterfaceElement(Element):
         width: Optional[int] = None,
         height: Optional[int] = None,
         margin: Optional[tuple[int, int, int, int]] = None,
-        **kwargs):
+        **kwargs
+        ) -> pn.Row:
         """Creates a row containing the chat area input and send button"""
         return pn.Row(
             self.create_chat_input_view(margin=(0, 0, 0, 0)),
@@ -179,13 +170,13 @@ class ChatInterfaceElement(Element):
         input_height: Optional[int] = None,
         width: Optional[int] = None,
         margin: Optional[tuple[int, int, int, int]] = None,
-        **kwargs):
+        **kwargs
+        ) -> pn.Column:
         """Creates a column containing the chat feed and chat input row"""
         return pn.Column(
             self.create_chatfeed_view(
                 height=feed_height,
                 sizing_mode='stretch_width',
-                
             ),
             self.create_chat_input_row_view(
                 height=input_height,

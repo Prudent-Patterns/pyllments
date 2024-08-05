@@ -33,11 +33,6 @@ class Component(param.Parameterized):
         # Return the parent directory of the module's file
         return Path(module.__file__).parent
 
-    def _view_exists(self, view):
-        if view:
-            warnings.warn(f'{view} already exists. Returning existing view.')
-            return True
-    
     def __hash__(self):
         """Return a hash of the component's id for use in hash-based collections."""
         return hash(self.id)
@@ -53,7 +48,15 @@ class Component(param.Parameterized):
         """Load CSS from the component's own CSS folder, cache it, and use it appropriately."""
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            # Derive the view name from the function name by removing 'create_' prefix
+            # Get the view attribute name from the function name
+            view_attr_name = func.__name__.replace('create_', '') + '_view'
+            
+            # Check if the view already exists
+            if hasattr(self, view_attr_name) and getattr(self, view_attr_name) is not None:
+                warnings.warn(f'{view_attr_name} already exists. Returning existing view.')
+                return getattr(self, view_attr_name)
+
+            # If the view doesn't exist, proceed with CSS loading and view creation
             view_name = func.__name__.replace('create_', '')
 
             sig = inspect.signature(func)

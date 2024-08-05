@@ -76,11 +76,8 @@ class HistoryHandlerElement(Element):
         title_css: list = [],
         width: int = 450,
         height: int = 800,
-        title_visible: bool = True,
-        
-    ):
-        if self._view_exists(self.context_view):
-            return self.context_view
+        title_visible: bool = True
+    ) -> pn.Column:
         self.context_view = pn.Column(
             pn.pane.Markdown(
                 "## Current History", 

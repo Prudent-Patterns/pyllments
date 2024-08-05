@@ -1,1 +1,4 @@
 *.ipynb linguist-documentation
+# Start Generation Here
+/assets linguist-ignore
+# End Generation Here
