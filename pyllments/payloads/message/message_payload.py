@@ -9,8 +9,7 @@ from pyllments.payloads.message.message_model import MessageModel
 
 
 class MessagePayload(Payload):
-    model = param.ClassSelector(class_=MessageModel)
-    
+        
     def __init__(
             self,
             role: Literal['human', 'system', 'ai'] = 'human',

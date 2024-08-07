@@ -6,8 +6,12 @@ from pyllments.base.element_base import Element
 from pyllments.elements.file_loader.file_loader_model import FileLoaderModel
 
 class FileLoaderElement(Element):
-    file_upload_view = param.ClassSelector(class_=pn.Column, doc="""
+    file_input_view = param.ClassSelector(class_=pn.Column, doc="""
         View responsible for selecting files, and uploading them""")
+    file_container_view = param.ClassSelector(class_=pn.Column, doc="""
+        View responsible for displaying the files""")
+    file_loader_view = param.ClassSelector(class_=pn.Column, doc="""
+        View responsible for displaying the file input and file container""")
     
     def __init__(self, **params):
         super().__init__(**params)
