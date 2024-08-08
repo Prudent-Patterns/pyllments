@@ -4,6 +4,8 @@ import inspect
 import param
 from loguru import logger
 
+from pyllments.elements import Element
+from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive
 from pyllments.common.param import PayloadSelector
 
@@ -12,16 +14,16 @@ class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
     # Name is set by the containing element
     payload = PayloadSelector(allow_None=True)
+    payload_class = param.ClassSelector(class_=Payload, is_instance=False)
     connected_elements = param.List()
 
-    def __init__(self, containing_element=None,**params):
+    def __init__(self, containing_element: Element = None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
 
 
 class InputPort(Port):
     output_ports = param.List(item_type=Port)
-
     unpack_payload_callback = param.Callable(doc="""
         The callback used to unpack the payload - has payload as its only argument.
         Unpacks the payload and connects it to the element's model""")
@@ -43,8 +45,9 @@ class InputPort(Port):
                 payload_type = first_arg_annotation
             
             self.param.payload.class_ = payload_type
+            self.payload_class = payload_type
 
-    def receive(self, payload):
+    def receive(self, payload: Payload):
         self.payload = payload  # This will use the _validate method of PayloadSelector
         if not self.unpack_payload_callback:
             raise ValueError(f"unpack_payload_callback must be set for port '{self.name}'")
@@ -104,6 +107,7 @@ class OutputPort(Port):
                 raise ValueError("pack_payload_callback must have a return type annotation")
             
             self.param.payload.class_ = return_annotation
+            self.payload_class = return_annotation
             self.required_items = {
                 name: {'value': None, 'type': type_}
                 for name, type_ in annotations.items()
