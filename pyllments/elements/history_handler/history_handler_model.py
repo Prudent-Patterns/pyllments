@@ -14,7 +14,7 @@ class HistoryHandlerModel(Model):
     history_token_count = param.Integer(default=0, bounds=(0, None), doc="""
         The amount of tokens in the history""")
 
-    context_tokens_limit = param.Integer(default=16000, bounds=(0, None), doc="""
+    context_token_limit = param.Integer(default=16000, bounds=(0, None), doc="""
         The amount of tokens to keep in the context window""")
     context = param.ClassSelector(class_=deque, default=deque(), instantiate=True)
     context_token_count = param.Integer(default=0, bounds=(0, None), doc="""
@@ -58,13 +58,13 @@ class HistoryHandlerModel(Model):
         self.history_token_count += self.new_message_token_estimate
 
     def update_context(self) -> None:
-        if self.new_message_token_estimate > self.context_tokens_limit:
+        if self.new_message_token_estimate > self.context_token_limit:
             raise ValueError(
-                f"The token count ({self.new_message_token_estimate}) of the new message exceeds the context limit ({self.context_tokens_limit})."
+                f"The token count ({self.new_message_token_estimate}) of the new message exceeds the context limit ({self.context_token_limit})."
             )
         while (
             self.context_token_count + self.new_message_token_estimate >
-            self.context_tokens_limit
+            self.context_token_limit
         ):
             popped_message = self.context.popleft()
             popped_message_token_est = popped_message.model.get_token_len(

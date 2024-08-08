@@ -6,7 +6,7 @@ from pyllments.payloads.message import MessagePayload
 
 class ChatInterfaceModel(Model):
     # TODO: Implement batch interface for messages - populating message_list > iterating
-    message_list = param.List(instantiate=True)
+    message_list = param.List(instantiate=True, item_type=MessagePayload)
     persist = param.Boolean(default=False, instantiate=True) # TODO: Implement persisting messages to disk
     new_message = param.ClassSelector(class_=MessagePayload)
     

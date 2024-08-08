@@ -6,6 +6,7 @@ from pyllments.base.model_base import Model
 class FileLoaderModel(Model):
     save_to_disk = param.Boolean(default=False, doc='Whether to save the file to disk')
     file_dir = param.String(default='', doc='Directory which files are saved to')
+    # TODO: Async file saving when batched
     b_file = param.ClassSelector(class_=bytes, doc='Bytes object of file')
     file_list = param.List(default=[], doc='List of files')
     
