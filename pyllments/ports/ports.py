@@ -4,7 +4,6 @@ import inspect
 import param
 from loguru import logger
 
-from pyllments.elements import Element
 from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive
 from pyllments.common.param import PayloadSelector
@@ -13,11 +12,12 @@ from pyllments.common.param import PayloadSelector
 class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
     # Name is set by the containing element
-    payload = PayloadSelector(allow_None=True)
-    payload_class = param.ClassSelector(class_=Payload, is_instance=False)
-    connected_elements = param.List()
+    payload = PayloadSelector(allow_None=True, doc="""
+        Stores the port's payload using a special selector that takes classes
+        and instances, both, and validates them""")
+    connected_elements = param.List(doc="List of elements connected to this port")
 
-    def __init__(self, containing_element: Element = None, **params):
+    def __init__(self, containing_element: 'Element' = None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
 
@@ -151,8 +151,8 @@ class OutputPort(Port):
     
     def _check_payload_compatibility(self, other: InputPort) -> bool:
         """Check if the payload types are compatible between self and other"""
-
-        def is_compatible(output_type, input_type):
+        # HIGHWAY TO THE DANGER ZONE
+        def is_compatible(output_type, input_type) -> bool:
             # If types are identical, they're compatible
             if output_type == input_type:
                 return True
@@ -190,12 +190,12 @@ class OutputPort(Port):
 
         return is_compatible(output_type, input_type)
 
-    def stage(self, **kwargs: param.Parameter):
+    def stage(self, bypass_type_check: bool = False, **kwargs: param.Parameter):
         """Stages the values within the port before packing"""
         for name, value in kwargs.items():
             if name not in self.required_items:
                 raise ValueError(f"'{name}' is not a required item for port '{self.name}'")
-            if self.type_checking:
+            if self.type_checking and not bypass_type_check:
                 expected_type = self.required_items[name]['type']
                 if not isinstance(value, expected_type):
                     raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
@@ -237,9 +237,9 @@ class OutputPort(Port):
         # For returning the payload to the caller 
         return self.payload
     
-    def stage_emit(self, **kwargs):
+    def stage_emit(self, bypass_type_check: bool = False, **kwargs):
         """Stages the payload and emits it - All required params need be present"""
-        self.stage(**kwargs)
+        self.stage(bypass_type_check=bypass_type_check, **kwargs)
         if not self.emit_when_ready: # avoid redundant emit
             self.emit()
 

@@ -6,8 +6,8 @@ from typing import Callable
 import param
 from loguru import logger
 
-from ..ports import Ports
-from .component_base import Component
+from pyllments.ports.ports import Ports
+from pyllments.base.component_base import Component
 
 class Element(Component):
     """Base class for all elements in the framework"""
