@@ -76,7 +76,7 @@ class OutputPort(Port):
         If true, infers the required items from pack_payload_callback
         and required_items is set to None""")
 
-    input_ports = param.List(item_type=Port, doc="""
+    input_ports = param.List(item_type=InputPort, doc="""
         The connected InputPorts which emit() will contact""")
 
     pack_payload_callback = param.Callable(default=None, doc="""
@@ -120,21 +120,22 @@ class OutputPort(Port):
         elif self.required_items:
             self.required_items = {item: {'value': None, 'type': None} for item in self.required_items}
 
-    def connect(self, other: Union[InputPort, tuple[InputPort]]):
+    def connect(self, input_ports: Union[InputPort, tuple[InputPort], list[InputPort]]):
         """Connects self and the other InputPort(s)"""
         
-        # Ensure 'other' is a single InputPort or a tuple of InputPorts
-        if isinstance(other, tuple):
-            ports_to_connect = other
-        elif isinstance(other, InputPort):
-            ports_to_connect = (other,)
-        else:
-            raise ValueError(f"Can only connect OutputPorts to InputPorts. "
+        is_iterable = isinstance(input_ports, (tuple, list))
+        def _port_check(input_port: InputPort):
+            """Checks if the individual port is an InputPort"""
+            if not isinstance(input_port, InputPort):
+                raise ValueError(f"Can only connect OutputPorts to InputPorts. "
                              f"Attempted to connect '{self.name}' ({type(self).__name__}) "
-                             f"to '{other.name}' ({type(other).__name__})")
-
-        # Connect each InputPort in the tuple
-        for port in ports_to_connect:
+                             f"to '{input_port.name}' ({type(input_port).__name__})")
+        # Connect each InputPort in the iterable
+        for port in (
+            input_ports if isinstance(input_ports, (tuple, list))
+            else (input_ports,)
+            ):
+            _port_check(port)
             # Check payload compatibility
             if not self._check_payload_compatibility(port):
                 raise ValueError(f"""InputPort and OutputPort payload types are not compatible:
@@ -147,6 +148,9 @@ class OutputPort(Port):
             self.connected_elements.append(port.containing_element)
             port.connected_elements.append(self.containing_element)
             port.output_ports.append(self)
+        
+        if not is_iterable:
+            return input_ports
 
     
     def _check_payload_compatibility(self, other: InputPort) -> bool:
