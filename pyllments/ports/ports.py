@@ -287,12 +287,20 @@ class Ports(param.Parameterized):
         super().__init__(**params)
         self.containing_element = containing_element
 
-    def add_input(self, name, **kwargs):
-        input_port = InputPort(name=name, containing_element=self.containing_element, **kwargs)
+    def add_input(self, name: str, unpack_payload_callback, **kwargs):
+        input_port = InputPort(
+            name=name,
+            unpack_payload_callback=unpack_payload_callback,
+            containing_element=self.containing_element,
+            **kwargs)
         self.input[name] = input_port
         return input_port
     
-    def add_output(self, name, **kwargs):
-        output_port = OutputPort(name=name, containing_element=self.containing_element, **kwargs)
+    def add_output(self, name: str, pack_payload_callback, **kwargs):
+        output_port = OutputPort(
+            name=name,
+            pack_payload_callback=pack_payload_callback,
+            containing_element=self.containing_element,
+            **kwargs)
         self.output[name] = output_port
         return output_port
