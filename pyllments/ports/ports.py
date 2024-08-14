@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Union, List, Dict, get_origin, get_args
 import inspect
 
 import param
-from loguru import logger
 
 from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive
