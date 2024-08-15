@@ -3,6 +3,10 @@ import param
 
 from pyllments.base.payload_base import Payload
 
+class PayloadType(param.ClassSelector):
+    """Holds the typing signature of the Payload"""
+
+    
 class PayloadSelector(param.ClassSelector):
     """
     PayloadSelector is a parameterized class that validates whether a given value

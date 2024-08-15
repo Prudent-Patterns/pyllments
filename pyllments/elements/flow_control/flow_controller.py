@@ -7,7 +7,6 @@ from pyllments.common.param import PayloadSelector
 from pyllments.ports.ports import InputPort, OutputPort
 
 
-
 class FlowPort(param.Parameterized):
     """Special Port wrapper for a user-friendy interface"""
     payload = PayloadSelector(allow_None=True, doc="""
@@ -90,6 +89,7 @@ class FlowPortMap(UserDict):
         def clear(self):
             super().clear()
             self._parent._update_list_view_item(self._key, self)
+
 
 class FlowController(Element):
     """
