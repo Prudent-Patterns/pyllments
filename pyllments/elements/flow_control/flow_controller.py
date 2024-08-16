@@ -8,16 +8,19 @@ from pyllments.ports.ports import InputPort, OutputPort
 
 
 class FlowPort(param.Parameterized):
-    """Special Port wrapper for a user-friendy interface"""
-    payload = PayloadSelector(allow_None=True, doc="""
-        Most recent payload that arrived at this port""")
+    """Special Port wrapper for port management in the flow controller"""
+
+    payload_type = param.Parameter(doc="""
+        Payload type for this port""")
     
-    def __init__(self, payload_class: type, **params):
+    def __init__(self, payload_type: type, **params):
         super().__init__(**params)
-        self.param.payload.class_ = payload_class
+        self.payload_type = payload_type
 
 
 class OutputFlowPort(FlowPort):
+    """Special OutputPort wrapper for port management in the flow controller"""
+
     output_port = param.ClassSelector(class_=OutputPort, doc="""
         Output port the flow port wraps""")
 
@@ -26,13 +29,24 @@ class OutputFlowPort(FlowPort):
 
 
 class InputFlowPort(FlowPort):
+    """Special InputPort wrapper for port management in the flow controller"""
+
     input_port = param.ClassSelector(class_=InputPort, doc="""
         Input port the flow port wraps""")
-    new = param.Boolean(default=True, doc="""
-        Whether a new payload just arrived""")
+    
+    payload = param.ClassSelector(default=None, class_=Payload, doc="""
+        Most recent payload that arrived at this port.
+        Removed after ingested by the flow_fn.
+        `new` flag is used to help caller determine if a new payload exists""")
     
 
 class FlowPortMap(UserDict):
+    """
+    Special dict wrapper that keeps two dicts, with one containing the
+    values set as dicts as raw dicts, and a special list-view dict
+    which contains the values set as dictionaries as lists of the dict values
+    Additionally: Said dictionaries are wrapped within their own dict wrapper
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._list_view_dict = {}
@@ -97,20 +111,42 @@ class FlowController(Element):
     Takes a user-provided callback which is meant to run every time a new
     input payload is received -- as well as maps for input and output payload types
     or ports to be used in the callback signature.
+    Either flow_map or connected_flow_map should be provided to set up the ports.
     Can also create multi-ports which take a variable amount of connections, and
     create a new port and connection for each.
     """
+
     flow_fn = param.Callable(doc="""
         User-provided callback to run every time a new input payload is received""")
+    
     flow_map = param.Dict(default={}, doc="""
         Alias map to the input and output payload types which are to be used in the
-        callback signature""")
+        callback signature
+        Example of how to structure the flow map:
+        {
+            'input': {
+                'flow_port_input1': MessagePayload
+            },
+            'output': {
+                'flow_port_output1': MessagePayload
+            }
+        }""")
     connected_flow_map = param.Dict(default={}, doc="""
-        Alias map to the input and output ports which are to be connected during instantiation""")
-
+        Alias map to the input and output ports which are to be connected during instantiation
+        Example of how to structure the connected flow map:
+        {
+            'input': {
+                'flow_port_input1': el.ports.output['output1']
+            },
+            'output': {
+                'flow_port_output1': el.ports.input['input1']
+            }
+        }""")
+    
     flow_port_map = param.ClassSelector(default=FlowPortMap(), class_=FlowPortMap, doc="""
         Alias map to the input and output flow ports which are to be used in the
         callback signature""")
+    
     context = param.Dict(default={}, doc="""
         Context for the user to manage""")
 
@@ -130,9 +166,9 @@ class FlowController(Element):
 
     def _setup_port_from_existing(self, io_type, alias, port):
         if io_type == 'input':
-            self._setup_input_port(alias, port.param.payload.class_, port)
+            self._setup_input_port(alias, port.payload_type, port)
         else:
-            self._setup_output_port(alias, port.param.payload.class_, port)
+            self._setup_output_port(alias, port.payload_type, port)
 
     def _setup_port_from_type(self, io_type, alias, payload_type):
         if io_type == 'input':
@@ -145,7 +181,7 @@ class FlowController(Element):
             self.flow_port_map[alias] = {}
             return
         
-        self.flow_port_map[alias] = InputFlowPort(payload_class=payload_type)
+        self.flow_port_map[alias] = InputFlowPort(payload_type=payload_type)
         
         def unpack(payload: payload_type):
             self._invoke_flow(alias, payload)
@@ -168,7 +204,7 @@ class FlowController(Element):
         
         self.flow_port_map[alias] = OutputFlowPort(
             output_port=output_port,
-            payload_class=payload_type
+            payload_type=payload_type
         )
         
         if existing_port:
@@ -202,7 +238,7 @@ class FlowController(Element):
         input_flow_port = InputFlowPort(
             input_port=input_port
         )
-        input_flow_port.param.payload.class_ = port_type
+        input_flow_port.payload_type = port_type
 
         self.flow_port_map[alias][port_alias] = input_flow_port
 
@@ -228,10 +264,8 @@ class FlowController(Element):
                 raise KeyError(f"No flow port found with alias '{input_port_name}'.")
 
         flow_port.payload = payload
-        flow_port.new = True
-
         self.flow_fn(c=self.context, **self.flow_port_map.list_view())
-        flow_port.new = False        
+        flow_port.payload = None
 
     def connect_output(self, alias: str, other_input_port):
         """Connect an output port to an external input port"""
@@ -256,9 +290,8 @@ class FlowController(Element):
 
         output_flow_port = OutputFlowPort(
             output_port=output_port,
-            payload_class=port_type
+            payload_type=port_type
         )
-        output_flow_port.param.payload.class_ = port_type
         self.flow_port_map[alias][port_alias] = output_flow_port
 
     def connect_inputs(self, input_alias_map: dict[str, list[OutputPort]]):

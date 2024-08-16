@@ -211,7 +211,7 @@ class OutputPort(Port):
         if not is_iterable:
             return input_ports
 
-    def stage(self, bypass_type_check: bool = False, **kwargs: param.Parameter):
+    def stage(self, bypass_type_check: bool = False, **kwargs):
         """Stages the values within the port before packing"""
         for name, value in kwargs.items():
             if name not in self.required_items:
