@@ -117,7 +117,13 @@ class FlowController(Element):
     """
 
     flow_fn = param.Callable(doc="""
-        User-provided callback to run every time a new input payload is received""")
+        User-provided callback to run every time a new input payload is received
+        Looks like:
+        def flow_fn(active_input_port, c, input_alias, output_alias):
+            ...
+        where the input and output aliases are the port aliases you created in
+        the flow_map or connected_flow_map
+                             """)
     
     flow_map = param.Dict(default={}, doc="""
         Alias map to the input and output payload types which are to be used in the
@@ -217,7 +223,8 @@ class FlowController(Element):
         """
         # Setup for multi-ports triggered upon connection
         if alias.startswith('multi_'):
-            self._multi_input_setup(alias, other_output_port)
+            # Multiports return the newly created port for custom mappings
+            return self._multi_input_setup(alias, other_output_port)
         else:
             other_output_port.connect(self.ports.input[alias])
 
@@ -241,6 +248,7 @@ class FlowController(Element):
         input_flow_port.payload_type = port_type
 
         self.flow_port_map[alias][port_alias] = input_flow_port
+        return input_flow_port
 
     def _invoke_flow(self, input_port_name: str, payload):
         is_multi = (input_port_name.startswith('multi_'))
@@ -264,14 +272,19 @@ class FlowController(Element):
                 raise KeyError(f"No flow port found with alias '{input_port_name}'.")
 
         flow_port.payload = payload
-        self.flow_fn(c=self.context, **self.flow_port_map.list_view())
+        self.flow_fn(
+            active_input_port=flow_port,
+            c=self.context,
+            **self.flow_port_map.list_view()
+        )
         flow_port.payload = None
 
     def connect_output(self, alias: str, other_input_port):
         """Connect an output port to an external input port"""
         # Setup for multi-ports triggered upon connection
         if alias.startswith('multi_'):
-            self._multi_output_setup(alias, other_input_port)
+            # Multiports return the newly created port for custom mappings
+            return self._multi_output_setup(alias, other_input_port)
         else:
             self.ports.output[alias].connect(other_input_port)
 
@@ -293,6 +306,7 @@ class FlowController(Element):
             payload_type=port_type
         )
         self.flow_port_map[alias][port_alias] = output_flow_port
+        return output_flow_port
 
     def connect_inputs(self, input_alias_map: dict[str, list[OutputPort]]):
         """Connect input ports to external output ports"""
