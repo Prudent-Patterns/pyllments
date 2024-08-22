@@ -167,3 +167,6 @@ corpus_local/*
 
 # Other
 .ignore*
+*.lance
+.lance/
+# Ignore all files and folders with a lance extension

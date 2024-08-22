@@ -35,4 +35,4 @@ class EmbedderElement(Element):
             self.ports.output['embedding_output'].stage_emit(processed_chunks=self.model.processed_chunks)
             with param.parameterized.disable_events():
                 self.model.processed_chunks = [] # Clean up
-        self.model.param.watch(fn, 'processed_chunks')  
+        self.model.param.watch(fn, 'processed_chunks')
