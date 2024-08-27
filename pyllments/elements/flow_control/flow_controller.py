@@ -107,13 +107,39 @@ class FlowPortMap(UserDict):
 
 class FlowController(Element):
     """
-    Used to control complex flow logic between Elements
+    Used to control complex flow logic between Elements.
     Takes a user-provided callback which is meant to run every time a new
     input payload is received -- as well as maps for input and output payload types
     or ports to be used in the callback signature.
     Either flow_map or connected_flow_map should be provided to set up the ports.
     Can also create multi-ports which take a variable amount of connections, and
     create a new port and connection for each.
+
+    Connecting ports after instantiation:
+    1. Using the '>' operator (standard Element connection):
+       element1.ports.output['some_output'] > flow_controller.ports.input['input_alias']
+       flow_controller.ports.output['output_alias'] > element2.ports.input['some_input']
+
+    2. Using connect_input and connect_output methods:
+       flow_controller.connect_input('input_alias', element1.ports.output['some_output'])
+       flow_controller.connect_output('output_alias', element2.ports.input['some_input'])
+
+    3. For multi-ports:
+       flow_controller.connect_input('multi_input_alias', element1.ports.output['output1'])
+       flow_controller.connect_input('multi_input_alias', element2.ports.output['output2'])
+
+    4. Connecting multiple ports at once:
+       flow_controller.connect_inputs({
+           'input_alias1': [element1.ports.output['output1'], element2.ports.output['output2']],
+           'input_alias2': [element3.ports.output['output3']]
+       })
+       flow_controller.connect_outputs({
+           'output_alias1': [element4.ports.input['input1'], element5.ports.input['input2']],
+           'output_alias2': [element6.ports.input['input3']]
+       })
+
+    Note: When using multi-ports, the alias in flow_map should start with 'multi_'.
+    For example: 'multi_input_alias': SomePayloadType
     """
 
     flow_fn = param.Callable(doc="""
@@ -131,24 +157,30 @@ class FlowController(Element):
         Example of how to structure the flow map:
         {
             'input': {
-                'flow_port_input1': MessagePayload
+                'flow_port_input1': MessagePayload,
+                'multi_input1': MessagePayload
             },
             'output': {
-                'flow_port_output1': MessagePayload
+                'flow_port_output1': MessagePayload,
+                'multi_output1': MessagePayload
             }
         }""")
     connected_flow_map = param.Dict(default={}, doc="""
-        Alias map to the input and output ports which are to be connected during instantiation
+        Alias map to the input and output ports which are to be connected.
+        Can be used during instantiation or after instantiation.
         Example of how to structure the connected flow map:
         {
             'input': {
-                'flow_port_input1': el.ports.output['output1']
+                'flow_port_input1': [el1.ports.output['output1'], el2.ports.output['output2']],
+                'multi_input1': [el3.ports.output['output3']]
             },
             'output': {
-                'flow_port_output1': el.ports.input['input1']
+                'flow_port_output1': [el4.ports.input['input1'], el5.ports.input['input2']],
+                'multi_output1': [el6.ports.input['input3']]
             }
         }""")
     
+
     flow_port_map = param.ClassSelector(default=FlowPortMap(), class_=FlowPortMap, doc="""
         Alias map to the input and output flow ports which are to be used in the
         callback signature""")
@@ -162,27 +194,42 @@ class FlowController(Element):
 
     def _setup_ports(self):
         for io_type in ['input', 'output']:
+            # Ensure flow_map has entries for both 'input' and 'output'
+            if io_type not in self.flow_map:
+                self.flow_map[io_type] = {}
+
             # Setup ports from flow_map (payload types)
-            for alias, payload_type in self.flow_map.get(io_type, {}).items():
+            for alias, payload_type in self.flow_map[io_type].items():
                 self._setup_port_from_type(io_type, alias, payload_type)
             
             # Setup ports from connected_flow_map (existing ports)
-            for alias, port in self.connected_flow_map.get(io_type, {}).items():
-                self._setup_port_from_existing(io_type, alias, port)
-
-    def _setup_port_from_existing(self, io_type, alias, port):
-        if io_type == 'input':
-            self._setup_input_port(alias, port.payload_type, port)
-        else:
-            self._setup_output_port(alias, port.payload_type, port)
+            for alias, ports in self.connected_flow_map.get(io_type, {}).items():
+                ports = [ports] if not isinstance(ports, list) else ports
+                if alias not in self.flow_map[io_type]:
+                    # If the alias is not in flow_map, infer the payload type and add it to flow_map
+                    payload_type = ports[0].payload_type if ports else None
+                    if payload_type:
+                        self.flow_map[io_type][alias] = payload_type
+                        self._setup_port_from_type(io_type, alias, payload_type)
+                    else:
+                        raise ValueError(f"Cannot infer payload type for {io_type} port '{alias}'")
+                
+                for port in ports:
+                    if io_type == 'input':
+                        self.connect_input(alias, port)
+                    else:
+                        self.connect_output(alias, port)
 
     def _setup_port_from_type(self, io_type, alias, payload_type):
+        if payload_type is None:
+            raise ValueError(f"Payload type for {io_type} port '{alias}' cannot be None")
+        
         if io_type == 'input':
             self._setup_input_port(alias, payload_type)
-        else:
+        elif io_type == 'output':
             self._setup_output_port(alias, payload_type)
 
-    def _setup_input_port(self, alias, payload_type, existing_port=None):
+    def _setup_input_port(self, alias, payload_type):
         if alias.startswith('multi_'):
             self.flow_port_map[alias] = {}
             return
@@ -194,11 +241,8 @@ class FlowController(Element):
         
         input_port = self.ports.add_input(alias, unpack_payload_callback=unpack)
         self.flow_port_map[alias].input_port = input_port
-        
-        if existing_port:
-            existing_port.connect(input_port)
 
-    def _setup_output_port(self, alias, payload_type, existing_port=None):
+    def _setup_output_port(self, alias, payload_type):
         if alias.startswith('multi_'):
             self.flow_port_map[alias] = {}
             return
@@ -212,9 +256,6 @@ class FlowController(Element):
             output_port=output_port,
             payload_type=payload_type
         )
-        
-        if existing_port:
-            output_port.connect(existing_port)
 
     def connect_input(self, alias: str, other_output_port):
         """
@@ -251,7 +292,7 @@ class FlowController(Element):
         return input_flow_port
 
     def _invoke_flow(self, input_port_name: str, payload):
-        is_multi = (input_port_name.startswith('multi_'))
+        is_multi = input_port_name.startswith('multi_')
         if is_multi:
             # Make sure to extract alias from port name
             num_suffix = input_port_name.rsplit('_')[-1]

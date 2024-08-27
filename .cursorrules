@@ -25,3 +25,6 @@ chat_interface:
 
 # Development Priorities
 Pyllments code is prioritized on being developer-friendly, where extensibility and modularity are first-class citizens. Elements should be customizeable with clean and intuitive interfaces. It should also be easy to create new elements depending on the needs of the developer. 
+
+# Documentation
+Docstrings should use a NumPy/SciPy style.
