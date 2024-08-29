@@ -9,36 +9,29 @@ from pyllments.ports.ports import InputPort, OutputPort
 
 class FlowPort(param.Parameterized):
     """Special Port wrapper for port management in the flow controller"""
-
-    payload_type = param.Parameter(doc="""
-        Payload type for this port""")
+    payload_type = param.Parameter(doc="Payload type for this port")
     
-    def __init__(self, payload_type: type, **params):
+    def __init__(self, **params):
         super().__init__(**params)
-        self.payload_type = payload_type
 
-
+# Update OutputFlowPort and InputFlowPort similarly
 class OutputFlowPort(FlowPort):
-    """Special OutputPort wrapper for port management in the flow controller"""
+    output_port = param.ClassSelector(class_=OutputPort, doc="Output port the flow port wraps")
 
-    output_port = param.ClassSelector(class_=OutputPort, doc="""
-        Output port the flow port wraps""")
+    def __init__(self, **params):
+        super().__init__(**params)
 
     def emit(self, payload: Payload):
         self.output_port.stage_emit(payload=payload)
 
-
 class InputFlowPort(FlowPort):
-    """Special InputPort wrapper for port management in the flow controller"""
+    input_port = param.ClassSelector(class_=InputPort, doc="Input port the flow port wraps")
+    payload = param.ClassSelector(default=None, class_=Payload, doc="Most recent payload that arrived at this port.")
 
-    input_port = param.ClassSelector(class_=InputPort, doc="""
-        Input port the flow port wraps""")
-    
-    payload = param.ClassSelector(default=None, class_=Payload, doc="""
-        Most recent payload that arrived at this port.
-        Removed after ingested by the flow_fn.
-        `new` flag is used to help caller determine if a new payload exists""")
-    
+    def __init__(self, name: str, payload_type: type, input_port: InputPort, **params):
+        super().__init__(name, payload_type, **params)
+        self.input_port = input_port
+
 
 class FlowPortMap(UserDict):
     """
@@ -234,7 +227,7 @@ class FlowController(Element):
             self.flow_port_map[alias] = {}
             return
         
-        self.flow_port_map[alias] = InputFlowPort(payload_type=payload_type)
+        self.flow_port_map[alias] = InputFlowPort(name=alias, payload_type=payload_type)
         
         def unpack(payload: payload_type):
             self._invoke_flow(alias, payload)
@@ -253,6 +246,7 @@ class FlowController(Element):
         output_port = self.ports.add_output(alias, pack_payload_callback=pack)
         
         self.flow_port_map[alias] = OutputFlowPort(
+            name=alias,
             output_port=output_port,
             payload_type=payload_type
         )
@@ -284,9 +278,10 @@ class FlowController(Element):
         other_output_port.connect(input_port)
 
         input_flow_port = InputFlowPort(
-            input_port=input_port
+            name=port_alias,
+            input_port=input_port,
+            payload_type=port_type
         )
-        input_flow_port.payload_type = port_type
 
         self.flow_port_map[alias][port_alias] = input_flow_port
         return input_flow_port
@@ -343,6 +338,7 @@ class FlowController(Element):
         self.ports.output[port_alias].connect(other_input_port)
 
         output_flow_port = OutputFlowPort(
+            name=port_alias,
             output_port=output_port,
             payload_type=port_type
         )
