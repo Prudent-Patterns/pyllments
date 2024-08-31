@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union, List, Dict, get_origin, get_args
+from typing import TYPE_CHECKING, Union, List, Dict, get_origin, get_args, Any
 import inspect
 from uuid import uuid4
 
@@ -143,13 +143,14 @@ class OutputPort(Port):
                 for name, type_ in annotations.items()
             }
             self.type_checking = True
-        # In the case of desired type-checking - enabled when required items are tuples
-        elif self.required_items and next(iter(self.required_items))['type']:
+        elif self.required_items and isinstance(next(iter(self.required_items)), dict):
             self.type_checking = True
-        # No type checking, just a list of required items
         elif self.required_items:
-            self.required_items = {item: {'value': None, 'type': None} for item in self.required_items}
-
+            self.required_items = {item: {'value': None, 'type': Any} for item in self.required_items}
+        else:
+            # If no required_items are specified, assume a single 'payload' item of Any type
+            self.required_items = {'payload': {'value': None, 'type': Any}}
+            self.type_checking = False
 
     def connect(self, input_ports: Union[InputPort, tuple[InputPort], list[InputPort]]):
         """Connects self and the other InputPort(s)"""
@@ -166,6 +167,10 @@ class OutputPort(Port):
                             f"to '{input_port.name}' ({type(input_port).__name__})")
             
             def _is_compatible(output_type, input_type):
+                # If output_type is Any, it's compatible with any input_type
+                if output_type is Any:
+                    return True
+                
                 # If types are identical, they're compatible
                 if output_type == input_type:
                     return True
@@ -218,7 +223,7 @@ class OutputPort(Port):
                 raise ValueError(f"'{name}' is not a required item for port '{self.name}'")
             if self.type_checking and not bypass_type_check:
                 expected_type = self.required_items[name]['type']
-                if not isinstance(value, expected_type):
+                if expected_type is not Any and not isinstance(value, expected_type):
                     raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
                                      f"is not an instance of {expected_type}")
             self.required_items[name]['value'] = value
@@ -235,7 +240,11 @@ class OutputPort(Port):
     def emit(self):
         """Packs the payload and emits it to all registered observers"""
         if not self.emit_ready:
-            raise Exception(f"Staged items do not match required items for port '{self.name}'")
+            raise ValueError(f"Emit failed for port '{self.name}' in element '{type(self.containing_element).__name__}': "
+                             f"Not all required items have been staged. "
+                             f"Required items: {list(self.required_items.keys())}. "
+                             f"Staged items: {[name for name, item in self.required_items.items() if item['value'] is not None]}. "
+                             "Please ensure all required items are staged before emitting.")
         else:
             packed_payload = self.pack_payload()        
         # Log the element name, port name, and type of payload being emitted

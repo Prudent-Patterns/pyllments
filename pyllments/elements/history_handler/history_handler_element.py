@@ -10,6 +10,7 @@ from pyllments.payloads.message.message_payload import MessagePayload
 from .history_handler_model import HistoryHandlerModel
 
 class HistoryHandlerElement(Element):
+    # TODO Add filtering support
     """
     Responsible for building the context that is sent to the LLM
     Model:
@@ -36,7 +37,7 @@ class HistoryHandlerElement(Element):
         self._create_watchers()
 
     def _message_input_setup(self):
-        def unpack(payload: MessagePayload):
+        def unpack(payload: MessagePayload): # TODO: Needs to work with list[MessagePayload]
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
             if (payload.model.mode == 'stream' and
