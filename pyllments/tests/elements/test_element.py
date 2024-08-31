@@ -7,11 +7,11 @@ from pyllments.base.element_base import Element
 
 class TestElement(Element):
     """
-    A simple element for testing purposes.
-    It has one input port and one output port to send and receive payloads.
+    Element used to test the inputs and outputs of other elements.
+    When set up as an input element, it will store the received payloads in a list.
+    When set up as an output element, it will emit the the specified payload with send_payload
     """
     received_payloads = param.List(default=[], doc="List of received payloads")
-    # output_payload = param.Parameter(default=None, doc="Payload to be emitted")
 
     def __init__(self, **params):
         super().__init__(**params)
