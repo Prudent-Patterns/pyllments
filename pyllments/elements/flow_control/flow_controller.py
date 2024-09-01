@@ -1,5 +1,6 @@
 from collections import UserDict
 import param
+from typing import Any
 
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
@@ -28,9 +29,9 @@ class InputFlowPort(FlowPort):
     input_port = param.ClassSelector(class_=InputPort, doc="Input port the flow port wraps")
     payload = param.ClassSelector(default=None, class_=Payload, doc="Most recent payload that arrived at this port.")
 
-    def __init__(self, name: str, payload_type: type, input_port: InputPort, **params):
-        super().__init__(name, payload_type, **params)
-        self.input_port = input_port
+    def __init__(self, **params):
+        super().__init__(**params)
+      
 
 
 class FlowPortMap(UserDict):
@@ -227,13 +228,16 @@ class FlowController(Element):
             self.flow_port_map[alias] = {}
             return
         
-        self.flow_port_map[alias] = InputFlowPort(name=alias, payload_type=payload_type)
-        
         def unpack(payload: payload_type):
             self._invoke_flow(alias, payload)
         
         input_port = self.ports.add_input(alias, unpack_payload_callback=unpack)
-        self.flow_port_map[alias].input_port = input_port
+        
+        self.flow_port_map[alias] = InputFlowPort(
+            name=alias,
+            payload_type=payload_type,
+            input_port=input_port
+        )
 
     def _setup_output_port(self, alias, payload_type):
         if alias.startswith('multi_'):

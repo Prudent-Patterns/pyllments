@@ -166,9 +166,9 @@ class OutputPort(Port):
                             f"Attempted to connect '{self.name}' ({type(self).__name__}) "
                             f"to '{input_port.name}' ({type(input_port).__name__})")
             
-            def _is_compatible(output_type, input_type):
-                # If output_type is Any, it's compatible with any input_type
-                if output_type is Any:
+            def _is_compatible(output_type, input_type):                
+                # If either type is Any, they're compatible
+                if output_type is Any or input_type is Any:
                     return True
                 
                 # If types are identical, they're compatible
@@ -192,10 +192,18 @@ class OutputPort(Port):
                     return _is_compatible(output_type, get_args(input_type)[0])
                 
                 # Check for subclass relationship for non-generic types
-                return issubclass(output_type, input_type)
+                try:
+                    result = issubclass(output_type, input_type)
+                    return result
+                except TypeError as e:
+                    print(f"TypeError in subclass check. output_type: {output_type}, input_type: {input_type}",
+                          f"\n\n{e}")
+                    return False
             
             # Actually call _is_compatible with the payload types
-            return _is_compatible(self.payload_type, input_port.payload_type)
+            compatibility_result = _is_compatible(self.payload_type, input_port.payload_type)
+        
+            return compatibility_result
         
         # Connect each InputPort in the iterable
         for port in (input_ports if is_iterable else (input_ports,)):
@@ -223,9 +231,18 @@ class OutputPort(Port):
                 raise ValueError(f"'{name}' is not a required item for port '{self.name}'")
             if self.type_checking and not bypass_type_check:
                 expected_type = self.required_items[name]['type']
-                if expected_type is not Any and not isinstance(value, expected_type):
-                    raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
-                                     f"is not an instance of {expected_type}")
+                if expected_type is not Any:
+                    if get_origin(expected_type) is Union:
+                        if not any(isinstance(value, t) for t in get_args(expected_type)):
+                            raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
+                                             f"is not an instance of any type in {expected_type}")
+                    elif get_origin(expected_type) is list:
+                        if not (isinstance(value, list) and all(isinstance(item, get_args(expected_type)[0]) for item in value)):
+                            raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
+                                             f"is not a list of {get_args(expected_type)[0]}")
+                    elif not isinstance(value, expected_type):
+                        raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
+                                         f"is not an instance of {expected_type}")
             self.required_items[name]['value'] = value
             
             # Log each individual staged item
