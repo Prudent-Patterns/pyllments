@@ -155,13 +155,7 @@ class ContextBuilder(param.Parameterized):
 
     def _flow_fn_setup(self):
         """Sets up the flow function for the flow controller"""
-        flow_map_args = [
-            *list(self.flow_controller.flow_map['input'].keys()),
-            'active_input_port',
-            'c',
-            'messages_output'
-        ]
-    
+        
         def validate_build_map(build_map):
             for input_port_name, input_items in build_map.items():
                 if input_port_name not in self.input_map:
@@ -169,71 +163,65 @@ class ContextBuilder(param.Parameterized):
                 for input_item in input_items:
                     if input_item not in self.input_map:
                         raise ValueError(f"Input item {input_item} not found in input_map")
-                     
-        validate_build_map(self.build_map)
-        preset_messages_kwargs = [f"{k}=self.preset_messages['{k}']" for k in self.preset_messages.keys()]
-        flow_map_kwargs = [f"{k}=self.flow_controller.flow_port_map['{k}']" for k in self.flow_controller.flow_port_map.keys()]
-        other_kwargs = ["c=c", "active_input_port=active_input_port"]
-        # code is meant to run every time a new input payload is received
-        code = f"""
-def flow_fn({', '.join(flow_map_args)}):
-    if self.build_fn:
-        print("{', '.join(flow_map_kwargs + preset_messages_kwargs + other_kwargs)}")
-        self.build_fn({', '.join(flow_map_kwargs + preset_messages_kwargs + other_kwargs)})
-    elif self.build_map:
-        input_port_keys = c.setdefault(
-            'input_port_keys',
-            [key for key in self.flow_controller.flow_port_map.keys()
-            if key != 'messages_output']
-        )
-        input_name_payload_dict = c.setdefault('input_name_payload_dict', {{}})
         
-        if c.get('is_ready', True):
-            input_keys_subset = self.build_map[active_input_port.name]
-            input_port_keys_subset = [key for key in input_keys_subset if key in input_port_keys]
-            c['input_keys_subset'] = input_keys_subset
-            c['input_port_keys_subset'] = input_port_keys_subset
-            c['is_ready'] = False
-        else:
-            input_keys_subset = c['input_keys_subset']
-            input_port_keys_subset = c['input_port_keys_subset']
+        validate_build_map(self.build_map)
 
-        if active_input_port.name in input_keys_subset:
-            input_name_payload_dict[active_input_port.name] = active_input_port.payload
+        def flow_fn(**kwargs):
+            active_input_port = kwargs['active_input_port']
+            c = kwargs['c']
+            messages_output = kwargs['messages_output']
 
-            if all([key in input_name_payload_dict for key in input_port_keys_subset]):
-                msg_payload_list = [
-                    to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
-                    if not isinstance(self.input_map[key][1], str)
-                    else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
-                    for key in input_keys_subset
-                ]
-                messages_output.emit(msg_payload_list)
-                c['is_ready'] = True
-                c['input_name_payload_dict'].clear()
-    else:
-        input_port_keys = c.setdefault(
-            'input_port_keys',
-                [key for key in self.flow_controller.flow_port_map.keys()
-                if key != 'messages_output']
-        )
-        input_name_payload_dict = c.setdefault('input_name_payload_dict', {{}})
-        input_name_payload_dict[active_input_port.name] = active_input_port.payload
-        if all([key in input_name_payload_dict for key in input_port_keys]):
-            msg_payload_list = [
-                to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
-                if not isinstance(self.input_map[key][1], str)
-                else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
-                for key in self.input_map.keys()
-            ]
-            messages_output.emit(msg_payload_list)
-            input_name_payload_dict.clear()
-        """
-        compiled_code = compile(code, 'context_builder_element.py', 'exec')
-        flow_fn = FunctionType(
-            compiled_code.co_consts[0],
-            {'self': self, 'to_message_payload': to_message_payload}
-        )
+            if self.build_fn:
+                self.build_fn(**kwargs)
+            elif self.build_map:
+                input_port_keys = c.setdefault(
+                    'input_port_keys',
+                    [key for key in self.flow_controller.flow_port_map.keys()
+                    if key != 'messages_output']
+                )
+                input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
+                
+                if c.get('is_ready', True):
+                    input_keys_subset = self.build_map[active_input_port.name]
+                    input_port_keys_subset = [key for key in input_keys_subset if key in input_port_keys]
+                    c['input_keys_subset'] = input_keys_subset
+                    c['input_port_keys_subset'] = input_port_keys_subset
+                    c['is_ready'] = False
+                else:
+                    input_keys_subset = c['input_keys_subset']
+                    input_port_keys_subset = c['input_port_keys_subset']
+
+                if active_input_port.name in input_keys_subset:
+                    input_name_payload_dict[active_input_port.name] = active_input_port.payload
+
+                    if all([key in input_name_payload_dict for key in input_port_keys_subset]):
+                        msg_payload_list = [
+                            to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
+                            if not isinstance(self.input_map[key][1], str)
+                            else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
+                            for key in input_keys_subset
+                        ]
+                        messages_output.emit(msg_payload_list)
+                        c['is_ready'] = True
+                        c['input_name_payload_dict'].clear()
+            else:
+                input_port_keys = c.setdefault(
+                    'input_port_keys',
+                    [key for key in self.flow_controller.flow_port_map.keys()
+                    if key != 'messages_output']
+                )
+                input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
+                input_name_payload_dict[active_input_port.name] = active_input_port.payload
+                if all([key in input_name_payload_dict for key in input_port_keys]):
+                    msg_payload_list = [
+                        to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
+                        if not isinstance(self.input_map[key][1], str)
+                        else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
+                        for key in self.input_map.keys()
+                    ]
+                    messages_output.emit(msg_payload_list)
+                    input_name_payload_dict.clear()
+
         return flow_fn
 
     def _create_message(self, msg_type, text):
