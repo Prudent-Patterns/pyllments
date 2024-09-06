@@ -18,6 +18,8 @@ chat_interface:
         - column.css
         - input.css
 
+
+
 # Primary Libraries Used
 - Panel is used to create the visualization layer and run the GUI. Views tend to consist of Panel objects which can be styled with Python and CSS.
 - Param is used to create parameterized classes which help create parameters that handle type validation, default values, constraints, and most importantly, reactivity(setting event handlers to catch changes).

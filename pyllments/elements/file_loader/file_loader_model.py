@@ -1,13 +1,13 @@
 import param
 
 from pyllments.base.model_base import Model
+from pyllments.payloads.file.file_payload import FilePayload
 
 
 class FileLoaderModel(Model):
-    save_to_disk = param.Boolean(default=False, doc='Whether to save the file to disk')
+    save_to_disk = param.Boolean(default=False, doc='Whether to save the files to disk')
     file_dir = param.String(default='', doc='Directory which files are saved to')
     # TODO: Async file saving when batched
-    b_file = param.ClassSelector(class_=bytes, doc='Bytes object of file')
     file_list = param.List(default=[], doc='List of files')
     
     def __init__(self, **params):
@@ -15,9 +15,13 @@ class FileLoaderModel(Model):
         
         self._create_watchers()
 
-    def save_file(self):
-        with open(self.file_dir, "wb") as file:
-            file.write(self.b_file)
+    def stage_file(self, filename: str, b_file: bytes, mime_type: str = None):
+        self.file_list.append(FilePayload(filename=filename, b_file=b_file, mime_type=mime_type))
+
+    def save_files(self):
+        for file in self.file_list:
+            with open(self.file_dir, "wb") as file:
+                file.write(file.b_file)
 
     def _create_watchers(self):
         if self.save_to_disk:
