@@ -16,17 +16,19 @@ class FilePayload(Payload):
 
     def __init__(
             self, 
-            filename: Optional[str] = None, 
-            b_file: Optional[bytes] = None, 
-            local_path: Optional[Path] = None, 
-            remote_path: Optional[Path] = None,
+            filename: Optional[str] = '', 
+            b_file: Optional[bytes] = b'', 
+            local_path: Optional[str] = '', 
+            remote_path: Optional[str] = '',
+            mime_type: Optional[str] = '',
             **params):
         super().__init__(**params)
         self.model = FileModel(
             filename=filename,
             b_file=b_file,
             local_path=local_path,
-            remote_path=remote_path
+            remote_path=remote_path,
+            mime_type=mime_type
         )
 
     @Component.view

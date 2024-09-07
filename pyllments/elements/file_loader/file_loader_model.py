@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import param
 
 from pyllments.base.model_base import Model
@@ -16,12 +18,19 @@ class FileLoaderModel(Model):
         self._create_watchers()
 
     def stage_file(self, filename: str, b_file: bytes, mime_type: str = None):
-        self.file_list.append(FilePayload(filename=filename, b_file=b_file, mime_type=mime_type))
+        file_payload = FilePayload(
+            filename=filename, 
+            b_file=b_file, 
+            mime_type=mime_type,
+            local_path=str(Path(self.file_dir, filename))
+        )
+        self.file_list.append(file_payload)
+        return file_payload
 
     def save_files(self):
         for file in self.file_list:
-            with open(self.file_dir, "wb") as file:
-                file.write(file.b_file)
+            with open(Path(self.file_dir, file.model.filename), "wb") as f:
+                f.write(file.model.b_file)
 
     def _create_watchers(self):
         if self.save_to_disk:

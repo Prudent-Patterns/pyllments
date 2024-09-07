@@ -10,7 +10,7 @@ input[type="file"] {
   }
   
   input[type="file"]::before {
-    content: 'Add Files Here';
+    content: 'Click to Add FIles';
     display: block;
     width: 100%;
     height: 100%;
