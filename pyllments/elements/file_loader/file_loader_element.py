@@ -74,7 +74,8 @@ class FileLoaderElement(Element):
             stylesheets=container_css,
             sizing_mode=sizing_mode,
             height=height,
-            width=width)
+            width=width,
+            scroll=True)
         for file in self.model.file_list:
             self.file_container_view.append(file.create_file_view())
 
