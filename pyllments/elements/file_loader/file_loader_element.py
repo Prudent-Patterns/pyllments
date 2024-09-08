@@ -8,7 +8,7 @@ from pyllments.payloads.file import FilePayload
 
 
 class FileLoaderElement(Element):
-    file_input_view = param.ClassSelector(class_=pn.Column, doc="""
+    file_input_view = param.ClassSelector(class_=pn.widgets.FileInput, doc="""
         View responsible for selecting files, and uploading them""")
     file_container_view = param.ClassSelector(class_=pn.Column, doc="""
         View responsible for displaying the files""")
@@ -46,23 +46,21 @@ class FileLoaderElement(Element):
         self, 
         input_css: list = [],
         sizing_mode: str = 'stretch_width',
-        width: int = None, 
-        height: int = 10,
-        ):
+        width: int = None):
         """Creates the 'Add Files Here' Button"""
         def new_file(event):
             obj = event.obj
             for filename, b_file, mime_type in zip(obj.filename, obj.value, obj.mime_type):
                 file_payload =self.model.stage_file(filename, b_file, mime_type)
-                if self.file_container_view:
+                if isinstance(self.file_container_view, pn.Column):
                     self.file_container_view.append(file_payload.create_file_view())
             if not self.file_send_view: # When there's no send button automatically emit
                 self.emit_files()            
 
-        file_input = pn.widgets.FileInput(
-            multiple=True, stylesheets=input_css, sizing_mode=sizing_mode, width=width, height=height)
-        file_input.param.watch(new_file, 'value')
-        return file_input
+        self.file_input_view = pn.widgets.FileInput(
+            multiple=True, stylesheets=input_css, sizing_mode=sizing_mode, width=width)
+        self.file_input_view.param.watch(new_file, 'value')
+        return self.file_input_view
     
     @Component.view
     def create_file_container_view(
@@ -72,15 +70,15 @@ class FileLoaderElement(Element):
         height: int = None,
         width: int = None):
         """Creates the container holding a visual of the uploaded files"""
-        file_container = pn.Column(
+        self.file_container_view = pn.Column(
             stylesheets=container_css,
             sizing_mode=sizing_mode,
             height=height,
             width=width)
         for file in self.model.file_list:
-            file_container.append(file.create_file_view())
+            self.file_container_view.append(file.create_file_view())
 
-        return file_container
+        return self.file_container_view
     
     @Component.view
     def create_file_send_view(
@@ -115,15 +113,14 @@ class FileLoaderElement(Element):
         """Creates a composition of the button and file container"""
 
         file_input_view = self.create_file_input_view()
-        file_container_view = self.create_file_container_view(
-            sizing_mode='stretch_both')
+        file_container_view = self.create_file_container_view()
         file_send_view = self.create_file_send_view()
 
-        return pn.Column(
+        self.file_loader_view = pn.Column(
             file_input_view,
             file_container_view, 
             file_send_view, 
             width=width, 
             height=height, 
             sizing_mode=sizing_mode)
-    
+        return self.file_loader_view

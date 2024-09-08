@@ -50,11 +50,13 @@ class Component(param.Parameterized):
         def wrapper(self, *args, **kwargs):
             # Get the view attribute name from the function name
             view_attr_name = func.__name__.replace('create_', '') + '_view'
-            
-            # Check if the view already exists
-            if hasattr(self, view_attr_name) and getattr(self, view_attr_name) is not None:
-                warnings.warn(f'{view_attr_name} already exists. Returning existing view.')
-                return getattr(self, view_attr_name)
+            # The expected class is checked due to Row and Column layouts using __len__ in if statements
+            if hasattr(self, view_attr_name):
+                existing_view = getattr(self, view_attr_name)
+                expected_class = self.param[view_attr_name].class_
+                if isinstance(existing_view, expected_class):
+                    warnings.warn(f'{view_attr_name} already exists. Returning existing view.')
+                    return existing_view
 
             # If the view doesn't exist, proceed with CSS loading and view creation
             view_name = func.__name__.replace('create_', '')

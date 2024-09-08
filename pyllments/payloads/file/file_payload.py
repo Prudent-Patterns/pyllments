@@ -33,8 +33,8 @@ class FilePayload(Payload):
 
     @Component.view
     def create_file_view(
-            self, 
-            icon_css: list = [],
+            self,
+            width: int = None,            icon_css: list = [],
             markdown_css: list = [],
             row_css: list = [],
             char_limit: Optional[int] = None):
@@ -63,4 +63,4 @@ class FilePayload(Payload):
         markdown = pn.pane.Markdown(
             filename, stylesheets=markdown_css)  
         
-        return pn.Row(icon_html, markdown, stylesheets=row_css)
+        return pn.Row(icon_html, markdown, sizing_mode='stretch_width', width=width, stylesheets=row_css)
