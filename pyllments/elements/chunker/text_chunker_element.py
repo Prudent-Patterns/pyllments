@@ -10,9 +10,9 @@ from pyllments.payloads.file import FilePayload
 
 class TextChunkerElement(Element):
 
-    def __init__(self, **params):
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 150, **params):
         super().__init__(**params)
-        self.model = TextChunkerModel()
+        self.model = TextChunkerModel(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         
         self._file_input_setup()
         self._chunk_output_setup()

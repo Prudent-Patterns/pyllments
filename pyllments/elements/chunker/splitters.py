@@ -6,10 +6,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 def base_text_splitter(
         file: TextIOWrapper, 
-        chunk_size: int, 
-        chunk_overlap, 
+        chunk_size: int = 200, # TODO Change to a golden value later
+        chunk_overlap: int = 20, 
         length_function = len, 
         keep_separator = False):
+    # namedtuple used for efficiency
     Chunk = namedtuple('Chunk', ['text', 'start_index', 'end_index'])
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, 

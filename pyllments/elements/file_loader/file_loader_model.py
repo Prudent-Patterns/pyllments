@@ -14,7 +14,9 @@ class FileLoaderModel(Model):
     
     def __init__(self, **params):
         super().__init__(**params)
-        
+        if self.file_dir and self.save_to_disk:
+            Path(self.file_dir).mkdir(parents=True, exist_ok=True)
+
         self._create_watchers()
 
     def stage_file(self, filename: str, b_file: bytes, mime_type: str = None):
@@ -31,7 +33,8 @@ class FileLoaderModel(Model):
         for file in self.file_list:
             with open(Path(self.file_dir, file.model.filename), "wb") as f:
                 f.write(file.model.b_file)
+        self.file_list = []
+        
 
     def _create_watchers(self):
-        if self.save_to_disk:
-            self.param.watch(self.save_file, 'b_file')
+        pass

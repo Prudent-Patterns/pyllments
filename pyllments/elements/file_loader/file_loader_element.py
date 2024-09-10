@@ -16,10 +16,10 @@ class FileLoaderElement(Element):
         View responsible for displaying the file input and file container""")
     file_send_view = param.ClassSelector(class_=pn.widgets.Button, doc="""
         View responsible for sending the files to the server""")
-
-    def __init__(self, **params):
+    # TODO: Needs to have views responsible for dispalying the sending process as well as the stored files
+    def __init__(self, file_dir: str = '', **params):
         super().__init__(**params)
-        self.model = FileLoaderModel()
+        self.model = FileLoaderModel(file_dir=file_dir)
 
         self._file_output_setup()
 
@@ -34,7 +34,8 @@ class FileLoaderElement(Element):
         self._create_file_list_watcher()    
         
     def emit_files(self):
-        self.model.save_files()
+        if self.model.save_to_disk:
+            self.model.save_files()
         self.ports.output['file_list_output'].stage_emit(self.model.file_list)
     # def _create_file_list_watcher(self):
     #     def on_file_list_change(event):
@@ -46,7 +47,8 @@ class FileLoaderElement(Element):
         self, 
         input_css: list = [],
         sizing_mode: str = 'stretch_width',
-        width: int = None):
+        width: int = None,
+        ):
         """Creates the 'Add Files Here' Button"""
         def new_file(event):
             obj = event.obj
@@ -99,9 +101,10 @@ class FileLoaderElement(Element):
             sizing_mode=sizing_mode,
             align='center')
         def send(event):
-            self.model.save_files()
-            self.file_container_view.clear()
-
+            if self.model.save_to_disk:
+                self.model.save_files()
+            # self.file_container_view.clear() # TODO: change back when there's a new view for the stored files
+            self.ports.output['file_list_output'].stage_emit(file_list=self.model.file_list)
         self.file_send_view.on_click(send)
         return self.file_send_view
 

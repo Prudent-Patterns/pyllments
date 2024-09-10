@@ -5,6 +5,11 @@ from pyllments.elements.chunker.splitters import base_text_splitter
 
 class TextChunkerModel(Model):
     
+    chunk_size = param.Integer(default=1000, doc="""
+        The size of the chunks to be created""")
+    chunk_overlap = param.Integer(default=200, doc="""
+        The overlap of the chunks to be created""")
+        
     # For ease for modification, returns named tuples to be processed by the model
     splitter_fn = param.Callable(default=base_text_splitter, doc="""
         Should return a list of Chunk Payloads given a File Payload""")

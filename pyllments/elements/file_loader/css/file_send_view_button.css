@@ -1,3 +1,4 @@
-bk-btn bk-btn-default {
-    background-color: #12B86C;
+:host(.solid) .bk-btn.bk-btn-default {
+    background-color: var(--tertiary-accent-color);
+    color: var(--white);
 }
