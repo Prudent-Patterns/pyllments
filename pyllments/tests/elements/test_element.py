@@ -21,6 +21,7 @@ class TestElement(Element):
         def unpack(payload: Any):
             """Store the received payload"""
             self.received_payloads.append(payload)
+            
         self.ports.add_input(
             name='test_input',
             unpack_payload_callback=unpack

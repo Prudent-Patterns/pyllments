@@ -5,7 +5,7 @@ from uuid import uuid4
 import param
 
 from pyllments.base.payload_base import Payload
-from pyllments.logging import log_staging, log_emit, log_receive
+from pyllments.logging import log_staging, log_emit, log_receive, log_connect
 
 
 class Port(param.Parameterized):
@@ -58,7 +58,7 @@ class InputPort(Port):
             if not self._validate_payload(payload):
                 raise TypeError(f"Incompatible payload type for port '{self.name}'. "
                                 f"Expected {self.payload_type}, got {type(payload)}")
-        log_receive(self.containing_element, self.name, payload)
+        log_receive(self, payload)
         self.unpack_payload_callback(payload)
         self.output_ports_validation_map[output_port] = True
 
@@ -220,7 +220,7 @@ class OutputPort(Port):
             port.connected_elements.append(self.containing_element)
             port.output_ports.append(self)
             port.output_ports_validation_map[self] = False
-        
+            log_connect(self, port)
         if not is_iterable:
             return input_ports
 
@@ -246,7 +246,7 @@ class OutputPort(Port):
             self.required_items[name]['value'] = value
             
             # Log each individual staged item
-            log_staging(self.containing_element, self.name, name, value)
+            log_staging(self, name, value)
 
         if self._emit_ready_check():
             self.emit_ready = True
@@ -265,7 +265,7 @@ class OutputPort(Port):
         else:
             packed_payload = self.pack_payload()        
         # Log the element name, port name, and type of payload being emitted
-        log_emit(self.containing_element, self.name, packed_payload)
+        log_emit(self, packed_payload)
         for port in self.input_ports:
             port.receive(packed_payload, self)
         

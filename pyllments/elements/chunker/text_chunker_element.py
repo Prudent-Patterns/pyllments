@@ -16,6 +16,8 @@ class TextChunkerElement(Element):
         
         self._file_input_setup()
         self._chunk_output_setup()
+        
+        self._set_chunk_payloads_watcher()
 
     def _file_input_setup(self):
         def unpack(payload: Union[FilePayload, list[FilePayload]]):
@@ -26,7 +28,7 @@ class TextChunkerElement(Element):
 
     def _chunk_output_setup(self):
         def pack(chunk_payloads: list[ChunkPayload]) -> list[ChunkPayload]:
-            with param.parameterized.disable_events():
+            with param.parameterized.discard_events(self.model):
                 self.model.chunk_payloads = [] # Clean up
             return chunk_payloads
         
@@ -35,7 +37,7 @@ class TextChunkerElement(Element):
     def _set_chunk_payloads_watcher(self):
         def fn(event):
             self.ports.output['chunk_output'].stage_emit(chunk_payloads=self.model.chunk_payloads)
-            with param.parameterized.disable_events():
+            with param.parameterized.discard_events(self.model):
                 self.model.chunk_payloads = [] # Clean up
 
         self.model.param.watch(fn, 'chunk_payloads')                             

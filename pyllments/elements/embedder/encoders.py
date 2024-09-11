@@ -3,8 +3,8 @@ import param
 from sentence_transformers import SentenceTransformer
 
 
-class SentenceTransformerEncoder(param.parameterized):
-    model_name = param.String(default="'Alibaba-NLP/gte-base-en-v1.5'", doc="""
+class SentenceTransformerEncoder(param.Parameterized):
+    model_name = param.String(default="Alibaba-NLP/gte-base-en-v1.5", doc="""
         The name of the model to use""")
     
     model = param.ClassSelector(class_=SentenceTransformer)
