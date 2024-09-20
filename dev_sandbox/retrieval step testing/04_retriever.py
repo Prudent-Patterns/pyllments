@@ -43,11 +43,13 @@ body {
 from pyllments.elements.chunker import TextChunkerElement
 from pyllments.elements.embedder import EmbedderElement
 from pyllments.elements.file_loader import FileLoaderElement
+from pyllments.elements.retriever import RetrieverElement
 from pyllments.tests import TestElement
 
 file_loader_element = FileLoaderElement(file_dir='loaded_files')
 chunker_element = TextChunkerElement(chunk_size=200, chunk_overlap=20)
 embedder_element = EmbedderElement()
+retriever_element = RetrieverElement()
 
 test_element = TestElement()
 

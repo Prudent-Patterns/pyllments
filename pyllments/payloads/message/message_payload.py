@@ -17,6 +17,7 @@ class MessagePayload(Payload):
             mode: Literal['stream', 'atomic', 'batch'] = 'stream',
             message_stream: Optional[Generator | AsyncGenerator] = None,
             is_multimodal: bool = False,
+            embedding = None,
             **params):
         super().__init__(**params)
         self.model = MessageModel(
@@ -24,7 +25,8 @@ class MessagePayload(Payload):
             message=message,
             message_stream=message_stream,
             mode=mode,
-            is_multimodal=is_multimodal)
+            is_multimodal=is_multimodal,
+            embedding=embedding)
 
     @Component.view
     def create_message_view(

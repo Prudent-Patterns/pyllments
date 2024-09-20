@@ -13,4 +13,4 @@ class ChunkModel(Model):
     end_idx = param.Integer(allow_None=True, doc="""
         End index of chunk in source file""")
     embedding = param.Parameter(doc=""" # TODO: Type this properly
-        Embedding of chunk""")
+        Embedding of chunk - likely ndarray(np.float32)""")

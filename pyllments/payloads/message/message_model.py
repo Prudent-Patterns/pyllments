@@ -36,6 +36,8 @@ class MessageModel(Model):
         Used to estimate the token length of the message(s)""")
     tokenization_map = param.Dict(default={},doc="""
         Used to map the model tokenizer to the token len""")
+    embedding = param.Parameter(doc=""" # TODO: Type this properly
+        Embedding of message - likely ndarray(np.float32)""")
 
     def __init__(self, **params):
         super().__init__(**params)
