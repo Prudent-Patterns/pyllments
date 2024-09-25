@@ -29,3 +29,7 @@ input[type="file"] {
     width: 0;
     height: 0;
   }
+
+  :host {
+    margin: 0;
+  }

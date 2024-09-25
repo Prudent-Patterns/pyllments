@@ -44,20 +44,27 @@ from pyllments.elements.chunker import TextChunkerElement
 from pyllments.elements.embedder import EmbedderElement
 from pyllments.elements.file_loader import FileLoaderElement
 from pyllments.elements.retriever import RetrieverElement
+from pyllments.elements.chat_interface import ChatInterfaceElement
 from pyllments.tests import TestElement
 
 file_loader_element = FileLoaderElement(file_dir='loaded_files')
 chunker_element = TextChunkerElement(chunk_size=200, chunk_overlap=20)
 embedder_element = EmbedderElement()
 retriever_element = RetrieverElement()
+chat_interface_element = ChatInterfaceElement()
 
 test_element = TestElement()
 
 file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
-embedder_element.ports.output['embedding_output'] > test_element.ports.input['test_input']
+embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
+
+chat_interface_element.ports.output['message_output'] > retriever_element.ports.input['message_input']
+
+retriever_element.ports.output['chunk_output'] > test_element.ports.input['test_input']
 
 
 file_loader_view = file_loader_element.create_file_loader_view()
-pn.Column(file_loader_view, height=600, width=300).servable()
+chat_interface_view = chat_interface_element.create_interface_view()
+pn.Column(file_loader_view, chat_interface_view, height=600, width=300).servable()
 

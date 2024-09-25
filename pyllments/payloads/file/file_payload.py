@@ -14,30 +14,18 @@ icon_css_map = {
 
 class FilePayload(Payload):
 
-    def __init__(
-            self, 
-            filename: Optional[str] = '', 
-            b_file: Optional[bytes] = b'', 
-            local_path: Optional[str] = '', 
-            remote_path: Optional[str] = '',
-            mime_type: Optional[str] = '',
-            **params):
+    def __init__(self, **params):
         super().__init__(**params)
-        self.model = FileModel(
-            filename=filename,
-            b_file=b_file,
-            local_path=local_path,
-            remote_path=remote_path,
-            mime_type=mime_type
-        )
+        self.model = FileModel(**params)
 
     @Component.view
     def create_file_view(
-            self,
-            width: int = None,            icon_css: list = [],
-            markdown_css: list = [],
-            row_css: list = [],
-            char_limit: Optional[int] = None):
+        self,
+        width: int = None,
+        icon_css: list = [],
+        markdown_css: list = [],
+        row_css: list = [],
+        char_limit: Optional[int] = None):
         """View Responsible for displaying the file icon and filename"""
         # Extract the file suffix from the filename
         file_suffix = self.model.filename.split('.')[-1] if '.' in self.model.filename else ''

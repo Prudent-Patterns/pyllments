@@ -2,3 +2,6 @@
     background-color: var(--tertiary-accent-color);
     color: var(--white);
 }
+:host {
+    margin: 0;
+}

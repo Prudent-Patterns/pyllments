@@ -26,3 +26,4 @@ dependencies:
     - langchain-chroma
     - langchain-anthropic
     - ruamel.yaml
+    - duckdb

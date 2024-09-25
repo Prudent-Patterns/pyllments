@@ -53,7 +53,7 @@ test_element = TestElement()
 
 file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
-embedder_element.ports.output['embedding_output'] > test_element.ports.input['test_input']
+embedder_element.ports.output['processed_chunks_output'] > test_element.ports.input['test_input']
 
 
 file_loader_view = file_loader_element.create_file_loader_view()

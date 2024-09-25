@@ -1,48 +1,48 @@
 import param
+from typing import List
 
 from pyllments.base.model_base import Model
 from pyllments.elements.chunker.splitters import base_text_splitter
 from pyllments.payloads.chunk import ChunkPayload
+from pyllments.payloads.file import FilePayload
 
 class TextChunkerModel(Model):
     
-    chunk_size = param.Integer(default=1000, doc="""
-        The size of the chunks to be created""")
-    chunk_overlap = param.Integer(default=200, doc="""
-        The overlap of the chunks to be created""")
+    chunk_size = param.Integer(default=1000, doc="The size of the chunks to be created")
+    chunk_overlap = param.Integer(default=200, doc="The overlap of the chunks to be created")
 
-    # For ease for modification, returns named tuples to be processed by the model
-    splitter_fn = param.Callable(default=base_text_splitter, doc="""
-        Should return a list of Chunk Payloads given a File Payload""")
+    splitter_fn = param.Callable(default=base_text_splitter, doc="Should return a list of Chunk Payloads given a File Payload")
     file_types = param.List(default=['txt', 'md'])
-    multi_proc = param.Boolean(default=False, doc="""
-        When True, multiple processes will handle the files simultaneously""")
-    file_payloads = param.List(default=[], doc="""List of files to chunk""")
-    chunk_payloads = param.List(default=[], doc="""List of chunk payloads""")
+    multi_proc = param.Boolean(default=False, doc="When True, multiple processes will handle the files simultaneously")
     
     def __init__(self, **params):
         super().__init__(**params)
-        self._set_watchers()
 
-    def _set_watchers(self):
-        self._set_file_list_watcher()
-
-    def _set_file_list_watcher(self):
-        def fn(event):
-            for file_payload in self.file_payloads:
-                for chunk in self.splitter_fn(
-                    file_payload.model.b_file, 
-                    chunk_size=self.chunk_size, 
-                    chunk_overlap=self.chunk_overlap):
-                    self.chunk_payloads.append(
-                        ChunkPayload(
-                            text=chunk.text,
-                            source_file=file_payload,
-                            start_idx=chunk.start_index,
-                            end_idx=chunk.end_index
-                        )
-                    )
-                self.param.trigger('chunk_payloads') # To let the model know that the chunk_payloads have been updated
-            with param.parameterized.discard_events(self):
-                self.file_payloads = [] # Clean up
-        self.param.watch(fn, 'file_payloads')
+    def make_chunks(self, file_payload: FilePayload) -> List[ChunkPayload]:
+        """
+        Create chunks from a single file payload.
+        
+        Parameters:
+        -----------
+        file_payload : FilePayload
+            The file payload to be chunked.
+        
+        Returns:
+        --------
+        List[ChunkPayload]
+            A list of chunk payloads created from the input file.
+        """
+        chunks = []
+        for chunk in self.splitter_fn(
+            file_payload.model.b_file, 
+            chunk_size=self.chunk_size, 
+            chunk_overlap=self.chunk_overlap):
+            chunks.append(
+                ChunkPayload(
+                    text=chunk.text,
+                    source_file=file_payload,
+                    start_idx=chunk.start_index,
+                    end_idx=chunk.end_index
+                )
+            )
+        return chunks
