@@ -14,8 +14,8 @@ class Payload(Component):
     view_cache = param.Dict(default={}, doc="""
         Cache for views - Set on the Instance Level""")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, **params):
+        super().__init__(**params)
 
     @staticmethod
     def _load_css(key, module_path):

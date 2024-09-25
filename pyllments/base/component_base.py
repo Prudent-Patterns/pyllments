@@ -18,8 +18,7 @@ class Component(param.Parameterized):
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, **params):
         self.id = str(uuid4())
 
     @classmethod

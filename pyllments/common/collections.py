@@ -2,8 +2,6 @@ import lancedb
 import numpy as np
 import param
 import pyarrow as pa
-
-
 # TODO: May need their own folders
 
 class Collection(param.Parameterized):

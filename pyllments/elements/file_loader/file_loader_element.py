@@ -8,15 +8,11 @@ from pyllments.payloads.file import FilePayload
 
 
 class FileLoaderElement(Element):
-    file_input_view = param.ClassSelector(class_=pn.widgets.FileInput, doc="""
-        View responsible for selecting files, and uploading them""")
-    file_container_view = param.ClassSelector(class_=pn.Column, doc="""
-        View responsible for displaying the files""")
-    file_loader_view = param.ClassSelector(class_=pn.Column, doc="""
-        View responsible for displaying the file input and file container""")
-    file_send_view = param.ClassSelector(class_=pn.widgets.Button, doc="""
-        View responsible for sending the files to the server""")
-    # TODO: Needs to have views responsible for dispalying the sending process as well as the stored files
+    file_input_view = param.ClassSelector(class_=pn.widgets.FileInput, doc="View responsible for selecting files, and uploading them")
+    file_container_view = param.ClassSelector(class_=pn.Column, doc="View responsible for displaying the files")
+    file_loader_view = param.ClassSelector(class_=pn.Column, doc="View responsible for displaying the file input and file container")
+    file_send_view = param.ClassSelector(class_=pn.widgets.Button, doc="View responsible for sending the files to the server")
+
     def __init__(self, file_dir: str = '', **params):
         super().__init__(**params)
         self.model = FileLoaderModel(file_dir=file_dir)
@@ -29,48 +25,24 @@ class FileLoaderElement(Element):
         
         self.ports.add_output('file_list_output', pack)
 
-
-    def _create_watchers(self):
-        self._create_file_list_watcher()    
-        
-    def emit_files(self):
-        if self.model.save_to_disk:
-            self.model.save_files()
-        self.ports.output['file_list_output'].stage_emit(self.model.file_list)
-    # def _create_file_list_watcher(self):
-    #     def on_file_list_change(event):
-    #         self.ports.output['file_list_output'].stage_emit('file_list', event.obj)
-    #     self.model.param.watch(on_file_list_change, 'file_list')
-            
     @Component.view
-    def create_file_input_view(
-        self, 
-        input_css: list = [],
-        sizing_mode: str = 'stretch_width',
-        width: int = None,
-        ):
+    def create_file_input_view(self, input_css: list = [], sizing_mode: str = 'stretch_width', width: int = None):
         """Creates the 'Add Files Here' Button"""
         def new_file(event):
             obj = event.obj
             for filename, b_file, mime_type in zip(obj.filename, obj.value, obj.mime_type):
-                file_payload =self.model.stage_file(filename, b_file, mime_type)
+                file_payload = self.model.stage_file(filename, b_file, mime_type)
                 if isinstance(self.file_container_view, pn.Column):
                     self.file_container_view.append(file_payload.create_file_view())
             if not self.file_send_view: # When there's no send button automatically emit
-                self.emit_files()            
-
+                self.emit_files()  
         self.file_input_view = pn.widgets.FileInput(
             multiple=True, stylesheets=input_css, sizing_mode=sizing_mode, width=width)
         self.file_input_view.param.watch(new_file, 'value')
         return self.file_input_view
     
     @Component.view
-    def create_file_container_view(
-        self,
-        container_css: list = [],
-        sizing_mode: str = "stretch_both",
-        height: int = None,
-        width: int = None):
+    def create_file_container_view(self, container_css: list = [], sizing_mode: str = "stretch_both", height: int = None, width: int = None):
         """Creates the container holding a visual of the uploaded files"""
         self.file_container_view = pn.Column(
             stylesheets=container_css,
@@ -84,14 +56,8 @@ class FileLoaderElement(Element):
         return self.file_container_view
     
     @Component.view
-    def create_file_send_view(
-        self,
-        button_css: list = [],
-        sizing_mode: str = 'stretch_width',
-        width: int = None,
-        height: int = None):
+    def create_file_send_view(self, button_css: list = [], sizing_mode: str = 'stretch_width', width: int = None, height: int = None):
         """Creates the button to send the files to the server"""
-        
         self.file_send_view = pn.widgets.Button(
             name='Send Files',
             icon='upload',
@@ -100,22 +66,12 @@ class FileLoaderElement(Element):
             height=height,
             sizing_mode=sizing_mode,
             align='center')
-        def send(event):
-            if self.model.save_to_disk:
-                self.model.save_files()
-            # self.file_container_view.clear() # TODO: change back when there's a new view for the stored files
-            self.ports.output['file_list_output'].stage_emit(file_list=self.model.file_list)
-        self.file_send_view.on_click(send)
+        self.file_send_view.on_click(self.emit_files)
         return self.file_send_view
 
     @Component.view
-    def create_file_loader_view(
-        self,
-        sizing_mode: str = 'stretch_both',
-        width: int = None,
-        height: int = None):
+    def create_file_loader_view(self, sizing_mode: str = 'stretch_both', width: int = None, height: int = None):
         """Creates a composition of the button and file container"""
-
         file_input_view = self.create_file_input_view()
         file_container_view = self.create_file_container_view()
         file_send_view = self.create_file_send_view()
@@ -128,3 +84,11 @@ class FileLoaderElement(Element):
             height=height, 
             sizing_mode=sizing_mode)
         return self.file_loader_view
+
+    def emit_files(self, event=None):
+        """Manually trigger file emission when the send button is clicked."""
+        self.model.save_files()
+        self.ports.output['file_list_output'].stage_emit(file_list=self.model.file_list)
+        self.model.clear_files()
+        if isinstance(self.file_container_view, pn.Column):
+            self.file_container_view.clear()
