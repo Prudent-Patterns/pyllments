@@ -28,11 +28,26 @@ class EmbedderModel(Model):
             chunk.model.embedding = embedding
         return chunks
 
+    def embed_chunk(self, chunk: ChunkPayload) -> ChunkPayload:
+        """
+        Embed a chunk and return the processed chunk with embedding.
+        """
+        chunk = self.embed_chunks([chunk])[0]
+        return chunk
+
     def embed_messages(self, messages: List[MessagePayload]) -> List[MessagePayload]:
         """
         Embed a list of messages and return the processed messages with embeddings.
         """
+        
         embed_list = self.encoder_model.encode([message.model.message.content for message in messages])
         for message, embedding in zip(messages, embed_list):
             message.model.embedding = embedding
         return messages
+    
+    def embed_message(self, message: MessagePayload) -> MessagePayload:
+        """
+        Embed a message and return the processed message with embedding.
+        """
+        message = self.embed_messages([message])[0]
+        return message

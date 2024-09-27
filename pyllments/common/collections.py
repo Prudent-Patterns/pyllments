@@ -26,7 +26,7 @@ class Collection(param.Parameterized):
 default_lance_db_schema = pa.schema([
     pa.field('text', pa.string()),
     pa.field('embedding', pa.list_(pa.float32(), 768)),
-    pa.field('source_file', pa.string()),
+    pa.field('source_filepath', pa.string()),
     pa.field('start_idx', pa.int32()),
     pa.field('end_idx', pa.int32())
 ])
@@ -70,11 +70,15 @@ class LanceDBCollection(Collection):
             n = self.n
         if metric is None:
             metric = self.metric
-        return self.collection.search(embedding) \
+        results = self.collection.search(embedding) \
             .metric(metric) \
             .limit(n) \
             .to_list()
-
+        for result in results:
+            result['distance'] = result['_distance']
+            del result['_distance']
+        return results
+    
     def get_random_items(self, n: int, column_name: str = 'text', get_dict: bool = False):
         """
         Gets random items from the collection. If column_name provided, returns an
@@ -85,3 +89,7 @@ class LanceDBCollection(Collection):
             return lance_table.sample(n).to_pydict()
         else:
             return lance_table.sample(n).column(column_name).to_pylist()
+    
+    def delete_collection(self):
+        """Deletes the collection"""
+        self.collection.drop_table(self.collection_name)

@@ -40,7 +40,7 @@ class TextChunkerModel(Model):
             chunks.append(
                 ChunkPayload(
                     text=chunk.text,
-                    source_file=file_payload.model.local_path,
+                    source_filepath=file_payload.model.local_path,
                     start_idx=chunk.start_index,
                     end_idx=chunk.end_index
                 )

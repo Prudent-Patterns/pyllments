@@ -20,8 +20,8 @@ class EmbedderElement(Element):
         self._chunks_input_setup()
         self._processed_chunks_output_setup()
 
-        self._messages_input_setup()
-        self._processed_messages_output_setup()
+        self._message_input_setup()
+        self._processed_message_output_setup()
 
     def _chunks_input_setup(self):
         def process_chunks(chunk_payloads: Union[List[ChunkPayload], ChunkPayload]):
@@ -37,16 +37,15 @@ class EmbedderElement(Element):
 
         self.ports.add_output(name='processed_chunks_output', pack_payload_callback=pack)
 
-    def _messages_input_setup(self):
-        def process_messages(message_payloads: Union[List[MessagePayload], MessagePayload]):
-            messages = message_payloads if isinstance(message_payloads, list) else [message_payloads]
-            processed_messages = self.model.embed_messages(messages)
-            self.ports.output['processed_messages_output'].stage_emit(processed_messages=processed_messages)
+    def _message_input_setup(self):
+        def process_message(message_payload: MessagePayload):
+            processed_message = self.model.embed_message(message_payload)
+            self.ports.output['processed_message_output'].stage_emit(processed_message=processed_message)
 
-        self.ports.add_input(name='message_input', unpack_payload_callback=process_messages)
+        self.ports.add_input(name='message_input', unpack_payload_callback=process_message)
 
-    def _processed_messages_output_setup(self):
-        def pack(processed_messages: List[MessagePayload]) -> List[MessagePayload]:
-            return processed_messages
+    def _processed_message_output_setup(self):
+        def pack(processed_message: MessagePayload) -> MessagePayload:
+            return processed_message
 
-        self.ports.add_output(name='processed_messages_output', pack_payload_callback=pack)
+        self.ports.add_output(name='processed_message_output', pack_payload_callback=pack)

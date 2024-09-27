@@ -11,7 +11,7 @@ from pyllments.payloads.message import MessagePayload
 default_lance_db_schema = pa.schema([
     pa.field('text', pa.string()),
     pa.field('embedding', pa.list_(pa.float32(), 768)),
-    pa.field('source_file', pa.string()),
+    pa.field('source_filepath', pa.string()),
     pa.field('start_idx', pa.int32()),
     pa.field('end_idx', pa.int32())
 ])
@@ -24,7 +24,7 @@ class RetrieverModel(Model):
         The collection to retrieve from. Based on a a DB backend for storage""")
     collection_name = param.String(default="", doc="""
         The name of the collection""")
-    url = param.String(default="", doc="""
+    url = param.String(default="data/lancedb", doc="""
         The url of the database""")
     embedding_dims = param.Integer(default=768, doc="""
         The dimension of the embedding""")
@@ -51,6 +51,7 @@ class RetrieverModel(Model):
 
         self.schema_cols = pa_schema_to_col_list(self.schema)
         self.collection = LanceDBCollection(
+            url=self.url,
             collection_name=self.collection_name,
             schema=self.schema
         )
@@ -61,6 +62,8 @@ class RetrieverModel(Model):
     
     def retrieve(self, message_payload: MessagePayload):
         embedding = message_payload.model.embedding
+        if embedding is None:
+            raise ValueError("No embedding found in MessagePayload")
         chunk_payloads = [
             ChunkPayload(**item)
             for item in self.collection.query(

@@ -59,7 +59,8 @@ file_loader_element.ports.output['file_list_output'] > chunker_element.ports.inp
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
 embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
 
-chat_interface_element.ports.output['message_output'] > retriever_element.ports.input['message_input']
+chat_interface_element.ports.output['message_output'] > embedder_element.ports.input['message_input']
+embedder_element.ports.output['processed_message_output'] > retriever_element.ports.input['message_input']
 
 retriever_element.ports.output['chunk_output'] > test_element.ports.input['test_input']
 
