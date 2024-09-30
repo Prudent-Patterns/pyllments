@@ -7,14 +7,15 @@ from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.payloads.message import MessagePayload
 from pyllments.ports import InputPort, OutputPort, Ports
 from pyllments.base.payload_base import Payload
-from pyllments.elements.context_builder.to_message import to_message_payload, payload_message_mapping
+from .to_message import to_message_payload
 
 class ContextBuilder(param.Parameterized):
     # TODO Add ports for the preset messages for additional modularity
     input_map = param.Dict(default={}, doc="""
         A dictionary mapping input keys to expected payload types. Determines the order of the output in
         base case when build_fn not provided.
-        Special prefixes: 'system_', 'human_', 'ai_' create messages of that type with the string you provide.
+        The value is a tuple where the first element is the message type ('system', 'human', 'ai') and
+        the second element is either a Payload type or a string for preset messages.
         e.g. 
         input = {
             'port_a': ('human', MessagePayload),

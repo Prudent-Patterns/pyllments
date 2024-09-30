@@ -29,7 +29,8 @@ class RetrieverElement(Element):
         """The input query used for retrieval"""
         def unpack(payload: MessagePayload):
             chunks = self.model.retrieve(payload)
-            self.ports.output['chunk_output'].stage_emit(chunk_payload=chunks)
+            if chunks:
+                self.ports.output['chunk_output'].stage_emit(chunk_payload=chunks)
         
         self.ports.add_input('message_input', unpack)
 
