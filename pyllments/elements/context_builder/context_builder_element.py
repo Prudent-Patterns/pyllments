@@ -7,7 +7,7 @@ from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.payloads.message import MessagePayload
 from pyllments.ports import InputPort, OutputPort, Ports
 from pyllments.base.payload_base import Payload
-from .to_message import to_message_payload
+from .to_message import to_message_payload, payload_message_mapping
 
 class ContextBuilder(param.Parameterized):
     # TODO Add ports for the preset messages for additional modularity
@@ -205,6 +205,8 @@ class ContextBuilder(param.Parameterized):
                         messages_output.emit(msg_payload_list)
                         c['is_ready'] = True
                         c['input_name_payload_dict'].clear()
+            # Default behavior without build_map or build_fn
+            # Waits for all payloads to be received and then emits the messages in the order of the input_map
             else:
                 input_port_keys = c.setdefault(
                     'input_port_keys',

@@ -4,7 +4,9 @@ from collections import deque
 import param
 
 from pyllments.base.model_base import Model
+from pyllments.common import get_token_len
 from pyllments.payloads.message import MessagePayload
+
 
 class HistoryHandlerModel(Model):
 

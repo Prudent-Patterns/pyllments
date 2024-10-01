@@ -46,6 +46,8 @@ from pyllments.elements.file_loader import FileLoaderElement
 from pyllments.elements.retriever import RetrieverElement
 from pyllments.elements.chat_interface import ChatInterfaceElement
 from pyllments.elements.context_builder import ContextBuilder
+from pyllments.elements.flow_control.flow_controllers.switch import Switch
+from pyllments.payloads.message import MessagePayload
 from pyllments.tests import TestElement
 
 file_loader_element = FileLoaderElement(file_dir='loaded_files')
@@ -54,6 +56,12 @@ embedder_element = EmbedderElement()
 retriever_element = RetrieverElement()
 chat_interface_element = ChatInterfaceElement()
 
+switch_element = Switch(
+    payload_type=MessagePayload, 
+    outputs=['with_retrieval', 'without_retrieval'], 
+    current_output='without_retrieval'
+)
+
 test_element = TestElement()
 
 file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
@@ -61,17 +69,8 @@ chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chu
 embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
 
 chat_interface_element.ports.output['message_output'] > embedder_element.ports.input['message_input']
-embedder_element.ports.output['processed_message_output'] > retriever_element.ports.input['message_input']
-
-context_builder = ContextBuilder(connected_input_map={
-    'main_system_prompt': ('system', 'You are a chatbot made for RAG.'),
-    'system_history_prompt': ('system', 'Below is the history of the conversation.'),
-    'history': True, #HISTORY ELEMENT PLACEHOLDER,
-    'retrieved': ('system', retriever_element.ports.output['chunk_output']),
-    
-})
-# retriever_element.ports.output['chunk_output'] > 
-# test_element.ports.input['test_input']
+embedder_element.ports.output['processed_message_output'] > switch_element.ports.input['payload_input']
+switch_element.ports.output['without_retrieval'] > test_element.ports.input['test_input']
 
 
 file_loader_view = file_loader_element.create_file_loader_view()

@@ -13,7 +13,7 @@ class MessageModel(Model):
     # TODO: Finalize if atomic mode should be with role and message_text
     # Or with langchain Messages
     role = param.Selector(
-        default=None, objects=['system', 'ai', 'human'],
+        default='human', objects=['system', 'ai', 'human'],
         doc="Useful to set for streams. Inferred when LangChain message is passed.")
     message = param.ClassSelector(
         class_=BaseMessage,
@@ -28,7 +28,7 @@ class MessageModel(Model):
         Used to identify if the message has been streamed""")
     id = param.String(doc="""
         Used to identify message""")
-    is_multimodal = param.Boolean(doc="""
+    is_multimodal = param.Boolean(default=False, doc="""
         Used to identify if the message(s) is multimodal""")
     estimated_token_len = param.Integer(doc="""
         Used to estimate the token length of the message(s)""")
@@ -62,21 +62,21 @@ class MessageModel(Model):
             for watcher in streamed_watchers['value']:
                 self.param.unwatch(watcher)
 
-    def get_token_len(self, model=None, push_stream=False):
-        if model in self.tokenization_map:
-            return self.tokenization_map[model]
-        match self.mode:
-            case 'atomic':
-                token_length = get_token_len(self.message.content, model)
-            case 'stream':
-                if push_stream:
-                    self.stream() 
-                if self.streamed:
-                    token_length = get_token_len(self.message.content, model)
-                else:
-                    raise ValueError("Message has not been streamed")
-            case _:
-                raise ValueError("Invalid mode: must be 'atomic' or 'stream'")
+    # def get_token_len(self, model=None, push_stream=False):
+    #     if model in self.tokenization_map:
+    #         return self.tokenization_map[model]
+    #     match self.mode:
+    #         case 'atomic':
+    #             token_length = get_token_len(self.message.content, model)
+    #         case 'stream':
+    #             if push_stream:
+    #                 self.stream() 
+    #             if self.streamed:
+    #                 token_length = get_token_len(self.message.content, model)
+    #             else:
+    #                 raise ValueError("Message has not been streamed")
+    #         case _:
+    #             raise ValueError("Invalid mode: must be 'atomic' or 'stream'")
         
-        self.tokenization_map[model] = token_length
-        return token_length
+    #     self.tokenization_map[model] = token_length
+    #     return token_length

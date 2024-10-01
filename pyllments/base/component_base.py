@@ -20,6 +20,9 @@ class Component(param.Parameterized):
 
     def __init__(self, **params):
         self.id = str(uuid4())
+        known_params = {k: v for k, v in params.items() if k in self.param}
+        super().__init__(**known_params)
+        
 
     @classmethod
     def _get_module_path(cls):

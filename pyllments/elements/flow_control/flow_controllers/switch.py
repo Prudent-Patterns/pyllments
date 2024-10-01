@@ -1,14 +1,16 @@
 import param
 
+from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import OutputPort, InputPort, Ports
 
 
-class Switch(param.Parameterized):
+class Switch(Element):
     """
     The Switch class routes an input payload to one of multiple output ports based on the current_output setting.
-
+    You set specify the output port aliases in the 'outputs' parameter, or in the 'connected_map' parameter while
+    the input port has the standard name 'payload_input'.
     Parameters:
     -----------
     payload_type : Type[Payload]
@@ -29,7 +31,7 @@ class Switch(param.Parameterized):
 
     Usage:
     ------
-    # Create a Switch with a list of output aliases, then connect it.
+    # Create a Switch with a list of output aliases, then connect it. 
     switch = Switch(
         outputs=['output1', 'output2'],
         payload_type=MessagePayload,
@@ -84,53 +86,41 @@ class Switch(param.Parameterized):
         super().__init__(**params)
         self._flow_controller_setup()
 
-    def _flow_map_setup(self):
+    def _flow_controller_setup(self):
+        flow_map = self._prepare_flow_map()
+        connected_flow_map = self._prepare_connected_flow_map()
+
+        def flow_fn(active_input_port, c, **kwargs):
+            if self.current_output in kwargs:
+                kwargs[self.current_output].emit(active_input_port.payload)
+
+        self.flow_controller = FlowController(
+            flow_fn=flow_fn,
+            flow_map=flow_map,
+            connected_flow_map=connected_flow_map
+        )
+
+        # Set up the ports attribute to match the flow_controller's ports
+        self.ports = self.flow_controller.ports
+
+        # Set up the current_output parameter if not already set
+        if not self.current_output and self.outputs:
+            self.current_output = self.outputs[0]
+
+    def _prepare_flow_map(self):
         flow_map = {'input': {'payload_input': self.payload_type}, 'output': {}}
         for output in self.outputs:
             flow_map['output'][output] = self.payload_type
         return flow_map
-
-    def _connected_flow_map_setup(self):
-        connected_flow_map = {'input': {}, 'output': {}}
+    def _prepare_connected_flow_map(self):
+        connected_flow_map = {'input': {'payload_input': []}, 'output': {}}
         
-        # Handle input connections
-        if 'input' in self.connected_map:
-            for key, ports in self.connected_map['input'].items():
-                if isinstance(ports, (list, tuple)):
-                    connected_flow_map['input'][key] = ports
-                elif isinstance(ports, OutputPort):
-                    connected_flow_map['input'][key] = [ports]
-                else:
-                    raise ValueError(f"Invalid value for input key '{key}': {ports}")
+        # Only allow 'payload_input' as the input port
+        if 'input' in self.connected_map and 'payload_input' in self.connected_map['input']:
+            connected_flow_map['input']['payload_input'] = self.connected_map['input']['payload_input']
         
-        # Handle output connections
         if 'output' in self.connected_map:
-            for key, ports in self.connected_map['output'].items():
-                if isinstance(ports, (list, tuple)):
-                    connected_flow_map['output'][key] = ports
-                elif isinstance(ports, InputPort):
-                    connected_flow_map['output'][key] = [ports]
-                else:
-                    raise ValueError(f"Invalid value for output key '{key}': {ports}")
-        
-        # Merge outputs from both outputs list and connected_map
-        merged_outputs = set(self.outputs)
-        merged_outputs.update(connected_flow_map['output'].keys())
-        self.outputs = list(merged_outputs)
+            connected_flow_map['output'] = self.connected_map['output']
         
         return connected_flow_map
 
-    def _flow_controller_setup(self):
-        flow_map = self._flow_map_setup()
-        connected_flow_map = self._connected_flow_map_setup()
-        
-        def flow_fn(payload_input, c, active_input_port, **kwargs):
-            if self.current_output in kwargs:
-                kwargs[self.current_output].emit(active_input_port.payload)
-
-        self.flow_controller = FlowController(flow_fn=flow_fn, flow_map=flow_map, connected_flow_map=connected_flow_map)
-        self.ports = self.flow_controller.ports
-        
-        # Set up the current_output parameter
-        if not self.current_output and self.outputs:
-            self.current_output = self.outputs[0]

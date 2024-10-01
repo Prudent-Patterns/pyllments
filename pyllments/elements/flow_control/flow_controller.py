@@ -192,27 +192,22 @@ class FlowController(Element):
             if io_type not in self.flow_map:
                 self.flow_map[io_type] = {}
 
-            # Setup ports from flow_map (payload types)
-            for alias, payload_type in self.flow_map[io_type].items():
-                self._setup_port_from_type(io_type, alias, payload_type)
-            
-            # Setup ports from connected_flow_map (existing ports)
-            for alias, ports in self.connected_flow_map.get(io_type, {}).items():
-                ports = [ports] if not isinstance(ports, list) else ports
-                if alias not in self.flow_map[io_type]:
-                    # If the alias is not in flow_map, infer the payload type and add it to flow_map
-                    payload_type = ports[0].payload_type if ports else None
-                    if payload_type:
-                        self.flow_map[io_type][alias] = payload_type
-                        self._setup_port_from_type(io_type, alias, payload_type)
-                    else:
-                        raise ValueError(f"Cannot infer payload type for {io_type} port '{alias}'")
+            # Combine aliases from both flow_map and connected_flow_map
+            all_aliases = set(self.flow_map[io_type].keys()) | set(self.connected_flow_map.get(io_type, {}).keys())
+
+            for alias in all_aliases:
+                if alias in self.flow_map[io_type]:
+                    payload_type = self.flow_map[io_type][alias]
+                    self._setup_port_from_type(io_type, alias, payload_type)
                 
-                for port in ports:
-                    if io_type == 'input':
-                        self.connect_input(alias, port)
-                    else:
-                        self.connect_output(alias, port)
+                if alias in self.connected_flow_map.get(io_type, {}):
+                    ports = self.connected_flow_map[io_type][alias]
+                    ports = [ports] if not isinstance(ports, list) else ports
+                    for port in ports:
+                        if io_type == 'input':
+                            self.connect_input(alias, port)
+                        else:
+                            self.connect_output(alias, port)
 
     def _setup_port_from_type(self, io_type, alias, payload_type):
         if payload_type is None:

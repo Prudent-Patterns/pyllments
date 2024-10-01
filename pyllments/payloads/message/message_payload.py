@@ -10,23 +10,9 @@ from pyllments.payloads.message.message_model import MessageModel
 
 class MessagePayload(Payload):
         
-    def __init__(
-            self,
-            role: Literal['human', 'system', 'ai'] = 'human',
-            message: BaseMessage = BaseMessage(content='', type='placeholder'),
-            mode: Literal['stream', 'atomic', 'batch'] = 'stream',
-            message_stream: Optional[Generator | AsyncGenerator] = None,
-            is_multimodal: bool = False,
-            embedding = None,
-            **params):
+    def __init__(self, **params):
         super().__init__(**params)
-        self.model = MessageModel(
-            role=role,
-            message=message,
-            message_stream=message_stream,
-            mode=mode,
-            is_multimodal=is_multimodal,
-            embedding=embedding)
+        self.model = MessageModel(**params)
 
     @Component.view
     def create_message_view(
@@ -124,6 +110,5 @@ class MessagePayload(Payload):
         view = pn.Row(
             *row_args, stylesheets=row_css,
             sizing_mode='stretch_width')    
-        return view
-    
+        return view 
     
