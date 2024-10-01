@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from collections import deque
 
 import param
@@ -23,56 +23,49 @@ class HistoryHandlerModel(Model):
         The amount of tokens in the context window""")
 
     tokenizer_model = param.String(default="gpt-4o-mini")
-    new_message = param.ClassSelector(class_=MessagePayload)
-    new_message_token_estimate = param.Integer(default=0, bounds=(0, None), doc="""
-        The estimated token length of the new message""")
 
     def __init__(self, **params):
         super().__init__(**params)
 
-    @param.depends('new_message', watch=True)
-    def load_message(self) -> None:
-        self.new_message_token_estimate = (
-            self.new_message.model.get_token_len(self.tokenizer_model)
-        )
-        self.update_history()
-        self.update_context()
+    def load_message(self, message: MessagePayload):
+        message_token_estimate = get_token_len(message.model.message.content, self.tokenizer_model)
+        self.update_history(message, message_token_estimate)
+        self.update_context(message, message_token_estimate)
         self.param.trigger('context')
 
-    def update_history(self) -> None:
-        if self.new_message_token_estimate > self.history_token_limit:
+    def update_history(self, message: MessagePayload, token_estimate: int):
+        if token_estimate > self.history_token_limit:
             raise ValueError(
-                f"The token count ({self.new_message_token_estimate}) of the new message exceeds the history limit ({self.history_token_limit})."
+                f"The token count ({token_estimate}) of the new message exceeds the history limit ({self.history_token_limit})."
             )
         # Remove messages from history until the new message will fit
         while (
-            self.history_token_count + self.new_message_token_estimate >
+            self.history_token_count + token_estimate >
             self.history_token_limit
         ):
-            popped_message = self.history.popleft()
-            popped_message_token_est = popped_message.model.tokenization_map.get(
-                self.tokenizer_model,
-                popped_message.model.get_token_len(self.tokenizer_model)
-            )
-            self.history_token_count -= popped_message_token_est
+            popped_message, popped_token_count = self.history.popleft()
+            self.history_token_count -= popped_token_count
 
-        self.history.append(self.new_message)
-        self.history_token_count += self.new_message_token_estimate
+        self.history.append((message, token_estimate))
+        self.history_token_count += token_estimate
 
-    def update_context(self) -> None:
-        if self.new_message_token_estimate > self.context_token_limit:
+    def update_context(self, message: MessagePayload, token_estimate: int):
+        if token_estimate > self.context_token_limit:
             raise ValueError(
-                f"The token count ({self.new_message_token_estimate}) of the new message exceeds the context limit ({self.context_token_limit})."
+                f"The token count ({token_estimate}) of the new message exceeds the context limit ({self.context_token_limit})."
             )
         while (
-            self.context_token_count + self.new_message_token_estimate >
+            self.context_token_count + token_estimate >
             self.context_token_limit
         ):
-            popped_message = self.context.popleft()
-            popped_message_token_est = popped_message.model.get_token_len(
-                self.tokenizer_model
-            )
-            self.context_token_count -= popped_message_token_est
+            popped_message, popped_token_count = self.context.popleft()
+            self.context_token_count -= popped_token_count
 
-        self.context.append(self.new_message)
-        self.context_token_count += self.new_message_token_estimate
+        self.context.append((message, token_estimate))
+        self.context_token_count += token_estimate
+
+    def get_context_messages(self) -> List[MessagePayload]:
+        return [message for message, _ in self.context]
+
+    def get_history_messages(self) -> List[MessagePayload]:
+        return [message for message, _ in self.history]

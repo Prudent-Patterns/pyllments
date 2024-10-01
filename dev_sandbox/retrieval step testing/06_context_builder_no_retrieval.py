@@ -73,13 +73,13 @@ switch_element = Switch(
     current_output='without_retrieval'
 )
 
-history_element = HistoryHandlerElement()
+history_handler_element = HistoryHandlerElement()
 
 context_builder = ContextBuilder(
     connected_input_map={
-        'main_system_prompt': ('system', 'You are a chatbot made for RAG.'),
+        'main_system_prompt': ('system', 'You are a chatbot made for RAG. You will be given a history of previous messages, retrieved chunks of text, and a user query.'),
         'system_history_prompt': ('system', 'Below is the history of the conversation.'),
-        'history': True, #HISTORY ELEMENT PLACEHOLDER,
+        'history': ('system', history_handler_element.ports.output['messages_output']),
         'system_retrieval_prompt': (
             'system', 
             'Below is the retrieved context for the conversation.'
@@ -89,8 +89,10 @@ context_builder = ContextBuilder(
             'system', 
             "Following, is the user query which you should respond to to the best of your ability given the information you have."
         ),
-        'query': ('human', )
-    }
+        'query': ('human', switch_element.ports.output['without_retrieval'])
+    },
+    build_map={
+        
 )
 # retriever_element.ports.output['chunk_output'] > 
 # test_element.ports.input['test_input']

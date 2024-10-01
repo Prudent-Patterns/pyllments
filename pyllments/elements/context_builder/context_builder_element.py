@@ -1,4 +1,5 @@
 from types import FunctionType
+from functools import cache
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import param
@@ -116,7 +117,7 @@ class ContextBuilder(param.Parameterized):
             (hasattr(payload_type, '__origin__') and issubclass(payload_type.__origin__, list)):
                 flow_map['input'][key] = payload_type
             elif isinstance(payload_type, str):
-                self.preset_messages[key] = self._create_message(msg_type, payload_type)
+                self.preset_messages[key] = type(self)._create_message(msg_type, payload_type)
         return flow_map
 
     def _connected_flow_map_setup(self, connected_input_map):
@@ -136,7 +137,7 @@ class ContextBuilder(param.Parameterized):
                 elif isinstance(ports_or_string, str):
                     msg_string = ports_or_string
                     if not self.preset_messages.get(key):
-                        self.preset_messages[key] = self._create_message(msg_type, msg_string)
+                        self.preset_messages[key] = type(self)._create_message(msg_type, msg_string)
                     if key not in self.input_map:
                         self.input_map[key] = (msg_type, msg_string)
                 else:
@@ -182,29 +183,36 @@ class ContextBuilder(param.Parameterized):
                 )
                 input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
                 
+                # Always store the incoming payload
+                input_name_payload_dict[active_input_port.name] = active_input_port.payload
+
                 if c.get('is_ready', True):
-                    input_keys_subset = self.build_map[active_input_port.name]
-                    input_port_keys_subset = [key for key in input_keys_subset if key in input_port_keys]
-                    c['input_keys_subset'] = input_keys_subset
-                    c['input_port_keys_subset'] = input_port_keys_subset
-                    c['is_ready'] = False
+                    if active_input_port.name in self.build_map:
+                        input_keys_subset = self.build_map[active_input_port.name]
+                        input_port_keys_subset = [key for key in input_keys_subset if key in input_port_keys]
+                        c['input_keys_subset'] = input_keys_subset
+                        c['input_port_keys_subset'] = input_port_keys_subset
+                        c['is_ready'] = False
+                    else:
+                        # If the active port isn't in build_map, we don't start a build sequence
+                        return
                 else:
                     input_keys_subset = c['input_keys_subset']
                     input_port_keys_subset = c['input_port_keys_subset']
 
-                if active_input_port.name in input_keys_subset:
-                    input_name_payload_dict[active_input_port.name] = active_input_port.payload
-
-                    if all([key in input_name_payload_dict for key in input_port_keys_subset]):
-                        msg_payload_list = [
-                            to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
-                            if not isinstance(self.input_map[key][1], str)
-                            else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
-                            for key in input_keys_subset
-                        ]
-                        messages_output.emit(msg_payload_list)
-                        c['is_ready'] = True
-                        c['input_name_payload_dict'].clear()
+                # Check if we have all required payloads
+                if all(key in input_name_payload_dict for key in input_port_keys_subset):
+                    msg_payload_list = [
+                        to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
+                        if not isinstance(self.input_map[key][1], str)
+                        else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
+                        for key in input_keys_subset
+                    ]
+                    messages_output.emit(msg_payload_list)
+                    c['is_ready'] = True
+                    # Only clear the payloads that were used
+                    for key in input_keys_subset:
+                        input_name_payload_dict.pop(key, None)
             # Default behavior without build_map or build_fn
             # Waits for all payloads to be received and then emits the messages in the order of the input_map
             else:
@@ -227,7 +235,9 @@ class ContextBuilder(param.Parameterized):
 
         return flow_fn
 
-    def _create_message(self, msg_type, text):
+    @staticmethod
+    @cache
+    def _create_message(msg_type, text):
         match msg_type:
             case 'human':
                 return HumanMessage(content=text)

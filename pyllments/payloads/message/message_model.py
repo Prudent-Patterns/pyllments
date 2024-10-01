@@ -30,12 +30,7 @@ class MessageModel(Model):
         Used to identify message""")
     is_multimodal = param.Boolean(default=False, doc="""
         Used to identify if the message(s) is multimodal""")
-    estimated_token_len = param.Integer(doc="""
-        Used to estimate the token length of the message(s)""")
-    tokenizer_model = param.String(default='gpt-4o-mini',doc="""
-        Used to estimate the token length of the message(s)""")
-    tokenization_map = param.Dict(default={},doc="""
-        Used to map the model tokenizer to the token len""")
+
     embedding = param.Parameter(doc=""" # TODO: Type this properly
         Embedding of message - likely ndarray(np.float32)""")
 

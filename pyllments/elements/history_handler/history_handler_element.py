@@ -43,11 +43,11 @@ class HistoryHandlerElement(Element):
             if (payload.model.mode == 'stream' and
                 not payload.model.streamed):
                 def stream_callback(event):
-                    self.model.new_message = payload
+                    self.model.load_message(payload)
 
                 payload.model.param.watch(stream_callback, 'streamed')
             else:
-                self.model.new_message = payload
+                self.model.load_message(payload)
 
         self.ports.add_input(
             name='message_input',
@@ -56,8 +56,7 @@ class HistoryHandlerElement(Element):
 
     def _messages_output_setup(self):
         def pack(context: deque) -> List[MessagePayload]:
-            message_list = list(context)
-            return message_list
+            return self.model.get_context_messages()
         
         self.ports.add_output(
             name='messages_output',
@@ -68,7 +67,8 @@ class HistoryHandlerElement(Element):
         self.model.param.watch(self.context_change_callback, 'context')
 
     def context_change_callback(self, event):
-        if self.model.new_message.model.role != 'ai':
+        last_message = self.model.get_context_messages()[-1]
+        if last_message.model.role != 'ai':
             self.ports.output['messages_output'].stage_emit(context=self.model.context)
 
     def create_context_view(
