@@ -1,4 +1,3 @@
-from typing import List, Tuple
 from collections import deque
 
 import param
@@ -64,8 +63,8 @@ class HistoryHandlerModel(Model):
         self.context.append((message, token_estimate))
         self.context_token_count += token_estimate
 
-    def get_context_messages(self) -> List[MessagePayload]:
+    def get_context_messages(self) -> list[MessagePayload]:
         return [message for message, _ in self.context]
 
-    def get_history_messages(self) -> List[MessagePayload]:
+    def get_history_messages(self) -> list[MessagePayload]:
         return [message for message, _ in self.history]

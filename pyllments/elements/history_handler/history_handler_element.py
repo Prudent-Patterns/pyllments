@@ -1,5 +1,4 @@
 from collections import deque
-from typing import List
 
 import param
 import panel as pn
@@ -23,7 +22,7 @@ class HistoryHandlerElement(Element):
     - input:
         - message_input: MessagePayload - Human and AI messages handled
     - output:
-        - messages_output: List[MessagePayload]
+        - messages_output: list[MessagePayload]
     """
     context_view = param.ClassSelector(class_=pn.Column)
 
@@ -57,7 +56,7 @@ class HistoryHandlerElement(Element):
         )
 
     def _messages_output_setup(self):
-        def pack(context: List[MessagePayload]) -> List[MessagePayload]:
+        def pack(context: list[MessagePayload]) -> list[MessagePayload]:
             return context
         
         self.ports.add_output(

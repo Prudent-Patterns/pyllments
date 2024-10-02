@@ -1,4 +1,4 @@
-from typing import List, Type, Union, get_origin, get_args
+from typing import Union, get_origin, get_args
 import param
 
 from pyllments.base.payload_base import Payload

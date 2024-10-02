@@ -190,9 +190,17 @@ class ContextBuilder(Element):
                 # Check if we have all required payloads
                 if all(key in input_name_payload_dict for key in input_port_keys_subset):
                     msg_payload_list = [
-                        to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
+                        to_message_payload(
+                            input_name_payload_dict[key], 
+                            self.payload_message_mapping,
+                            expected_type=self.flow_controller.flow_port_map[key].payload_type
+                        )
                         if not isinstance(self.input_map[key][1], str)
-                        else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
+                        else to_message_payload(
+                            self.preset_messages[key], 
+                            self.payload_message_mapping,
+                            expected_type=MessagePayload
+                        )
                         for key in input_keys_subset
                     ]
                     messages_output.emit(msg_payload_list)
@@ -212,9 +220,17 @@ class ContextBuilder(Element):
                 input_name_payload_dict[active_input_port.name] = active_input_port.payload
                 if all([key in input_name_payload_dict for key in input_port_keys]):
                     msg_payload_list = [
-                        to_message_payload(input_name_payload_dict[key], self.payload_message_mapping)
+                        to_message_payload(
+                            input_name_payload_dict[key], 
+                            self.payload_message_mapping,
+                            expected_type=self.flow_controller.flow_port_map[key].payload_type
+                        )
                         if not isinstance(self.input_map[key][1], str)
-                        else to_message_payload(self.preset_messages[key], self.payload_message_mapping)
+                        else to_message_payload(
+                            self.preset_messages[key], 
+                            self.payload_message_mapping,
+                            expected_type=MessagePayload
+                        )
                         for key in self.input_map.keys()
                     ]
                     messages_output.emit(msg_payload_list)
@@ -227,10 +243,10 @@ class ContextBuilder(Element):
     def _create_message(msg_type, text):
         match msg_type:
             case 'human':
-                return HumanMessage(content=text)
+                return MessagePayload(message=HumanMessage(content=text))
             case 'ai':
-                return AIMessage(content=text)
+                return MessagePayload(message=AIMessage(content=text))
             case 'system':
-                return SystemMessage(content=text)
+                return MessagePayload(message=SystemMessage(content=text))
             case _:
                 raise ValueError(f"Invalid message type: {msg_type}")

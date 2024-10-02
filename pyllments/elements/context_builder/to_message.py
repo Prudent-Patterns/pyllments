@@ -42,8 +42,13 @@ payload_message_mapping = {
     SystemMessage: system_message2message,
 }
 
-def to_message_payload(payload, payload_message_mapping=payload_message_mapping):
-    payload_type = type(payload)
+def to_message_payload(payload, payload_message_mapping=payload_message_mapping, expected_type=None):
+    if isinstance(payload, MessagePayload):
+        # If the payload is already a MessagePayload (like from preset_messages),
+        # return it directly
+        return payload
+    
+    payload_type = expected_type or type(payload)
     try:
         return payload_message_mapping[payload_type](payload)
     except KeyError:

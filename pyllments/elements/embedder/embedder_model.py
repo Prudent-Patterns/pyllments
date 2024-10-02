@@ -1,5 +1,4 @@
 import param
-from typing import List
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.chunk.chunk_payload import ChunkPayload
@@ -19,7 +18,7 @@ class EmbedderModel(Model):
         self.encoder_model = self.encoder_model_class(model_name=self.encoder_model_name)
         self.embedding_dims = self.encoder_model.embedding_dims
 
-    def embed_chunks(self, chunks: List[ChunkPayload]) -> List[ChunkPayload]:
+    def embed_chunks(self, chunks: list[ChunkPayload]) -> list[ChunkPayload]:
         """
         Embed a list of chunks and return the processed chunks with embeddings.
         """
@@ -35,7 +34,7 @@ class EmbedderModel(Model):
         chunk = self.embed_chunks([chunk])[0]
         return chunk
 
-    def embed_messages(self, messages: List[MessagePayload]) -> List[MessagePayload]:
+    def embed_messages(self, messages: list[MessagePayload]) -> list[MessagePayload]:
         """
         Embed a list of messages and return the processed messages with embeddings.
         """

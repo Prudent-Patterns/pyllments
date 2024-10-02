@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union
 
 import param
 
@@ -24,7 +24,7 @@ class EmbedderElement(Element):
         self._processed_message_output_setup()
 
     def _chunks_input_setup(self):
-        def process_chunks(chunk_payloads: Union[List[ChunkPayload], ChunkPayload]):
+        def process_chunks(chunk_payloads: Union[list[ChunkPayload], ChunkPayload]):
             chunks = chunk_payloads if isinstance(chunk_payloads, list) else [chunk_payloads]
             processed_chunks = self.model.embed_chunks(chunks)
             self.ports.output['processed_chunks_output'].stage_emit(processed_chunks=processed_chunks)
@@ -32,7 +32,7 @@ class EmbedderElement(Element):
         self.ports.add_input(name='chunk_input', unpack_payload_callback=process_chunks)
 
     def _processed_chunks_output_setup(self):
-        def pack(processed_chunks: List[ChunkPayload]) -> List[ChunkPayload]:
+        def pack(processed_chunks: list[ChunkPayload]) -> list[ChunkPayload]:
             return processed_chunks
 
         self.ports.add_output(name='processed_chunks_output', pack_payload_callback=pack)

@@ -1,4 +1,4 @@
-from typing import Union, List, Tuple
+from typing import Union
 
 import param
 
@@ -18,7 +18,7 @@ class TextChunkerElement(Element):
         self._chunk_output_setup()
 
     def _file_input_setup(self):
-        def unpack(payload: Union[FilePayload, List[FilePayload]]):
+        def unpack(payload: Union[FilePayload, list[FilePayload]]):
             file_payload_list = payload if isinstance(payload, list) else [payload]
             for file_payload in file_payload_list:
                 chunks = self.model.make_chunks(file_payload)
@@ -27,7 +27,7 @@ class TextChunkerElement(Element):
         self.ports.add_input(name='file_input', unpack_payload_callback=unpack)
 
     def _chunk_output_setup(self):
-        def pack(chunks: List[ChunkPayload]) -> List[ChunkPayload]:
+        def pack(chunks: list[ChunkPayload]) -> list[ChunkPayload]:
             return chunks
         
         self.ports.add_output(name='chunk_output', pack_payload_callback=pack)

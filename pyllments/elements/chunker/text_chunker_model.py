@@ -1,5 +1,4 @@
 import param
-from typing import List
 
 from pyllments.base.model_base import Model
 from pyllments.elements.chunker.splitters import base_text_splitter
@@ -18,7 +17,7 @@ class TextChunkerModel(Model):
     def __init__(self, **params):
         super().__init__(**params)
 
-    def make_chunks(self, file_payload: FilePayload) -> List[ChunkPayload]:
+    def make_chunks(self, file_payload: FilePayload) -> list[ChunkPayload]:
         """
         Create chunks from a single file payload.
         
@@ -29,7 +28,7 @@ class TextChunkerModel(Model):
         
         Returns:
         --------
-        List[ChunkPayload]
+        list[ChunkPayload]
             A list of chunk payloads created from the input file.
         """
         chunks = []
