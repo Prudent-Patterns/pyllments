@@ -5,7 +5,7 @@ from typing import Any
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.common.param import PayloadSelector
-from pyllments.ports.ports import InputPort, OutputPort
+from pyllments.ports.ports import InputPort, OutputPort, Ports
 
 
 class FlowPort(param.Parameterized):
@@ -181,14 +181,18 @@ class FlowController(Element):
     
     context = param.Dict(default={}, doc="""
         Context for the user to manage""")
+    
+    containing_element = param.ClassSelector(default=None, class_=Element, doc="""
+        Element that contains/uses this flow controller""")
 
     def __init__(self, **params):
         super().__init__(**params)
+        if self.containing_element:
+            self.ports = Ports(containing_element=self.containing_element)
         self._setup_ports()
 
     def _setup_ports(self):
         for io_type in ['input', 'output']:
-            # Ensure flow_map has entries for both 'input' and 'output'
             if io_type not in self.flow_map:
                 self.flow_map[io_type] = {}
 
@@ -196,11 +200,26 @@ class FlowController(Element):
             all_aliases = set(self.flow_map[io_type].keys()) | set(self.connected_flow_map.get(io_type, {}).keys())
 
             for alias in all_aliases:
+                # Determine payload type
                 if alias in self.flow_map[io_type]:
                     payload_type = self.flow_map[io_type][alias]
-                    self._setup_port_from_type(io_type, alias, payload_type)
-                
-                if alias in self.connected_flow_map.get(io_type, {}):
+                elif io_type in self.connected_flow_map and alias in self.connected_flow_map[io_type]:
+                    ports = self.connected_flow_map[io_type][alias]
+                    ports = [ports] if not isinstance(ports, list) else ports
+                    if ports:
+                        payload_type = ports[0].payload_type
+                    else:
+                        # Skip this alias if it has an empty list in connected_flow_map and isn't in flow_map
+                        continue
+                else:
+                    # This case shouldn't occur, but let's handle it just in case
+                    raise ValueError(f"Unable to determine payload type for {io_type} port '{alias}'")
+
+                # Set up the port
+                self._setup_port_from_type(io_type, alias, payload_type)
+
+                # Connect ports if they're in connected_flow_map
+                if io_type in self.connected_flow_map and alias in self.connected_flow_map[io_type]:
                     ports = self.connected_flow_map[io_type][alias]
                     ports = [ports] if not isinstance(ports, list) else ports
                     for port in ports:

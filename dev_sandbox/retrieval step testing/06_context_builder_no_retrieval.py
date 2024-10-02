@@ -62,10 +62,9 @@ test_element = TestElement()
 
 file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
-embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
+# embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
 
 chat_interface_element.ports.output['message_output'] > embedder_element.ports.input['message_input']
-embedder_element.ports.output['processed_message_output'] > retriever_element.ports.input['message_input']
 
 switch_element = Switch(
     payload_type=MessagePayload, 
@@ -73,7 +72,12 @@ switch_element = Switch(
     current_output='without_retrieval'
 )
 
+embedder_element.ports.output['processed_message_output'] > switch_element.ports.input['payload_input']
+# retriever_element.ports.input['message_input']
+
+
 history_handler_element = HistoryHandlerElement()
+test_element.ports.output['test_output'] > history_handler_element.ports.input['message_input']
 
 context_builder = ContextBuilder(
     connected_input_map={
@@ -92,11 +96,22 @@ context_builder = ContextBuilder(
         'query': ('human', switch_element.ports.output['without_retrieval'])
     },
     build_map={
-        
+        'query': [
+            'main_system_prompt', 
+            'system_history_prompt', 
+            'history', 
+            # 'system_retrieval_prompt', 
+            # 'retrieved', 
+            'system_query_prompt',
+            'query'
+        ]
+    }
 )
-# retriever_element.ports.output['chunk_output'] > 
-# test_element.ports.input['test_input']
 
+context_builder.ports.output['messages_output'] > test_element.ports.input['test_input']
+
+from langchain_core.messages import HumanMessage
+test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
 
 file_loader_view = file_loader_element.create_file_loader_view()
 chat_interface_view = chat_interface_element.create_interface_view()

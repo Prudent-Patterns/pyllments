@@ -95,6 +95,7 @@ class Switch(Element):
                 kwargs[self.current_output].emit(active_input_port.payload)
 
         self.flow_controller = FlowController(
+            containing_element=self,
             flow_fn=flow_fn,
             flow_map=flow_map,
             connected_flow_map=connected_flow_map

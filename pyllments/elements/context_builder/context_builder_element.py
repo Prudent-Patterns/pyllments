@@ -7,10 +7,11 @@ import param
 from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.payloads.message import MessagePayload
 from pyllments.ports import InputPort, OutputPort, Ports
+from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from .to_message import to_message_payload, payload_message_mapping
 
-class ContextBuilder(param.Parameterized):
+class ContextBuilder(Element):
     # TODO Add ports for the preset messages for additional modularity
     input_map = param.Dict(default={}, doc="""
         A dictionary mapping input keys to expected payload types. Determines the order of the output in
@@ -86,29 +87,16 @@ class ContextBuilder(param.Parameterized):
     def _flow_controller_setup(self):
         if not (self.input_map or self.connected_input_map):
             raise ValueError("At least one of input_map or connected_input_map must be provided.")
-        
-        if self.input_map and self.connected_input_map:
-            flow_map = self._flow_map_setup(self.input_map)
+        flow_controller_kwargs = {}
+        flow_map = self._flow_map_setup(self.input_map)
+        flow_controller_kwargs['flow_map'] = flow_map
+        if self.connected_input_map:
             connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
-            self.flow_controller = FlowController(
-                flow_map=flow_map,
-                connected_flow_map=connected_flow_map
-            )
-        elif self.connected_input_map:
-            connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
-            self.flow_controller = FlowController(
-                connected_flow_map=connected_flow_map
-            )
-        elif self.input_map:
-            flow_map = self._flow_map_setup(self.input_map)
-            self.flow_controller = FlowController(
-                flow_map=flow_map
-            )
-        else:
-            raise ValueError("Either input_map or connected_input_map must be provided, but not both.")
+            flow_controller_kwargs['connected_flow_map'] = connected_flow_map
+        print(flow_controller_kwargs)
+        self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
         
-        flow_fn = self._flow_fn_setup()
-        self.flow_controller.flow_fn = flow_fn
+        self.flow_controller.flow_fn = self._flow_fn_setup()
 
     def _flow_map_setup(self, input_map):
         flow_map = {'input': {}, 'output': {'messages_output': list[MessagePayload]}}
@@ -123,9 +111,18 @@ class ContextBuilder(param.Parameterized):
     def _connected_flow_map_setup(self, connected_input_map):
         connected_flow_map = {'input': {}, 'output': {}}
         
-        # Handle input connections
-        if 'input' in connected_input_map:
-            for key, (msg_type, ports_or_string) in connected_input_map['input'].items():
+        for key, (msg_type, ports_or_string) in connected_input_map.items():
+            if key == 'output':
+                # Handle output connections
+                for out_key, ports in ports_or_string.items():
+                    if isinstance(ports, (list, tuple)):
+                        connected_flow_map['output'][out_key] = ports
+                    elif isinstance(ports, InputPort):
+                        connected_flow_map['output'][out_key] = [ports]
+                    else:
+                        raise ValueError(f"Invalid value for output key '{out_key}': {ports}")
+            else:
+                # Handle input connections
                 if isinstance(ports_or_string, (list, tuple)):
                     connected_flow_map['input'][key] = ports_or_string
                     if key not in self.input_map:
@@ -136,22 +133,12 @@ class ContextBuilder(param.Parameterized):
                         self.input_map[key] = (msg_type, ports_or_string.payload_type)
                 elif isinstance(ports_or_string, str):
                     msg_string = ports_or_string
-                    if not self.preset_messages.get(key):
+                    if key not in self.preset_messages:
                         self.preset_messages[key] = type(self)._create_message(msg_type, msg_string)
                     if key not in self.input_map:
                         self.input_map[key] = (msg_type, msg_string)
                 else:
-                    raise ValueError(f"Invalid value for input key '{key}': {ports_or_string}")
-        
-        # Handle output connections
-        if 'output' in connected_input_map:
-            for key, ports in connected_input_map['output'].items():
-                if isinstance(ports, (list, tuple)):
-                    connected_flow_map['output'][key] = ports
-                elif isinstance(ports, InputPort):
-                    connected_flow_map['output'][key] = [ports]
-                else:
-                    raise ValueError(f"Invalid value for output key '{key}': {ports}")
+                    raise ValueError(f"Invalid value for key '{key}': {ports_or_string}")
         
         return connected_flow_map
 
