@@ -27,7 +27,7 @@ class OutputFlowPort(FlowPort):
 
 class InputFlowPort(FlowPort):
     input_port = param.ClassSelector(class_=InputPort, doc="Input port the flow port wraps")
-    payload = param.ClassSelector(default=None, class_=Payload, doc="Most recent payload that arrived at this port.")
+    payload = param.ClassSelector(default=None, class_=(list, Payload), doc="Most recent payload that arrived at this port.")
 
     def __init__(self, **params):
         super().__init__(**params)

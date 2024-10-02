@@ -49,14 +49,16 @@ class HistoryHandlerElement(Element):
             else:
                 self.model.load_message(payload)
 
+            self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
+
         self.ports.add_input(
             name='message_input',
             unpack_payload_callback=unpack
         )
 
     def _messages_output_setup(self):
-        def pack(context: deque) -> List[MessagePayload]:
-            return self.model.get_context_messages()
+        def pack(context: List[MessagePayload]) -> List[MessagePayload]:
+            return context
         
         self.ports.add_output(
             name='messages_output',
