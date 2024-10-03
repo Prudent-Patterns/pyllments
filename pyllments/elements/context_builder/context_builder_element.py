@@ -218,21 +218,27 @@ class ContextBuilder(Element):
                 )
                 input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
                 input_name_payload_dict[active_input_port.name] = active_input_port.payload
+                # Convert to MessagePayloads or lists of MessagePayloads, then emit all of them
                 if all([key in input_name_payload_dict for key in input_port_keys]):
-                    msg_payload_list = [
-                        to_message_payload(
-                            input_name_payload_dict[key], 
-                            self.payload_message_mapping,
-                            expected_type=self.flow_controller.flow_port_map[key].payload_type
+                    msg_payload_list = []
+                    for key in self.input_map.keys():
+                        payload = (
+                            to_message_payload(
+                                input_name_payload_dict[key], 
+                                self.payload_message_mapping,
+                                expected_type=self.flow_controller.flow_port_map[key].payload_type
+                            )
+                            if not isinstance(self.input_map[key][1], str)
+                            else to_message_payload(
+                                self.preset_messages[key], 
+                                self.payload_message_mapping,
+                                expected_type=MessagePayload
+                            )
                         )
-                        if not isinstance(self.input_map[key][1], str)
-                        else to_message_payload(
-                            self.preset_messages[key], 
-                            self.payload_message_mapping,
-                            expected_type=MessagePayload
-                        )
-                        for key in self.input_map.keys()
-                    ]
+                        if isinstance(payload, list):
+                            msg_payload_list.extend(payload)
+                        else:
+                            msg_payload_list.append(payload)
                     messages_output.emit(msg_payload_list)
                     input_name_payload_dict.clear()
 

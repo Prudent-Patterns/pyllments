@@ -58,7 +58,7 @@ embedder_element = EmbedderElement()
 retriever_element = RetrieverElement()
 chat_interface_element = ChatInterfaceElement()
 
-test_element = TestElement()
+test_element = TestElement(receive_callback=lambda p: [item.model.message for item in p])
 
 file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
