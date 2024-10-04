@@ -19,7 +19,7 @@ def base_text_splitter(
         length_function=length_function,
         keep_separator=keep_separator)
     file_text = file.decode('utf-8')
-    documents = text_splitter.create_documents(file_text)
+    documents = text_splitter.create_documents([file_text])
     chunk_list = []
     for doc in documents:
         text = doc.page_content

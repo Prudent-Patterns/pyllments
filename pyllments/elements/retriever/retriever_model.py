@@ -1,5 +1,7 @@
 import param
 import pyarrow as pa
+import time
+from loguru import logger
 
 from pyllments.base.model_base import Model
 from pyllments.common.collections import LanceDBCollection, Collection
@@ -57,13 +59,27 @@ class RetrieverModel(Model):
         )
     
     def add_item(self, chunk_payload: ChunkPayload):
+        start_time = time.time()
+        
         item = {col: getattr(chunk_payload.model, col) for col in self.schema_cols}
         self.collection.add_item(item)
+
+        logger.info(f"RetrieverModel: Added item to collection. Time elapsed: {time.time() - start_time:.2f} seconds")
+
+    def add_items(self, chunk_payloads: list[ChunkPayload]):
+        start_time = time.time()
+
+        items = [{col: getattr(chunk_payload.model, col) for col in self.schema_cols} for chunk_payload in chunk_payloads]
+        self.collection.add_items(items)
+        
+        logger.info(f"RetrieverModel: Added {len(chunk_payloads)} items to collection. Time elapsed: {time.time() - start_time:.2f} seconds")
     
     def retrieve(self, message_payload: MessagePayload):
+        start_time = time.time()
         embedding = message_payload.model.embedding
         if embedding is None:
             raise ValueError("No embedding found in MessagePayload")
+        logger.info("RetrieverModel: Starting query")
         chunk_payloads = [
             ChunkPayload(**item)
             for item in self.collection.query(
@@ -71,4 +87,7 @@ class RetrieverModel(Model):
                 n=self.retrieval_n,
                 metric=self.metric)
         ]
+        logger.info(f"RetrieverModel: Query completed. Time elapsed: {time.time() - start_time:.2f} seconds")
+    
         return chunk_payloads
+    

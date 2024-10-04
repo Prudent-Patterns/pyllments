@@ -28,12 +28,12 @@ class HistoryHandlerElement(Element):
 
     def __init__(self, **params):
         super().__init__(**params)
-        self.model = HistoryHandlerModel()
+        self.model = HistoryHandlerModel(**params)
         
         self._message_input_setup()
         self._messages_output_setup()
 
-        self._create_watchers()
+        self._messages_input_setup()
 
     def _message_input_setup(self):
         def unpack(payload: MessagePayload): # TODO: Needs to work with list[MessagePayload]
@@ -50,10 +50,7 @@ class HistoryHandlerElement(Element):
 
             self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
 
-        self.ports.add_input(
-            name='message_input',
-            unpack_payload_callback=unpack
-        )
+        self.ports.add_input(name='message_input', unpack_payload_callback=unpack)
 
     def _messages_output_setup(self):
         def pack(context: list[MessagePayload]) -> list[MessagePayload]:
@@ -64,13 +61,13 @@ class HistoryHandlerElement(Element):
             pack_payload_callback=pack
         )
 
-    def _create_watchers(self):
-        self.model.param.watch(self.context_change_callback, 'context')
+    def _messages_input_setup(self):
+        def unpack(payload: list[MessagePayload]):
+            for message in payload:
+                self.model.load_message(message)
 
-    def context_change_callback(self, event):
-        last_message = self.model.get_context_messages()[-1]
-        if last_message.model.role != 'ai':
-            self.ports.output['messages_output'].stage_emit(context=self.model.context)
+        self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
+
 
     def create_context_view(
         self, 

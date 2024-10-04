@@ -2,6 +2,7 @@ import lancedb
 import numpy as np
 import param
 import pyarrow as pa
+import time
 # TODO: May need their own folders
 
 class Collection(param.Parameterized):
@@ -70,6 +71,7 @@ class LanceDBCollection(Collection):
             n = self.n
         if metric is None:
             metric = self.metric
+        start_time = time.time()
         results = self.collection.search(embedding) \
             .metric(metric) \
             .limit(n) \

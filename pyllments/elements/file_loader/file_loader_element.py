@@ -88,7 +88,17 @@ class FileLoaderElement(Element):
     def emit_files(self, event=None):
         """Manually trigger file emission when the send button is clicked."""
         self.model.save_files()
+
         self.ports.output['file_list_output'].stage_emit(file_list=self.model.file_list)
+
+        self.clear_files()
+
+    def clear_files(self):
+        """Clear the files from both the model and the view."""
         self.model.clear_files()
+
         if isinstance(self.file_container_view, pn.Column):
-            self.file_container_view.clear()
+            def clear_view():
+                self.file_container_view.clear()
+
+            pn.state.execute(clear_view)
