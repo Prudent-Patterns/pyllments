@@ -7,7 +7,7 @@ from pyllments.payloads.message import MessagePayload
 from pyllments.elements.retriever.retriever_model import RetrieverModel
 
 class RetrieverElement(Element):
-    # Needs two col viz, one for the created chunks, and one for the retrieved chunks
+    # TODO Needs two col viz, one for the created chunks, and one for the retrieved chunks
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -23,10 +23,7 @@ class RetrieverElement(Element):
             start_time = time.time()
             logger.info("RetrieverElement: Starting chunk input processing")
             chunks = payload if isinstance(payload, list) else [payload]
-            for i, chunk in enumerate(chunks):
-                self.model.add_item(chunk)
-                if i % 100 == 0:  # Log every 100 chunks
-                    logger.info(f"RetrieverElement: Processed {i+1} chunks. Time elapsed: {time.time() - start_time:.2f} seconds")
+            self.model.add_items(chunks)  # Use add_items to process all chunks at once
             logger.info(f"RetrieverElement: Finished processing {len(chunks)} chunks. Total time: {time.time() - start_time:.2f} seconds")
         
         self.ports.add_input('chunk_input', unpack)

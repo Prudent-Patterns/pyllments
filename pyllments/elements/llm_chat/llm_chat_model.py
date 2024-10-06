@@ -1,10 +1,10 @@
 import param
 
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages.base import BaseMessage
+from langchain_core.messages import AIMessage
 
 from pyllments.base.model_base import Model
-
+from pyllments.payloads.message import MessagePayload
 
 class LLMChatModel(Model):
     chat_model = param.ClassSelector(class_=BaseLanguageModel, doc="""
@@ -18,14 +18,10 @@ class LLMChatModel(Model):
     
     provider_name = param.String(default='openai', doc='Provider of the model')
     model_name = param.String(default='gpt-4o-mini', doc='Name of the model')
-    incoming_messages = param.List(item_type=BaseMessage)
     output_mode = param.Selector(
         objects=['atomic', 'stream'],
         default='stream',
         )
-    # new_message = param.ClassSelector(class_=AIMessage)
-    outgoing_message = param.Parameter(doc="""
-        AIMessage or Stream, depending on output_mode""")
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -87,3 +83,16 @@ class LLMChatModel(Model):
     def _initialize_model(self):
         """Initializes the model"""
         self.chat_model = self.provider(model_name=self.model_name, **self.model_args)
+
+    def generate_response(self, messages: list[MessagePayload]) -> MessagePayload:
+        """Generate a response based on the input MessagePayload(s)."""        
+        langchain_messages = [msg.model.message for msg in messages]
+
+        if self.output_mode == 'atomic':
+            response = self.chat_model.invoke(langchain_messages)
+            return MessagePayload(message=response, mode='atomic')
+        elif self.output_mode == 'stream':
+            response_stream = self.chat_model.stream(langchain_messages)
+            return MessagePayload(role='ai', message_stream=response_stream, mode='stream')
+        else:
+            raise ValueError(f"Invalid output mode: {self.output_mode}")
