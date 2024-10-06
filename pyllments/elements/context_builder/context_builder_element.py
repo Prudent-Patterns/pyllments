@@ -93,7 +93,6 @@ class ContextBuilder(Element):
         if self.connected_input_map:
             connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
             flow_controller_kwargs['connected_flow_map'] = connected_flow_map
-        logger.info("Flow controller setup with kwargs: {}", flow_controller_kwargs)
         self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
         
         self.flow_controller.flow_fn = self._flow_fn_setup()
@@ -160,8 +159,6 @@ class ContextBuilder(Element):
             c = kwargs['c']
             messages_output = kwargs['messages_output']
 
-            logger.info(f"[ContextBuilder] Active input port: {active_input_port.name}")
-            
             if self.build_fn:
                 self.build_fn(**kwargs)
             elif self.build_map:
@@ -174,12 +171,10 @@ class ContextBuilder(Element):
                 
                 # Always store the incoming payload
                 input_name_payload_dict[active_input_port.name] = active_input_port.payload
-
-                logger.info(f"[ContextBuilder] Payload received on {active_input_port.name}: {type(active_input_port.payload)}")
-                logger.info(f"[ContextBuilder] Current input_name_payload_dict keys: {list(input_name_payload_dict.keys())}")
-
+                logger.info(f"[ContextBuilder] Set payload on port {active_input_port.name}: {type(active_input_port.payload)}")
                 if c.get('is_ready', True):
                     if active_input_port.name in self.build_map:
+                        logger.info(f"[ContextBuilder] Building messages for {active_input_port.name}: {self.build_map[active_input_port.name]}")
                         input_keys_subset = self.build_map[active_input_port.name]
                         input_port_keys_subset = [key for key in input_keys_subset if key in input_port_keys]
                         c['input_keys_subset'] = input_keys_subset
@@ -194,7 +189,6 @@ class ContextBuilder(Element):
 
                 # Check if we have all required payloads
                 if all(key in input_name_payload_dict for key in input_port_keys_subset):
-                    logger.info(f"[ContextBuilder] Building messages for keys: {input_keys_subset}")
                     msg_payload_list = [
                         to_message_payload(
                             input_name_payload_dict[key], 
@@ -209,14 +203,12 @@ class ContextBuilder(Element):
                         )
                         for key in input_keys_subset
                     ]
-                    messages_output.emit(msg_payload_list)
-                    logger.info(f"[ContextBuilder] Emitting {len(msg_payload_list)} messages")
-                    c['is_ready'] = True
-                    # Only clear the payloads that were used
+
                     for key in input_keys_subset:
                         input_name_payload_dict.pop(key, None)
-                    logger.info(f"[ContextBuilder] Cleared payloads: {input_keys_subset}")
-                    logger.info(f"[ContextBuilder] Updated input_name_payload_dict keys: {list(input_name_payload_dict.keys())}")
+                    c['is_ready'] = True
+                    logger.info(f"[ContextBuilder] Emitting ports: {input_keys_subset}")
+                    messages_output.emit(msg_payload_list)
             # Default behavior without build_map or build_fn
             # Waits for all payloads to be received and then emits the messages in the order of the input_map
             else:
@@ -227,6 +219,8 @@ class ContextBuilder(Element):
                 )
                 input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
                 input_name_payload_dict[active_input_port.name] = active_input_port.payload
+                logger.info(f"[ContextBuilder] Set payload on port {active_input_port.name}: {type(active_input_port.payload)}")
+
                 # Convert to MessagePayloads or lists of MessagePayloads, then emit all of them
                 if all([key in input_name_payload_dict for key in input_port_keys]):
                     msg_payload_list = []
@@ -248,10 +242,9 @@ class ContextBuilder(Element):
                             msg_payload_list.extend(payload)
                         else:
                             msg_payload_list.append(payload)
-                    messages_output.emit(msg_payload_list)
-                    logger.info("[ContextBuilder] Default flow_fn execution")
-                    logger.info(f"[ContextBuilder] Emitting {len(msg_payload_list)} messages")
+                            
                     input_name_payload_dict.clear()
+                    messages_output.emit(msg_payload_list)
 
         return flow_fn
 
