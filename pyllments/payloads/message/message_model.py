@@ -21,7 +21,7 @@ class MessageModel(Model):
         doc="""Message to be populated""")
     mode = param.Selector(
         objects=['atomic', 'stream'],
-        default='stream')
+        default='atomic')
     message_stream = param.ClassSelector(class_=(Generator, AsyncGenerator), doc="""
         Used with stream mode, assumes AI message created from stream""")
     streamed = param.Boolean(default=False, doc="""

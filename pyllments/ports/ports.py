@@ -78,8 +78,16 @@ class InputPort(Port):
             if origin is Union:
                 return any(validate_type(payload, arg) for arg in args)
             elif origin is list:
-                return (isinstance(payload, list) and
-                        all(isinstance(item, args[0]) for item in payload))
+                if not isinstance(payload, list):
+                    raise ValueError(f"For port '{self.name}', payload is not a list. "
+                                     f"Expected a list of {get_args(expected_type)[0]}")
+                if not payload:
+                    raise ValueError(f"For port '{self.name}', payload is an empty list. "
+                                     f"Expected a non-empty list of {get_args(expected_type)[0]}")
+                if not all(isinstance(item, get_args(expected_type)[0]) for item in payload):
+                    raise ValueError(f"For port '{self.name}', payload contains items "
+                                     f"that are not instances of {get_args(expected_type)[0]}")
+                return True  # If we've passed all checks for list type
             else:
                 return isinstance(payload, expected_type)
             
@@ -237,9 +245,15 @@ class OutputPort(Port):
                             raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
                                              f"is not an instance of any type in {expected_type}")
                     elif get_origin(expected_type) is list:
-                        if not (isinstance(value, list) and all(isinstance(item, get_args(expected_type)[0]) for item in value)):
+                        if not isinstance(value, list):
                             raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
-                                             f"is not a list of {get_args(expected_type)[0]}")
+                                             f"is not a list")
+                        if not value:
+                            raise ValueError(f"For port '{self.name}', item '{name}' is an empty list. "
+                                             f"Expected a non-empty list of {get_args(expected_type)[0]}")
+                        if not all(isinstance(item, get_args(expected_type)[0]) for item in value):
+                            raise ValueError(f"For port '{self.name}', item '{name}' contains items "
+                                             f"that are not instances of {get_args(expected_type)[0]}")
                     elif not isinstance(value, expected_type):
                         raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
                                          f"is not an instance of {expected_type}")

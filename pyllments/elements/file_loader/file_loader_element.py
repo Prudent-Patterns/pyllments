@@ -98,7 +98,4 @@ class FileLoaderElement(Element):
         self.model.clear_files()
 
         if isinstance(self.file_container_view, pn.Column):
-            def clear_view():
-                self.file_container_view.clear()
-
-            pn.state.execute(clear_view)
+            self.file_container_view.clear()

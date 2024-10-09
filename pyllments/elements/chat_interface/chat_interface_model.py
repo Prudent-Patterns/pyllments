@@ -21,6 +21,6 @@ class ChatInterfaceModel(Model):
             )
 
     def _new_message_updated(self, event):
-        if self.new_message.model.mode == 'stream':
+        if self.new_message.model.mode == 'stream' and not self.new_message.model.streamed:
             self.new_message.model.stream()
         self.message_list.append(self.new_message)

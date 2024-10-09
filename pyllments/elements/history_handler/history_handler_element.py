@@ -39,16 +39,16 @@ class HistoryHandlerElement(Element):
         def unpack(payload: MessagePayload): # TODO: Needs to work with list[MessagePayload]
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
-            if (payload.model.mode == 'stream' and
-                not payload.model.streamed):
+            if payload.model.mode == 'stream' and not payload.model.streamed:
                 def stream_callback(event):
                     self.model.load_message(payload)
 
                 payload.model.param.watch(stream_callback, 'streamed')
             else:
                 self.model.load_message(payload)
-
-            self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
+            # Only stage_emit if context isn't an empty list
+            if self.model.context:
+                self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
 
         self.ports.add_input(name='message_input', unpack_payload_callback=unpack)
 
