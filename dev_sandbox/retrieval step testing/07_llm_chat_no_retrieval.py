@@ -46,7 +46,7 @@ from pyllments.elements.file_loader import FileLoaderElement
 from pyllments.elements.retriever import RetrieverElement
 from pyllments.elements.chat_interface import ChatInterfaceElement
 from pyllments.elements.context_builder import ContextBuilder
-from pyllments.elements.flow_control.flow_controllers.switch import Switch
+from pyllments.elements.flow_control.flow_controllers.switch.switch import Switch
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.history_handler import HistoryHandlerElement
 from pyllments.elements.llm_chat import LLMChatElement

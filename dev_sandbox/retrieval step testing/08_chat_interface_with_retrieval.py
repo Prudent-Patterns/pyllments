@@ -59,7 +59,11 @@ retriever_element = RetrieverElement()
 chat_interface_element = ChatInterfaceElement()
 llm_chat_element = LLMChatElement()
 
-test_element = TestElement(receive_callback=lambda p: p)
+test_element = TestElement(
+    # receive_callback=lambda p: [i.model.message.content for i in p]
+    receive_callback=lambda p: [i.model.text for i in p]
+)
+
 
 file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
@@ -72,6 +76,8 @@ switch_element = Switch(
     outputs=['with_retrieval', 'without_retrieval'], 
     current_output='with_retrieval'
 )
+
+switch_element.ports.output['with_retrieval'] > retriever_element.ports.input['message_input']
 
 embedder_element.ports.output['processed_message_output'] > switch_element.ports.input['payload_input']
 
@@ -117,8 +123,11 @@ context_builder = ContextBuilder(
 context_builder.ports.output['messages_output'] > history_handler_element.ports.input['messages_input']
 context_builder.ports.output['messages_output'] > llm_chat_element.ports.input['messages_input']
 llm_chat_element.ports.output['message_output'] > history_handler_element.ports.input['message_input']
-# llm_chat_element.ports.output['message_output'] > chat_interface_element.ports.input['message_input']
-llm_chat_element.ports.output['message_output'] > test_element.ports.input['test_input']
+llm_chat_element.ports.output['message_output'] > chat_interface_element.ports.input['message_input']
+# llm_chat_element.ports.output['message_output'] > test_element.ports.input['test_input']
+# context_builder.ports.output['messages_output'] >  test_element.ports.input['test_input']
+# retriever_element.ports.output['chunk_output'] > test_element.ports.input['test_input']
+embedder_element.ports.output['processed_chunks_output'] > test_element.ports.input['test_input']
 
 from langchain_core.messages import HumanMessage
 test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))

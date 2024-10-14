@@ -1,0 +1,16 @@
+:host {
+    --surface-color: var(--secondary-accent-color);
+}
+
+:host(.solid) .bk-btn-group .bk-btn.bk-btn-default.bk-active {
+    color: var(--white);
+    background-color: var(--primary-accent-color);
+    box-shadow: none; /* Consider adding a box-shadow for better visibility */
+}
+
+/* Added hover effect for better user experience */
+:host(.solid) .bk-btn-group .bk-btn.bk-btn-default:hover {
+    background-color: var(--primary-accent-color); /* Change background on hover */
+    color: var(--white); /* Maintain text color on hover */
+    box-shadow: inset 0px 3px 5px rgb(0 0 0 / 50%)
+}

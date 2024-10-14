@@ -189,20 +189,21 @@ class ContextBuilder(Element):
 
                 # Check if we have all required payloads
                 if all(key in input_name_payload_dict for key in input_port_keys_subset):
-                    msg_payload_list = [
-                        to_message_payload(
+                    msg_payload_list = []
+                    for key in input_keys_subset:
+                        payload = (
+                            to_message_payload(
                             input_name_payload_dict[key], 
                             self.payload_message_mapping,
                             expected_type=self.flow_controller.flow_port_map[key].payload_type
                         )
                         if not isinstance(self.input_map[key][1], str)
-                        else to_message_payload(
-                            self.preset_messages[key], 
-                            self.payload_message_mapping,
-                            expected_type=MessagePayload
+                        else self.preset_messages[key]
                         )
-                        for key in input_keys_subset
-                    ]
+                        if isinstance(payload, list):
+                            msg_payload_list.extend(payload)
+                        else:
+                            msg_payload_list.append(payload)
 
                     for key in input_keys_subset:
                         input_name_payload_dict.pop(key, None)
@@ -232,11 +233,7 @@ class ContextBuilder(Element):
                                 expected_type=self.flow_controller.flow_port_map[key].payload_type
                             )
                             if not isinstance(self.input_map[key][1], str)
-                            else to_message_payload(
-                                self.preset_messages[key], 
-                                self.payload_message_mapping,
-                                expected_type=MessagePayload
-                            )
+                            else self.preset_messages[key]
                         )
                         if isinstance(payload, list):
                             msg_payload_list.extend(payload)

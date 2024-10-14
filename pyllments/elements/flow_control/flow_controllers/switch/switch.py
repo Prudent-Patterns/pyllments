@@ -1,6 +1,10 @@
+from typing import Literal, Optional, Any
+
+from panel.widgets import RadioButtonGroup
 import param
 
 from pyllments.base.element_base import Element
+from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import OutputPort, InputPort, Ports
@@ -61,7 +65,7 @@ class Switch(Element):
     switch.current_output = 'port2'
     """
 
-    payload_type = param.ClassSelector(class_=Payload, is_instance=False, doc="Type of payload this switch will handle")
+    payload_type = param.ClassSelector(class_=(Payload, Any), is_instance=False, doc="Type of payload this switch will handle")
     outputs = param.List(default=[], item_type=str, doc="List of output port aliases")
     connected_map = param.Dict(default={}, doc="""
         Dictionary of input and output aliases mapped to ports for connection.
@@ -81,6 +85,8 @@ class Switch(Element):
 
     flow_controller = param.ClassSelector(class_=FlowController, doc="FlowController object")
     ports = param.ClassSelector(class_=Ports, allow_None=False, doc="Ports object")
+
+    switch_view = param.ClassSelector(class_=RadioButtonGroup, allow_None=True, is_instance=True)
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -113,6 +119,7 @@ class Switch(Element):
         for output in self.outputs:
             flow_map['output'][output] = self.payload_type
         return flow_map
+
     def _prepare_connected_flow_map(self):
         connected_flow_map = {'input': {'payload_input': []}, 'output': {}}
         
@@ -122,6 +129,38 @@ class Switch(Element):
         
         if 'output' in self.connected_map:
             connected_flow_map['output'] = self.connected_map['output']
+            # Populate the outputs list with the output port names from connected_map
+            self.outputs = list(self.connected_map['output'].keys())
         
         return connected_flow_map
+    
+    @Component.view
+    def create_switch_view(
+        self,
+        orientation: Literal['horizontal', 'vertical'] = 'horizontal',
+        radio_button_group_css: list[str] = [],
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        sizing_mode: Literal['fixed', 'stretch_width', 'stretch_height', 'stretch_both'] = None,
+    ):
+        if sizing_mode is None:
+            sizing_mode = 'stretch_height' if orientation == 'vertical' else 'stretch_width'
+        self.switch_view = RadioButtonGroup(
+            options=self.outputs,
+            orientation=orientation,
+            stylesheets=radio_button_group_css,
+            height=height,
+            width=width,
+            sizing_mode=sizing_mode,
+            value=self.current_output
+        )
+
+        def switch_fn(event):
+            self.current_output = event.new
+        
+        self.switch_view.param.watch(switch_fn, 'value')
+        return self.switch_view
+
+        
+
 

@@ -8,6 +8,7 @@ from pyllments.base.element_base import Element
 from pyllments.payloads.message.message_payload import MessagePayload
 from .history_handler_model import HistoryHandlerModel
 
+# TODO: Allow support of other payload types
 class HistoryHandlerElement(Element):
     # TODO Add filtering support
     """

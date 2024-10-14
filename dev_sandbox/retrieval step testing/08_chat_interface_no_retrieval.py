@@ -70,7 +70,7 @@ chat_interface_element.ports.output['message_output'] > embedder_element.ports.i
 switch_element = Switch(
     payload_type=MessagePayload, 
     outputs=['with_retrieval', 'without_retrieval'], 
-    current_output='with_retrieval'
+    current_output='without_retrieval'
 )
 
 embedder_element.ports.output['processed_message_output'] > switch_element.ports.input['payload_input']
@@ -117,8 +117,8 @@ context_builder = ContextBuilder(
 context_builder.ports.output['messages_output'] > history_handler_element.ports.input['messages_input']
 context_builder.ports.output['messages_output'] > llm_chat_element.ports.input['messages_input']
 llm_chat_element.ports.output['message_output'] > history_handler_element.ports.input['message_input']
-# llm_chat_element.ports.output['message_output'] > chat_interface_element.ports.input['message_input']
-llm_chat_element.ports.output['message_output'] > test_element.ports.input['test_input']
+llm_chat_element.ports.output['message_output'] > chat_interface_element.ports.input['message_input']
+# llm_chat_element.ports.output['message_output'] > test_element.ports.input['test_input']
 
 from langchain_core.messages import HumanMessage
 test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
