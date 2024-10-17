@@ -85,7 +85,7 @@ class HistoryHandlerElement(Element):
                 stylesheets=title_css
             ),
             *[
-                msg.create_collapsing_message_view()
+                msg[0].create_collapsible_view()
                 for msg in self.model.context
             ],
             stylesheets=column_css,
@@ -94,7 +94,7 @@ class HistoryHandlerElement(Element):
         )
         def _update_context_view(event):
             self.context_view.objects = [
-                msg.create_collapsing_message_view()
+                msg.create_collapsible_view()
                 for msg in self.model.context
             ]
         self.model.param.watch(_update_context_view, 'context')

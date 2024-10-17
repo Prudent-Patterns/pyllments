@@ -81,7 +81,7 @@ class ChatInterfaceElement(Element):
             **kwargs)
         message_views = [
             self.inject_payload_css(
-                message.create_message_view,
+                message.create_static_view,
                 show_role=True
                 ) 
             for message in self.model.message_list
@@ -91,7 +91,7 @@ class ChatInterfaceElement(Element):
         def _update_chatfeed(event):
             self.chatfeed_view.append(
                 self.inject_payload_css(
-                    event.new.create_message_view,
+                    event.new.create_static_view,
                     show_role=True
                 )
             )

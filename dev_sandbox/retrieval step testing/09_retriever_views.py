@@ -134,6 +134,10 @@ test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
 
 file_loader_view = file_loader_element.create_file_loader_view()
 chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
-pn.Column(file_loader_view, chat_interface_view, height=900, width=500).servable()
+pn.Row(
+    retriever_element.create_created_chunks_view(),
+    retriever_element.create_retrieved_chunks_view(),
+    pn.Column(file_loader_view, chat_interface_view, height=900, width=500)
+    ).servable()
 
  

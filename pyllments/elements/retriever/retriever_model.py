@@ -44,6 +44,11 @@ class RetrieverModel(Model):
         The token limit of the model""")
     retrieval_tokenizer_model = param.String(default="gpt-4o-mini", doc="""
         The model used to tokenize the text""")
+    # Temporary storage of retrieved and added chunks
+    retrieved_chunks = param.List(class_=ChunkPayload, doc="""
+        The chunks retrieved from the collection""")
+    created_chunks = param.List(class_=ChunkPayload, doc="""
+        The chunks created by the model""")
 
     def __init__(self, retrieval_token_limit=None, **params):
         super().__init__(**params)
@@ -69,6 +74,8 @@ class RetrieverModel(Model):
     def add_items(self, chunk_payloads: list[ChunkPayload]):
         start_time = time.time()
 
+        self.created_chunks = chunk_payloads
+        
         items = [{col: getattr(chunk_payload.model, col) for col in self.schema_cols} for chunk_payload in chunk_payloads]
         self.collection.add_items(items)
         
@@ -87,6 +94,7 @@ class RetrieverModel(Model):
                 n=self.retrieval_n,
                 metric=self.metric)
         ]
+        self.retrieved_chunks = chunk_payloads
         logger.info(f"RetrieverModel: Query completed. Time elapsed: {time.time() - start_time:.2f} seconds")
     
         return chunk_payloads

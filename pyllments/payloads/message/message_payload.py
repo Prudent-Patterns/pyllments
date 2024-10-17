@@ -15,7 +15,7 @@ class MessagePayload(Payload):
         self.model = MessageModel(**params)
 
     @Component.view
-    def create_message_view(
+    def create_static_view(
         self,
         human_markdown_css: list = [],
         human_row_css: list = [],
@@ -55,7 +55,7 @@ class MessagePayload(Payload):
         return view
     
     @Component.view
-    def create_collapsing_message_view(
+    def create_collapsible_view(
         self,
         human_markdown_css: list = [],
         human_row_css: list = [],

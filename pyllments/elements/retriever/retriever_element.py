@@ -1,13 +1,18 @@
 import time
-from loguru import logger
 from typing import Union
+
+from loguru import logger
+import panel as pn
+import param
+
 from pyllments.base.element_base import Element
 from pyllments.payloads.chunk import ChunkPayload
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.retriever.retriever_model import RetrieverModel
 
 class RetrieverElement(Element):
-    # TODO Needs two col viz, one for the created chunks, and one for the retrieved chunks
+    retrieved_chunks_view = param.ClassSelector(class_=pn.Column)
+    created_chunks_view = param.ClassSelector(class_=pn.Column)
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -47,3 +52,74 @@ class RetrieverElement(Element):
             return chunk_payload
         
         self.ports.add_output('chunk_output', pack)
+
+    def create_retrieved_chunks_view(
+        self, 
+        column_css: list = [], 
+        title_css: list = [],
+        width: int = 450,
+        height: int = 800,
+        title_visible: bool = True
+    ) -> pn.Column:
+        """Creates a view for displaying the retrieved chunks."""
+        self.retrieved_chunks_view = pn.Column(
+            pn.pane.Markdown(
+                "## Retrieved Chunks", 
+                visible=title_visible,
+                stylesheets=title_css
+            ),
+            *[
+                chunk.create_collapsible_view()  # Assuming a method exists to create a view for each chunk
+                for chunk in self.model.retrieved_chunks  # Assuming retrieved_chunks is a list in the model
+            ],
+            stylesheets=column_css,
+            width=width,
+            height=height
+        )
+        
+        def _update_retrieved_chunks_view(event):
+            self.retrieved_chunks_view.objects[1:] = [
+                chunk.create_collapsible_view()
+                for chunk in self.model.retrieved_chunks
+            ]
+            self.retrieved_chunks_view.param.trigger('objects')
+
+        
+        self.model.param.watch(_update_retrieved_chunks_view, 'retrieved_chunks')
+        return self.retrieved_chunks_view
+
+    def create_created_chunks_view(
+        self, 
+        column_css: list = [], 
+        title_css: list = [],
+        width: int = 450,
+        height: int = 800,
+        title_visible: bool = True
+    ) -> pn.Column:
+        """Creates a view for displaying the created chunks."""
+        self.created_chunks_view = pn.Column(
+            pn.pane.Markdown(
+                "## Created Chunks", 
+                visible=title_visible,
+                stylesheets=title_css
+            ),
+            *[
+                chunk.create_collapsible_view()
+                for chunk in self.model.created_chunks
+            ],
+            stylesheets=column_css,
+            width=width,
+            height=height
+        )
+        
+        def _update_created_chunks_view(event):
+            self.created_chunks_view.objects[1:] = [
+                chunk.create_collapsible_view()
+                for chunk in self.model.created_chunks
+            ]
+            self.created_chunks_view.param.trigger('objects')
+        
+        self.model.param.watch(_update_created_chunks_view, 'created_chunks')
+
+        return self.created_chunks_view
+        
