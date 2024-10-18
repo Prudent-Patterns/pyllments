@@ -86,7 +86,6 @@ class MessagePayload(Payload):
 
         markdown = pn.pane.Markdown(
             self.model.message.content[:truncation_length],
-            # self.model.message.content,
             stylesheets=markdown_css)
  
         def _update_message_view(event):
@@ -96,8 +95,10 @@ class MessagePayload(Payload):
 
         def toggle_visibility(event):
             if event.new:  # If the toggle is activated
+                expand_button.icon = 'minus'
                 markdown.object = self.model.message.content
             else:  # If the toggle is deactivated
+                expand_button.icon = 'plus'
                 markdown.object = self.model.message.content[:truncation_length]
         expand_button.param.watch(toggle_visibility, 'value')
 

@@ -61,6 +61,7 @@ class ChunkPayload(Payload):
         view = pn.Row(
             expand_button,
             markdown,
+            sizing_mode='stretch_width',
             stylesheets=row_css
             )
         

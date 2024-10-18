@@ -1,6 +1,6 @@
 :host(.outline) .bk-btn-group .bk-btn-primary.bk-active {
     background-color: var(--faded-text-color); /* Set primary color to faded text color for active primary button */
-    color: var(--primary-background-color);
+    /* color: var(--primary-background-color); */
 }
 :host .bk-btn.bk-btn-primary.bk-active:hover {
     color: var(--white);

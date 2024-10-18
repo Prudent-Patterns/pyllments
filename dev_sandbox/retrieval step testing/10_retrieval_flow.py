@@ -70,7 +70,7 @@ file_loader_element.ports.output['file_list_output'] > chunker_element.ports.inp
 chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
 embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
 
-chat_interface_element.ports.output['message_output'] > embedder_element.ports.input['message_input']
+
 
 switch_element = Switch(
     payload_type=MessagePayload, 
@@ -78,9 +78,12 @@ switch_element = Switch(
     current_output='with_retrieval'
 )
 
-switch_element.ports.output['with_retrieval'] > retriever_element.ports.input['message_input']
+chat_interface_element.ports.output['message_output'] > switch_element.ports.input['payload_input']
+embedder_element.ports.input['message_input'] > retriever_element.ports.input['message_input']
 
-embedder_element.ports.output['processed_message_output'] > switch_element.ports.input['payload_input']
+switch_element.ports.output['without_retrieval'] > retriever_element.ports.input['message_input']
+
+# embedder_element.ports.output['processed_message_output'] > context_builder.ports.input['query']
 
 history_handler_element = HistoryHandlerElement()
 test_element.ports.output['test_output'] > history_handler_element.ports.input['message_input']
@@ -99,7 +102,7 @@ context_builder = ContextBuilder(
             'system', 
             "Following, is the user query which you should respond to to the best of your ability given the information you have."
         ),
-        'query': ('human', [switch_element.ports.output['without_retrieval'], switch_element.ports.output['with_retrieval']])
+        'query': ('human', [embedder_element.ports.output['processed_message_output'], switch_element.ports.output['without_retrieval']])
     },
     build_map={
         'query': [
