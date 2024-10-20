@@ -141,10 +141,12 @@ class Switch(Element):
         radio_button_group_css: list[str] = [],
         height: Optional[int] = None,
         width: Optional[int] = None,
+        margin: Optional[str] = 0,
         sizing_mode: Literal['fixed', 'stretch_width', 'stretch_height', 'stretch_both'] = None,
     ):
         if sizing_mode is None:
             sizing_mode = 'stretch_height' if orientation == 'vertical' else 'stretch_width'
+        
         self.switch_view = RadioButtonGroup(
             options=self.outputs,
             orientation=orientation,
@@ -152,7 +154,8 @@ class Switch(Element):
             height=height,
             width=width,
             sizing_mode=sizing_mode,
-            value=self.current_output
+            value=self.current_output,
+            margin=margin
         )
 
         def switch_fn(event):

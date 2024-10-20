@@ -75,14 +75,14 @@ embedder_element.ports.output['processed_chunks_output'] > retriever_element.por
 switch_element = Switch(
     payload_type=MessagePayload, 
     outputs=['with_retrieval', 'without_retrieval'], 
-    current_output='with_retrieval'
+    current_output='without_retrieval'
 )
 
 chat_interface_element.ports.output['message_output'] > switch_element.ports.input['payload_input']
-embedder_element.ports.input['message_input'] > retriever_element.ports.input['message_input']
+embedder_element.ports.output['processed_message_output'] > retriever_element.ports.input['message_input']
 
-switch_element.ports.output['without_retrieval'] > retriever_element.ports.input['message_input']
-
+switch_element.ports.output['with_retrieval'] > embedder_element.ports.input['message_input']
+# retriever_element.ports.input['message_input']
 # embedder_element.ports.output['processed_message_output'] > context_builder.ports.input['query']
 
 history_handler_element = HistoryHandlerElement()
@@ -138,10 +138,11 @@ test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
 
 file_loader_view = file_loader_element.create_file_loader_view()
 chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
+switch_view = switch_element.create_switch_view(orientation='horizontal', margin=(7, 0))
 pn.Row(
     retriever_element.create_created_chunks_view(),
     retriever_element.create_retrieved_chunks_view(),
-    pn.Column(file_loader_view, chat_interface_view, height=900, width=500)
+    pn.Column(file_loader_view, chat_interface_view, switch_view, height=900, width=500)
     ).servable()
 
  
