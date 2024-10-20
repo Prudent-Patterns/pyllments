@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim as main
+FROM --platform=linux/amd64 debian:bookworm-slim as main
 
 COPY environment.yml /
 
