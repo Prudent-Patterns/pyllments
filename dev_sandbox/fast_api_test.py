@@ -24,7 +24,7 @@ async def read_item(item_id: int):
 
 def run_server():
     print("Starting the FastAPI server...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8200)
 print('script works outside of the condish')
 if __name__ == "__main__":
     print("Script is being run directly")
