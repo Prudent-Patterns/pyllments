@@ -21,5 +21,16 @@
     },
     "search.exclude": {
         "**/assets/**": true
+    },
+    "remote.localPortHost": "allInterfaces",
+    "remote.autoForwardPorts": true,
+    "remote.portsAttributes": {
+        
+        "443": {
+            "protocol": "https"
+        },
+        "8443": {
+            "protocol": "https"
+        }
     }
 }

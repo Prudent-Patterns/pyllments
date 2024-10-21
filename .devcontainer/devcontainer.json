@@ -21,7 +21,7 @@
 			]
 		}
 	},
-	"appPort": [8000, 8200],
+	"forwardPorts": [8000, 8200],
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
