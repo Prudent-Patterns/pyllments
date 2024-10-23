@@ -27,3 +27,7 @@ dependencies:
     - langchain-anthropic
     - ruamel.yaml
     - duckdb
+    - fastapi[standard]
+    - bokeh-fastapi
+    - loguru
+    - lancedb

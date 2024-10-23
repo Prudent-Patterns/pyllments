@@ -139,11 +139,20 @@ test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
 file_loader_view = file_loader_element.create_file_loader_view()
 chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
 switch_view = switch_element.create_switch_view(orientation='horizontal', margin=(7, 0))
-pn.Row(
-    retriever_element.create_created_chunks_view(),
-    retriever_element.create_retrieved_chunks_view(),
-    pn.Column(file_loader_view, chat_interface_view, switch_view, height=900, width=500)
-    ).servable()
 
-# panel serve 10_retrieval_flow.py --static-dirs assets=/workspaces/pyllments/pyllments/assets
- 
+from fastapi import FastAPI
+from panel.io.fastapi import add_application
+from fastapi.staticfiles import StaticFiles
+
+app = FastAPI()
+app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
+
+@add_application('/', app=app, title='Pyllments')
+def create_pyllments_app():
+    return pn.Row(
+        retriever_element.create_created_chunks_view(),
+        retriever_element.create_retrieved_chunks_view(),
+        pn.Column(file_loader_view, chat_interface_view, switch_view, height=900, width=500)
+    )
+
+    
