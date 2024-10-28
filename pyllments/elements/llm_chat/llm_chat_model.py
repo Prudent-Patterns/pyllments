@@ -92,7 +92,7 @@ class LLMChatModel(Model):
             response = self.chat_model.invoke(langchain_messages)
             return MessagePayload(message=response, mode='atomic')
         elif self.output_mode == 'stream':
-            response_stream = self.chat_model.stream(langchain_messages)
+            response_stream = self.chat_model.astream(langchain_messages)
             return MessagePayload(role='ai', message_stream=response_stream, mode='stream')
         else:
             raise ValueError(f"Invalid output mode: {self.output_mode}")

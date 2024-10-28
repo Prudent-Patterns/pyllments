@@ -3,6 +3,7 @@ from typing import Optional
 import panel as pn
 import param
 from langchain_core.messages.human import HumanMessage
+from loguru import logger # TODO: remove after debugging
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
@@ -200,7 +201,7 @@ class ChatInterfaceElement(Element):
                 new_message = MessagePayload(
                     message=HumanMessage(input_text),
                     mode='atomic')
-            self.model.new_message = new_message
+                self.model.new_message = new_message
             
         elif event.obj is self.chat_input_view: # When value changes on 'enter'
             input_text = self.chat_input_view.value

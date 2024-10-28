@@ -4,6 +4,7 @@ from uuid import uuid4
 import param
 from langchain_core.messages.base import BaseMessage
 from langchain_core.messages.ai import AIMessage
+from loguru import logger # TODO: remove after debugging
 
 from pyllments.base.model_base import Model
 from pyllments.common.tokenizers import get_token_len
@@ -41,14 +42,15 @@ class MessageModel(Model):
         if self.message.type != 'placeholder':
             self.role = self.message.type
 
-    def stream(self):
-        # TODO Needs async implementation
+    async def stream(self):
         if self.mode != 'stream':
             raise ValueError("Cannot stream: Mode is not set to 'stream'")
         self.message = AIMessage(' ') # TODO: REMOVE WHITESPACE
-        for chunk in self.message_stream:
+        logger.info(f"Entering the langchain stream") # TODO: remove after debugging
+        async for chunk in self.message_stream:
             self.message.content += chunk.content
             self.param.trigger('message')
+        logger.info(f"Exiting the langchain stream") # TODO: remove after debugging
         self.message.response_metadata = chunk.response_metadata
         self.message.id = chunk.id
         self.streamed = True
