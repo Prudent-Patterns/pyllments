@@ -6,6 +6,7 @@ import panel as pn
 import param
 
 from pyllments.base.element_base import Element
+from pyllments.base.component_base import Component
 from pyllments.payloads.chunk import ChunkPayload
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.retriever.retriever_model import RetrieverModel
@@ -53,6 +54,7 @@ class RetrieverElement(Element):
         
         self.ports.add_output('chunk_output', pack)
 
+    @Component.view
     def create_retrieved_chunks_view(
         self, 
         column_css: list = [], 
@@ -74,7 +76,8 @@ class RetrieverElement(Element):
             ],
             stylesheets=column_css,
             width=width,
-            height=height
+            height=height,
+            scroll=True
         )
         
         def _update_retrieved_chunks_view(event):
@@ -88,6 +91,7 @@ class RetrieverElement(Element):
         self.model.param.watch(_update_retrieved_chunks_view, 'retrieved_chunks')
         return self.retrieved_chunks_view
 
+    @Component.view
     def create_created_chunks_view(
         self, 
         column_css: list = [], 
@@ -109,7 +113,8 @@ class RetrieverElement(Element):
             ],
             stylesheets=column_css,
             width=width,
-            height=height
+            height=height,
+            scroll=True
         )
         
         def _update_created_chunks_view(event):

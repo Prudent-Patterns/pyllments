@@ -78,12 +78,13 @@ class HistoryHandlerElement(Element):
         height: int = 800,
         title_visible: bool = True
     ) -> pn.Column:
+        header = pn.pane.Markdown(
+            "## Current History", 
+            visible=title_visible,
+            stylesheets=title_css
+        )
         self.context_view = pn.Column(
-            pn.pane.Markdown(
-                "## Current History", 
-                visible=title_visible,
-                stylesheets=title_css
-            ),
+            header,
             *[
                 msg[0].create_collapsible_view()
                 for msg in self.model.context
@@ -93,8 +94,9 @@ class HistoryHandlerElement(Element):
             height=height
         )
         def _update_context_view(event):
-            self.context_view.objects = [
-                msg.create_collapsible_view()
+            # Keep the header and update only the message views
+            self.context_view.objects = [header] + [
+                msg[0].create_collapsible_view()
                 for msg in self.model.context
             ]
         self.model.param.watch(_update_context_view, 'context')

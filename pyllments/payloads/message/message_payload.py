@@ -76,6 +76,11 @@ class MessagePayload(Payload):
                 markdown_css = ai_markdown_css
                 row_css = ai_row_css
                 role_str = 'AI'
+            case 'system':
+                markdown_css = human_markdown_css
+                row_css = human_row_css
+                role_str = 'System'
+            
 
         expand_button = pn.widgets.Toggle(
             icon='plus',
