@@ -19,9 +19,9 @@ class ContextBuilder(Element):
         The value is a tuple where the first element is the message type ('system', 'human', 'ai') and
         the second element is either a Payload type or a string for preset messages.
         e.g. 
-        input = {
+        input_map = {
             'port_a': ('human', MessagePayload),
-            'port_b': ('ai', List[MessagePayload]), # list will be expanded
+            'port_b': ('ai', list[MessagePayload]), # list will be expanded
             'system_msg': ('system', "This text will be a sys message") # can be system/human/ai
 	    }
         """)
@@ -94,7 +94,7 @@ class ContextBuilder(Element):
             connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
             flow_controller_kwargs['connected_flow_map'] = connected_flow_map
         self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
-        
+        # _flow_fn_setup requires the FlowController to be setup beforehand
         self.flow_controller.flow_fn = self._flow_fn_setup()
 
     def _flow_map_setup(self, input_map):
@@ -175,22 +175,22 @@ class ContextBuilder(Element):
                 if c.get('is_ready', True):
                     if active_input_port.name in self.build_map:
                         logger.info(f"[ContextBuilder] Building messages for {active_input_port.name}: {self.build_map[active_input_port.name]}")
-                        input_keys_subset = self.build_map[active_input_port.name]
-                        input_port_keys_subset = [key for key in input_keys_subset if key in input_port_keys]
-                        c['input_keys_subset'] = input_keys_subset
+                        required_ports = self.build_map[active_input_port.name]
+                        input_port_keys_subset = [key for key in required_ports if key in input_port_keys]
+                        c['required_ports'] = required_ports
                         c['input_port_keys_subset'] = input_port_keys_subset
                         c['is_ready'] = False
                     else:
                         # If the active port isn't in build_map, we don't start a build sequence
                         return
                 else:
-                    input_keys_subset = c['input_keys_subset']
+                    required_ports = c['required_ports']
                     input_port_keys_subset = c['input_port_keys_subset']
 
                 # Check if we have all required payloads
                 if all(key in input_name_payload_dict for key in input_port_keys_subset):
                     msg_payload_list = []
-                    for key in input_keys_subset:
+                    for key in required_ports:
                         payload = (
                             to_message_payload(
                             input_name_payload_dict[key], 
@@ -205,10 +205,10 @@ class ContextBuilder(Element):
                         else:
                             msg_payload_list.append(payload)
 
-                    for key in input_keys_subset:
+                    for key in required_ports:
                         input_name_payload_dict.pop(key, None)
                     c['is_ready'] = True
-                    logger.info(f"[ContextBuilder] Emitting ports: {input_keys_subset}")
+                    logger.info(f"[ContextBuilder] Emitting ports: {required_ports}")
                     messages_output.emit(msg_payload_list)
             # Default behavior without build_map or build_fn
             # Waits for all payloads to be received and then emits the messages in the order of the input_map

@@ -134,6 +134,9 @@ class FlowController(Element):
 
     Note: When using multi-ports, the alias in flow_map should start with 'multi_'.
     For example: 'multi_input_alias': SomePayloadType
+
+    When FlowController is used within an element, it is recommended to assign that element's
+    ports to the FlowController's ports parameter in the __init__ method.
     """
 
     flow_fn = param.Callable(doc="""

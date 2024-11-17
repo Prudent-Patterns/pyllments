@@ -12,4 +12,5 @@ class APIModel(Model):
         super().__init__(**params)
 
     def create_post_route(self, route_name, route_function):
+        pass
 

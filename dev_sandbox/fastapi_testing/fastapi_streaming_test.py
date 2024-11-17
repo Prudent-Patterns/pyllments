@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from panel.io.fastapi import add_application
 import panel as pn
-import asyncio
+
 import time
 
 app = FastAPI()
