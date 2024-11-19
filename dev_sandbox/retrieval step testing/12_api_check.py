@@ -55,7 +55,12 @@ from pyllments.elements.flow_control.flow_controllers.switch.switch import Switc
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.history_handler import HistoryHandlerElement
 from pyllments.elements.llm_chat import LLMChatElement
+from pyllments.elements.api import APIElement
 from pyllments.tests import TestElement
+
+from langchain_core.messages import HumanMessage
+import time
+import asyncio
 
 app = FastAPI()
 app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
@@ -149,6 +154,33 @@ def create_pyllments_app():
     file_loader_view = file_loader_element.create_file_loader_view()
     chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
     switch_view = switch_element.create_switch_view(orientation='horizontal', margin=(7, 0))
+
+    def output_pack_fn(request_dict) -> MessagePayload:
+        return MessagePayload(**{
+            'message': HumanMessage(content=request_dict['message']),
+            'role': request_dict['role']
+        })
+    
+    async def message_callback(payload):
+        while not payload.model.streamed:
+            await asyncio.sleep(0.1)
+        return payload.model.message.content
+    api_element = APIElement(
+        app=app,
+        endpoint='api',
+        connected_input_map={
+            'message_input': llm_chat_element.ports.output['message_output']
+        },
+        response_dict={
+            'message_input': {
+                'message': message_callback,
+                'role': 'role'
+            }
+        },
+        output_pack_fn=output_pack_fn, 
+        outgoing_input_port=chat_interface_element.ports.input['message_emit_input']
+    )
+    
     return pn.Row(
         pn.Column(
             retriever_element.create_created_chunks_view(height=450),

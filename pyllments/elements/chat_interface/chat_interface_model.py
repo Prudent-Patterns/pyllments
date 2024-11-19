@@ -19,21 +19,20 @@ class ChatInterfaceModel(Model):
 
     def _create_new_message_watcher(self):
         async def _new_message_updated(event):
-            # logger.info(f"Watcher triggered: old={id(event.old) if event.old else None}, new={id(event.new)}")
-            if (
-                event.new  # Make sure we have a new message
-                and event.new.model.mode == 'stream'  # Check mode on the new message
-                and not event.new.model.streamed  # Check streamed status on the new message
-                and event.old is not event.new
-                ):  # Only proceed if message actually changed
+            if not event.new or event.old is event.new:  # Skip if no message or same message
+                return
+                
+            if (event.new.model.mode == 'stream' 
+                and not event.new.model.streamed):  # Handle streaming AI messages
                 await event.new.model.stream()
-            self.message_list.append(self.new_message)
+            
+            self.message_list.append(event.new)  # Add message regardless of type
 
         self.param.watch(
             _new_message_updated, 
             'new_message', 
             precedence=10,
-            onlychanged=True  # Only trigger for actual changes
+            onlychanged=True
         )
 
     # @param.depends('new_message', watch=True)

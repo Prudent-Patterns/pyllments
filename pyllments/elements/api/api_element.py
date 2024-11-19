@@ -1,14 +1,16 @@
-from pyllments.base import Element
-from pyllments.base import Payload
+from pyllments.base.element_base import Element
+from pyllments.base.payload_base import Payload
 from pyllments.elements.flow_control import FlowController
-from pyllments.ports import Ports
-from .api_model import APIModel
+from pyllments.ports import InputPort
+# from pyllments.ports import Ports
+# from .api_model import APIModel
 
 import param
 from asyncio import Future
 from fastapi import FastAPI, HTTPException
 import asyncio
-
+from inspect import signature
+from loguru import logger
 class APIElement(Element):
     """
     Element that adds API routes to the LLM system
@@ -35,6 +37,7 @@ class APIElement(Element):
 
         response_dict = {
         # attribute_name is retrieved from the payload at the respective port e.g. payload.model.attribute_name
+        # lambda function can be provided to retrieve the attribute_name from the payload
             'port_a': {'alias': 'attribute_name'}
             'port_b': {'another_alias': 'another_attribute_name'}
         }
@@ -78,14 +81,16 @@ class APIElement(Element):
 
     output_pack_fn = param.Callable(default=None, doc="""
         A function used to package the output dictionary into the desired payload type. e.g.
-        def output_pack_fn(return_dict):
+        def output_pack_fn(request_dict):
             return MessagePayload(
             mode='system',
             message= )
         """)
 
+    outgoing_input_port = param.ClassSelector(class_=InputPort, doc="""
+        An optional input port to connect upon initialization.""")
 
-    app = param.ClassSelector(default=FastAPI(), class_=FastAPI, doc="""
+    app = param.ClassSelector(class_=FastAPI, doc="""
         The FastAPI app object for the API.""")
 
     endpoint = param.String(default="api", doc="""
@@ -93,13 +98,23 @@ class APIElement(Element):
     
     response_future = param.ClassSelector(class_=Future, doc="""
         The future object for the API response.""")
+    
+    test = param.Boolean(default=False)
+
+    stored_kwargs = param.Dict(default={}, doc="Storage for complete kwargs from flow_fn")
 
     def __init__(self, **params):
         super().__init__(**params)
-        self.model = APIModel(**params)
-        self._flow_controller_setup()
-        self._route_setup()
-
+        # self.model = APIModel(**params)
+        if not self.test:   
+            self._flow_controller_setup()
+            self._route_setup()
+        else:
+            @self.app.post(f"/{self.endpoint}")
+            async def test_post(item: dict):
+                return {'sent_request': item}
+        if self.outgoing_input_port:
+            self.ports.output['api_output'] > self.outgoing_input_port
 
     def _flow_controller_setup(self):
         if not (self.input_map or self.connected_input_map):
@@ -131,7 +146,7 @@ class APIElement(Element):
         return connected_flow_map
 
     def _flow_fn_setup(self):
-        def flow_fn(**kwargs) -> dict:
+        async def async_flow_fn(**kwargs):
             active_input_port = kwargs['active_input_port']
             c = kwargs['c']
             
@@ -172,38 +187,60 @@ class APIElement(Element):
                         input_name_payload_dict.pop(key, None)
                     c['is_ready'] = True
             elif self.response_dict:
+                # Add debug logging
+                logger.debug(f"[APIElement] Processing response_dict with active port: {active_input_port.name}")
                 input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
                 
                 # Store incoming payload
                 input_name_payload_dict[active_input_port.name] = active_input_port.payload
                 
+                # Add debug logging
+                logger.debug(f"[APIElement] Current stored payloads: {list(input_name_payload_dict.keys())}")
+                logger.debug(f"[APIElement] Required ports: {list(self.response_dict.keys())}")
+                
                 # Check if we have all required payloads defined in response_dict
                 if all(port_name in input_name_payload_dict for port_name in self.response_dict.keys()):
+                    logger.info("[APIElement] All required payloads received, building response")
                     # Build return dictionary using the response_dict mapping
                     for port_name, alias_attr_map in self.response_dict.items():
                         payload = input_name_payload_dict[port_name]
                         for alias, attr_name in alias_attr_map.items():
-                            return_dict[alias] = getattr(payload.model, attr_name)
+                            if isinstance(attr_name, str):
+                                return_dict[alias] = getattr(payload.model, attr_name)
+                            else:  # In case of lambda function or async function being provided
+                                if asyncio.iscoroutinefunction(attr_name):
+                                    return_dict[alias] = await attr_name(payload)
+                                else:
+                                    return_dict[alias] = attr_name(payload)
                     
                     # Clear stored payloads after processing
                     input_name_payload_dict.clear()
 
             # Set the response future if we have a return dictionary
-            if return_dict and self.response_future and not self.response_future.done():
-                self.response_future.set_result(return_dict)
-            
+            if return_dict:
+                logger.info(f"[APIElement] Setting response future to {return_dict}")
+                if self.response_future and not self.response_future.done():
+                    self.response_future.set_result(return_dict)
+                else:
+                    logger.warning("[APIElement] Response future not available or already done")
+
+        def flow_fn(**kwargs):
+            # Return the task directly - FlowController will handle clearing after completion
+            return asyncio.create_task(async_flow_fn(**kwargs))
 
         return flow_fn
 
     def _route_setup(self):
+        output_port_payload_type = signature(self.output_pack_fn).return_annotation
         # Set up the output port for the Element
-        def pack_payload_callback(request_dict: dict) -> Payload:
+        def pack_payload_callback(request_dict: dict) -> output_port_payload_type:
             return self.output_pack_fn(request_dict)
         self.ports.add_output('api_output', pack_payload_callback=pack_payload_callback)
 
         @self.app.post(f"/{self.endpoint}")
         async def post_return(item: dict):
             # Check if there's already a request being processed
+            logger.info(f"[APIElement] Request received: {item}")
             if self.response_future and not self.response_future.done():
                 raise HTTPException(
                     status_code=429, 

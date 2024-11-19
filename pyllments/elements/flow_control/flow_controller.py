@@ -1,12 +1,14 @@
 from collections import UserDict
 import param
 from typing import Any
+import asyncio
 
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.common.param import PayloadSelector
 from pyllments.ports.ports import InputPort, OutputPort, Ports
-
+# TODO: Reach decision about whether to get rid of InputFlowPorts to avoid stale storage of paylaods - currently
+# they payloads are being set to the flowports and not being cleaned up.
 
 class FlowPort(param.Parameterized):
     """Special Port wrapper for port management in the flow controller"""
@@ -321,7 +323,7 @@ class FlowController(Element):
             try:
                 flow_port = flow_multi_port[input_port_name]
             except KeyError:
-                raise KeyError(f"No flow port found with in {alias} with name '{input_port_name}'.")
+                raise KeyError(f"No flow port found in {alias} with name '{input_port_name}'.")
         else:
             try:
                 flow_port = self.flow_port_map[input_port_name]
@@ -329,12 +331,23 @@ class FlowController(Element):
                 raise KeyError(f"No flow port found with alias '{input_port_name}'.")
 
         flow_port.payload = payload
-        self.flow_fn(
+        result = self.flow_fn(
             active_input_port=flow_port,
             c=self.context,
             **self.flow_port_map.list_view()
         )
-        flow_port.payload = None
+
+        # If result is a coroutine/task, create a task that waits for it before clearing
+        if asyncio.iscoroutine(result) or isinstance(result, asyncio.Task):
+            async def clear_after_complete():
+                try:
+                    await result
+                finally:
+                    flow_port.payload = None
+            asyncio.create_task(clear_after_complete())
+        else:
+            # Synchronous case - clear immediately as before
+            flow_port.payload = None
 
     def connect_output(self, alias: str, other_input_port):
         """Connect an output port to an external input port"""

@@ -39,7 +39,7 @@ class ChatInterfaceElement(Element):
         
         self._message_output_setup()
         self._message_input_setup()
-
+        self._message_emit_input_setup()
     def _message_output_setup(self):
         """Sets up the output message port"""
         def pack(new_message: MessagePayload) -> MessagePayload:
@@ -50,12 +50,22 @@ class ChatInterfaceElement(Element):
             pack_payload_callback=pack)
     
     def _message_input_setup(self):
-        """Sets up the input message port"""
+        """Sets up the input message port - does not emit from the message_output port"""
         def unpack(payload: MessagePayload):
             self.model.new_message = payload
         
         self.ports.add_input(
             name='message_input',
+            unpack_payload_callback=unpack)
+        
+    def _message_emit_input_setup(self):
+        """Sets up the message_emit_input port - emits from the message_output port"""
+        def unpack(payload: MessagePayload):
+            self.model.new_message = payload
+            self.ports.output['message_output'].stage_emit(new_message=payload)
+
+        self.ports.add_input(
+            name='message_emit_input',
             unpack_payload_callback=unpack)
 
     @Component.view
