@@ -179,8 +179,10 @@ class APIElement(Element):
                         for port_name in required_ports
                     }
                     
-                    # Call callback function with collected payloads
-                    return_dict = callback_fn(**callback_kwargs)
+                    if asyncio.iscoroutinefunction(callback_fn):
+                        return_dict = await callback_fn(**callback_kwargs)
+                    else:
+                        return_dict = callback_fn(**callback_kwargs)
                     
                     # Clear processed payloads
                     for key in required_ports:
