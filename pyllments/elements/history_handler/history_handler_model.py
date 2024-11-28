@@ -26,11 +26,25 @@ class HistoryHandlerModel(Model):
     def __init__(self, **params):
         super().__init__(**params)
 
-    def load_message(self, message: MessagePayload):
-        message_token_estimate = get_token_len(message.model.message.content, self.tokenizer_model)
-        self.update_history(message, message_token_estimate)
-        self.update_context(message, message_token_estimate)
+    def load_messages(self, messages: list[MessagePayload]):
+        """Batch load multiple messages efficiently."""
+        # Calculate token estimates for all messages first
+        message_tokens = [
+            (msg, get_token_len(msg.model.message.content, self.tokenizer_model))
+            for msg in messages
+        ]
+        
+        # Update history and context in batch
+        for message, token_estimate in message_tokens:
+            self.update_history(message, token_estimate)
+            self.update_context(message, token_estimate)
+        
+        # Trigger context update only once after all messages are processed
         self.param.trigger('context')
+
+    def load_message(self, message: MessagePayload):
+        """Load a single message. For backwards compatibility."""
+        self.load_messages([message])
 
     def update_history(self, message: MessagePayload, token_estimate: int):
         if token_estimate > self.history_token_limit:

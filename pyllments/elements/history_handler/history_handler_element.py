@@ -1,4 +1,5 @@
 from collections import deque
+from itertools import islice
 
 import param
 import panel as pn
@@ -37,16 +38,17 @@ class HistoryHandlerElement(Element):
         self._messages_input_setup()
 
     def _message_input_setup(self):
-        def unpack(payload: MessagePayload): # TODO: Needs to work with list[MessagePayload]
+        def unpack(payload: MessagePayload):
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
             if payload.model.mode == 'stream' and not payload.model.streamed:
                 def stream_callback(event):
-                    self.model.load_message(payload)
+                    self.model.load_messages([payload])
 
                 payload.model.param.watch(stream_callback, 'streamed')
             else:
-                self.model.load_message(payload)
+                self.model.load_messages([payload])
+            
             # Only stage_emit if context isn't an empty list
             if self.model.context:
                 self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
@@ -64,8 +66,7 @@ class HistoryHandlerElement(Element):
 
     def _messages_input_setup(self):
         def unpack(payload: list[MessagePayload]):
-            for message in payload:
-                self.model.load_message(message)
+            self.model.load_messages(payload)
 
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
@@ -118,16 +119,25 @@ class HistoryHandlerElement(Element):
         )
 
         async def _update_context_view(event):
-            # Create a list to track view updates
-            new_objects = [
-                msg[0].create_collapsible_view() 
-                for msg in self.model.context
-            ]
+            current_len = len(self.model.context)
+            container_len = len(self.context_container.objects)
             
-            # Update the container objects all at once
-            self.context_container.objects = new_objects
+            # If messages were removed from the start (sliding window)
+            while container_len > current_len:
+                del self.context_container.objects[0]  # Remove from start
+                container_len -= 1
             
+            # Add any new messages at the end
+            if current_len > container_len:
+                # Use islice to efficiently get only the new messages
+                new_views = [
+                    msg[0].create_collapsible_view()
+                    for msg in islice(self.model.context, container_len, None)
+                ]
+                self.context_container.extend(new_views)
+            
+            # Ensure visual update
+            self.context_container.param.trigger('objects')
 
-        # Use Panel's async handler for better FastAPI integration
         self.model.param.watch(_update_context_view, 'context')
         return self.context_view

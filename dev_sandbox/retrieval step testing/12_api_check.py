@@ -153,7 +153,7 @@ def create_pyllments_app():
 
     file_loader_view = file_loader_element.create_file_loader_view()
     chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
-    switch_view = switch_element.create_switch_view(orientation='horizontal', margin=(7, 0))
+    switch_view = switch_element.create_switch_view(orientation='horizontal')
 
     def output_pack_fn(request_dict) -> MessagePayload:
         return MessagePayload(**{
@@ -183,14 +183,22 @@ def create_pyllments_app():
     
     return pn.Row(
         pn.Column(
-            retriever_element.create_created_chunks_view(height=450),
-            pn.Spacer(height=10),
-            retriever_element.create_retrieved_chunks_view(height=450),
+            retriever_element.create_created_chunks_view(height=445),
+            pn.VSpacer(),
+            retriever_element.create_retrieved_chunks_view(height=445),
             height=900,
             width=500
         ),
         pn.Spacer(width=10),
-        pn.Column(file_loader_view, chat_interface_view, switch_view, height=900, width=500),
+        pn.Column(
+            file_loader_view, 
+            pn.Spacer(height=10),
+            chat_interface_view, 
+            pn.Spacer(height=10),
+            switch_view, 
+            height=900, 
+            width=500
+        ),
         pn.Spacer(width=10),
         history_handler_element.create_context_view(height=900, width=500),
     )
