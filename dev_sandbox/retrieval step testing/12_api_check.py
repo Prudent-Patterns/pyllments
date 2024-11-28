@@ -186,12 +186,13 @@ def create_pyllments_app():
             retriever_element.create_created_chunks_view(height=450),
             pn.Spacer(height=10),
             retriever_element.create_retrieved_chunks_view(height=450),
-            height=900
+            height=900,
+            width=500
         ),
         pn.Spacer(width=10),
         pn.Column(file_loader_view, chat_interface_view, switch_view, height=900, width=500),
         pn.Spacer(width=10),
-        history_handler_element.create_context_view(height=900),
+        history_handler_element.create_context_view(height=900, width=500),
     )
 
 # panel serve 10_retrieval_flow.py --static-dirs assets=/workspaces/pyllments/pyllments/assets

@@ -11,6 +11,8 @@ from fastapi import FastAPI, HTTPException
 import asyncio
 from inspect import signature
 from loguru import logger
+
+
 class APIElement(Element):
     """
     Element that adds API routes to the LLM system
@@ -103,6 +105,8 @@ class APIElement(Element):
 
     stored_kwargs = param.Dict(default={}, doc="Storage for complete kwargs from flow_fn")
 
+    timeout = param.Number(default=30.0, doc="Timeout for API requests in seconds.")
+
     def __init__(self, **params):
         super().__init__(**params)
         # self.model = APIModel(**params)
@@ -150,6 +154,10 @@ class APIElement(Element):
             active_input_port = kwargs['active_input_port']
             c = kwargs['c']
             
+            # Only process if there's an active API request
+            if not self.response_future:
+                return
+            
             return_dict = {}
             if self.build_fn:
                 return_dict = self.build_fn(**kwargs)
@@ -189,17 +197,9 @@ class APIElement(Element):
                         input_name_payload_dict.pop(key, None)
                     c['is_ready'] = True
             elif self.response_dict:
-                # Add debug logging
-                logger.debug(f"[APIElement] Processing response_dict with active port: {active_input_port.name}")
                 input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
-                
                 # Store incoming payload
-                input_name_payload_dict[active_input_port.name] = active_input_port.payload
-                
-                # Add debug logging
-                logger.debug(f"[APIElement] Current stored payloads: {list(input_name_payload_dict.keys())}")
-                logger.debug(f"[APIElement] Required ports: {list(self.response_dict.keys())}")
-                
+                input_name_payload_dict[active_input_port.name] = active_input_port.payload                
                 # Check if we have all required payloads defined in response_dict
                 if all(port_name in input_name_payload_dict for port_name in self.response_dict.keys()):
                     logger.info("[APIElement] All required payloads received, building response")
@@ -214,7 +214,6 @@ class APIElement(Element):
                                     return_dict[alias] = await attr_name(payload)
                                 else:
                                     return_dict[alias] = attr_name(payload)
-                    
                     # Clear stored payloads after processing
                     input_name_payload_dict.clear()
 
@@ -249,24 +248,20 @@ class APIElement(Element):
                     detail="Another request is being processed"
                 )
             
-            # Create new future for this request
             self.response_future = asyncio.Future()
-            
-            # Emit request through output port
             self.ports.output['api_output'].stage_emit(request_dict=item)
             
             try:
-                # Wait for response with timeout
                 response = await asyncio.wait_for(
                     self.response_future,
-                    timeout=30.0
+                    timeout=self.timeout
                 )
                 return response
             except asyncio.TimeoutError:
+                logger.error(f"[APIElement] Request timed out after {self.timeout} seconds")
                 raise HTTPException(
                     status_code=408, 
-                    detail="Request timeout"
+                    detail=f"Request timed out after {self.timeout} seconds"
                 )
             finally:
-                # Clear the future
                 self.response_future = None

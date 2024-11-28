@@ -69,36 +69,65 @@ class HistoryHandlerElement(Element):
 
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
-
+    @Component.view
     def create_context_view(
         self, 
         column_css: list = [], 
+        container_css: list = [],
         title_css: list = [],
-        width: int = 450,
-        height: int = 800,
+        width: int = None,
+        height: int = None,
+        sizing_mode: str = 'stretch_both',
         title_visible: bool = True
     ) -> pn.Column:
-        header = pn.pane.Markdown(
-            "## Current History", 
-            visible=title_visible,
-            stylesheets=title_css
+        """Creates a view for displaying the message history."""
+        # Create a separate container for messages
+        self.context_container = pn.Column(
+            *[msg[0].create_collapsible_view() 
+              for msg in self.model.context],
+            scroll=True,
+            sizing_mode='stretch_both',
+            stylesheets=container_css
         )
+
+        # Handle sizing mode
+        match (width, height):
+            case (None, None):
+                pass
+            case (_, None):
+                sizing_mode = 'stretch_height'
+            case (None, _):
+                sizing_mode = 'stretch_width'
+            case (_, _):
+                sizing_mode = 'fixed'
+
+        # Main view column
         self.context_view = pn.Column(
-            header,
-            *[
-                msg[0].create_collapsible_view()
-                for msg in self.model.context
-            ],
+            pn.pane.Markdown(
+                "### Current History", 
+                visible=title_visible,
+                stylesheets=title_css,
+                sizing_mode='stretch_width'
+            ),
+            self.context_container,
             stylesheets=column_css,
             width=width,
-            height=height
+            height=height,
+            sizing_mode=sizing_mode,
+            scroll=False
         )
-        def _update_context_view(event):
-            # Keep the header and update only the message views
-            self.context_view.objects = [header] + [
-                msg[0].create_collapsible_view()
+
+        async def _update_context_view(event):
+            # Create a list to track view updates
+            new_objects = [
+                msg[0].create_collapsible_view() 
                 for msg in self.model.context
             ]
-        self.model.param.watch(_update_context_view, 'context')
+            
+            # Update the container objects all at once
+            self.context_container.objects = new_objects
+            
 
+        # Use Panel's async handler for better FastAPI integration
+        self.model.param.watch(_update_context_view, 'context')
         return self.context_view

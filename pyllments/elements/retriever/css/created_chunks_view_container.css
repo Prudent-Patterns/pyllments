@@ -1,0 +1,5 @@
+:host {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-accent-color) transparent;
+    flex: 1 1 0;
+}

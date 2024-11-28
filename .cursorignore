@@ -8,6 +8,8 @@ projects
 examples/
 .ignore*
 assets/
+dev_sandbox/
+dev_nbs/
 # Log files to ignore
 *.log
 logs/

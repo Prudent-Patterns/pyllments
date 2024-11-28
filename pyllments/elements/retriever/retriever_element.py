@@ -57,36 +57,55 @@ class RetrieverElement(Element):
     @Component.view
     def create_retrieved_chunks_view(
         self, 
-        column_css: list = [], 
+        column_css: list = [],
+        container_css: list = [],
         title_css: list = [],
-        width: int = 450,
-        height: int = 800,
+        width: int = None,
+        height: int = None,
+        sizing_mode: str = 'stretch_both',
         title_visible: bool = True
     ) -> pn.Column:
         """Creates a view for displaying the retrieved chunks."""
+        self.retrieved_chunks_container = pn.Column(*[
+                chunk.create_collapsible_view()
+                for chunk in self.model.retrieved_chunks
+            ],
+            scroll=True,
+            sizing_mode='stretch_both',
+            stylesheets=container_css
+        )
+        
+        match (width, height):
+            case (None, None):
+                pass
+            case (_, None):
+                sizing_mode = 'stretch_height'
+            case (None, _):
+                sizing_mode = 'stretch_width'
+            case (_, _):
+                sizing_mode = 'fixed'
+            
         self.retrieved_chunks_view = pn.Column(
             pn.pane.Markdown(
-                "## Retrieved Chunks", 
+                "### Retrieved Chunks", 
                 visible=title_visible,
-                stylesheets=title_css
+                stylesheets=title_css,
+                sizing_mode='stretch_width'
             ),
-            *[
-                chunk.create_collapsible_view()  # Assuming a method exists to create a view for each chunk
-                for chunk in self.model.retrieved_chunks  # Assuming retrieved_chunks is a list in the model
-            ],
+            self.retrieved_chunks_container,
             stylesheets=column_css,
             width=width,
             height=height,
-            scroll=True
+            sizing_mode=sizing_mode,
+            scroll=False
         )
         
         def _update_retrieved_chunks_view(event):
-            self.retrieved_chunks_view.objects[1:] = [
+            self.retrieved_chunks_container.objects = [
                 chunk.create_collapsible_view()
                 for chunk in self.model.retrieved_chunks
             ]
             self.retrieved_chunks_view.param.trigger('objects')
-
         
         self.model.param.watch(_update_retrieved_chunks_view, 'retrieved_chunks')
         return self.retrieved_chunks_view
@@ -94,31 +113,49 @@ class RetrieverElement(Element):
     @Component.view
     def create_created_chunks_view(
         self, 
-        column_css: list = [], 
+        column_css: list = [],
+        container_css: list = [],
         title_css: list = [],
-        width: int = 450,
-        height: int = 800,
+        width: int = None,
+        height: int = None,
+        sizing_mode: str = 'stretch_both',
         title_visible: bool = True
     ) -> pn.Column:
         """Creates a view for displaying the created chunks."""
-        self.created_chunks_view = pn.Column(
-            pn.pane.Markdown(
-                "## Created Chunks", 
-                visible=title_visible,
-                stylesheets=title_css
-            ),
-            *[
+        self.created_chunks_container = pn.Column(*[
                 chunk.create_collapsible_view()
                 for chunk in self.model.created_chunks
             ],
+            scroll=True,
+            sizing_mode='stretch_both',
+            stylesheets=container_css
+        )
+        match (width, height):
+            case (None, None):
+                pass
+            case (_, None):
+                sizing_mode = 'stretch_height'
+            case (None, _):
+                sizing_mode = 'stretch_width'
+            case (_, _):
+                sizing_mode = 'fixed'
+        self.created_chunks_view = pn.Column(
+            pn.pane.Markdown(
+                "### Created Chunks", 
+                visible=title_visible,
+                stylesheets=title_css,
+                sizing_mode='stretch_width'
+            ),
+            self.created_chunks_container,
             stylesheets=column_css,
             width=width,
             height=height,
-            scroll=True
+            sizing_mode=sizing_mode,
+            scroll=False
         )
         
         def _update_created_chunks_view(event):
-            self.created_chunks_view.objects[1:] = [
+            self.created_chunks_container.objects = [
                 chunk.create_collapsible_view()
                 for chunk in self.model.created_chunks
             ]
@@ -127,4 +164,3 @@ class RetrieverElement(Element):
         self.model.param.watch(_update_created_chunks_view, 'created_chunks')
 
         return self.created_chunks_view
-        

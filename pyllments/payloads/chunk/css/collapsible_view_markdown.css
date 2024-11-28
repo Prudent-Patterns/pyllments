@@ -1,10 +1,13 @@
 :host {
     line-height: 1.3;
     width: calc(100% - 55px);
+    overflow-wrap: break-word;
+    word-break: break-word;
+    margin: 0;
 }
 
 :host p {
-    margin: 3px;
+    margin: 3px 0;
 }
 
 .chunk_header {
