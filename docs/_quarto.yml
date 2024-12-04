@@ -1,0 +1,55 @@
+project:
+  type: website
+
+website:
+  title: "Pyllments Documentation"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Getting Started
+      - about.qmd
+  sidebar:
+    style: docked
+    contents:
+      - text: "Introduction"
+        href: index.qmd
+      - text: "Installation"
+        href: installation.qmd
+      - section: "Getting Started Tutorial"
+        href: basics-summary.qmd
+        contents:
+          - Creating your first element
+          - Connecting elements
+          - Building your first flow
+          - Testing your flow
+          - Deploying your flow
+      - section: "How To"
+        contents:
+          - How to build a chat interface
+          - How to use conversation history
+          - How to use a retriever
+      - section: Explanation
+        contents:
+          - Elements
+          - Ports
+          - Payloads
+          - Persistence
+          - Server
+      - section: "Elements"
+        contents:
+          - elements-summary.qmd
+          - LLMChatElement.qmd
+          - FileLoaderElement.qmd
+          - EmbedderElement.qmd
+          - RetrieverElement.qmd
+      - text: API
+      - acknowlegment.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+
+
+

@@ -1,14 +1,17 @@
 FROM --platform=linux/amd64 debian:bookworm-slim as main
 
-COPY environment.yml /
-
-# Update and upgrade system packages
+# Update and upgrade system packages, install all required dependencies in one layer
 RUN apt-get -y update && \
     apt-get -y upgrade && \
+    apt-get -y install wget git-all ffmpeg build-essential libopengl0 libsm6 libegl1 && \
     apt-get clean
 
-# Install system dependencies
-RUN apt-get -y install wget git-all ffmpeg build-essential libopengl0 libsm6 libegl1
+# Install Quarto
+RUN wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.6.39/quarto-1.6.39-linux-amd64.deb && \
+    dpkg -i quarto-1.6.39-linux-amd64.deb && \
+    rm quarto-1.6.39-linux-amd64.deb
+
+COPY environment.yml /
 
 # Set up Miniconda
 RUN mkdir -p ~/miniconda3 && \

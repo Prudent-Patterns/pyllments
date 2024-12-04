@@ -13,4 +13,5 @@ dev_nbs/
 # Log files to ignore
 *.log
 logs/
+docs/
 # End of Selection

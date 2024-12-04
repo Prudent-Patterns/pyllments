@@ -101,7 +101,7 @@ def create_pyllments_app():
     # embedder_element.ports.output['processed_message_output'] > context_builder.ports.input['query']
 
     history_handler_element = HistoryHandlerElement()
-    # test_element.ports.output['test_output'] > history_handler_element.ports.input['message_input']
+    test_element.ports.output['test_output'] > history_handler_element.ports.input['message_input']
 
     context_builder = ContextBuilder(
         connected_input_map={
@@ -121,19 +121,12 @@ def create_pyllments_app():
         },
         build_map={
             'query': [
-                'main_system_prompt',
-                'system_query_prompt',
-                'query'
-            ],
-            # When history exists
-            'history': [
                 'main_system_prompt', 
                 'system_history_prompt', 
                 'history', 
                 'system_query_prompt',
                 'query'
             ],
-            # When history exists and retrieval is needed
             'retrieved': [
                 'main_system_prompt', 
                 'system_history_prompt', 
@@ -152,11 +145,11 @@ def create_pyllments_app():
     llm_chat_element.ports.output['message_output'] > chat_interface_element.ports.input['message_input']
     # llm_chat_element.ports.output['message_output'] > test_element.ports.input['test_input']
     # context_builder.ports.output['messages_output'] >  test_element.ports.input['test_input']
-    # retriever_element.ports.output['chunk_output'] > test_element.ports.input['test_input']
+    retriever_element.ports.output['chunk_output'] > test_element.ports.input['test_input']
     # embedder_element.ports.output['processed_chunks_output'] > test_element.ports.input['test_input']
 
-    # from langchain_core.messages import HumanMessage
-    # test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
+    from langchain_core.messages import HumanMessage
+    test_element.send_payload(MessagePayload(message=HumanMessage(content='Hello')))
 
     file_loader_view = file_loader_element.create_file_loader_view()
     chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
@@ -172,7 +165,6 @@ def create_pyllments_app():
         while not payload.model.streamed:
             await asyncio.sleep(0.1)
         return payload.model.message.content
-    
     api_element = APIElement(
         app=app,
         endpoint='api',
