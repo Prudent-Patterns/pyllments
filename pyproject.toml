@@ -13,4 +13,9 @@ license = Apache-2.0
 license_file = LICENSE
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pyllments"]
+packages = ["pyllments"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    
+]
