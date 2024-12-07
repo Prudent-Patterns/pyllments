@@ -3,3 +3,7 @@ title: "About"
 ---
 
 About this site
+
+```bash
+pyllments serve flow.py --logging=True
+```

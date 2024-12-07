@@ -31,3 +31,4 @@ dependencies:
     - bokeh-fastapi
     - loguru
     - lancedb
+    - typer

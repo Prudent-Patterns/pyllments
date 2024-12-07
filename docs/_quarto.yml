@@ -2,48 +2,57 @@ project:
   type: website
 
 website:
+  search:
+    location: navbar
+    type: textbox
   title: "Pyllments Documentation"
   navbar:
     left:
       - href: index.qmd
         text: Getting Started
-      - about.qmd
+      - How-To
+      - Elements
+      - API Reference
+    right:
+      - icon: github
+        href: https://github.com/prudent-patterns/pyllments
   sidebar:
-    style: docked
+    style: "docked"
     contents:
-      - text: "Introduction"
+      - text: "📚 Introduction"
         href: index.qmd
-      - text: "Installation"
+      - text: "🔧 Installation"
         href: installation.qmd
-      - section: "Getting Started Tutorial"
+      - section: "🎓 Getting Started Tutorial"
         href: basics-summary.qmd
         contents:
-          - Creating your first element
-          - Connecting elements
-          - Building your first flow
-          - Testing your flow
-          - Deploying your flow
-      - section: "How To"
+          - 1. Creating your first element
+          - 2. Connecting elements
+          - 3. Building your first flow
+          - 4. Testing your flow
+          - 5. Deploying your flow
+      - section: "📋 How To"
         contents:
           - How to build a chat interface
           - How to use conversation history
           - How to use a retriever
-      - section: Explanation
+      - section: 💡 Explanation
         contents:
+          - Architecture
           - Elements
           - Ports
           - Payloads
           - Persistence
           - Server
-      - section: "Elements"
+      - section: "🧩 Elements"
         contents:
           - elements-summary.qmd
           - LLMChatElement.qmd
           - FileLoaderElement.qmd
           - EmbedderElement.qmd
           - RetrieverElement.qmd
-      - text: API
-      - acknowlegment.qmd
+      - text: 🔌 API
+      - 💝 acknowlegment.qmd
 
 format:
   html:

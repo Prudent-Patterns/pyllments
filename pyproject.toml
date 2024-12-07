@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = pyllments
+version = 0.0.1
+url = https://github.com/Prudent-Patterns/pyllments
+author = Dmitriy Leybel
+author_email = dmleybel@gmail.com
+description = A Python framework for building modular, extensible LLM applications through composable Elements in a flow-based architecture. Pyllments enables developers to create both graphical and API-based LLM applications by connecting specialized Elements through a flexible port system, with built-in support for UI components and LLM integrations.
+license = Apache-2.0
+license_file = LICENSE
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyllments"]
