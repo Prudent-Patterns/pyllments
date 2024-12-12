@@ -32,7 +32,7 @@
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": {
 		"dev_bin": "apt-get install nano",
-		"panel": "conda install -y -n pyllments jupyter_bokeh ipykernel ipython"
+		"uv": "uv pip install jupyter_bokeh ipykernel ipython"
 	}
 
 	// Configure tool-specific properties.
