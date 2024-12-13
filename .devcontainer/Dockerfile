@@ -18,7 +18,9 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 RUN uv venv
 
-# ENV PATH="/opt/venv/bin:$PATH"
+# Set the virtual environment path
+ENV VIRTUAL_ENV=/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-install-workspace
