@@ -64,11 +64,14 @@ def serve(filename: str):
 
 
 def flow(func):
-    """A decorator that does nothing and simply returns the function."""
+    """
+    A decorator that adds the contains_view attribute to the function and wraps it.
+    It is used to indicate that the function being wrapped returns a view and can be
+    served as a GUI.
+    """
     func.contains_view = True
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        print('Wrappity Wrapped')
         return func(*args, **kwargs)
     return wrapper
 
