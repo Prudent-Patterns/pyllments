@@ -48,6 +48,9 @@ dependencies = [
     "typer"
 ]
 
+[project.scripts]
+pyllments = "pyllments.__main__:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["pyllments"]
 
