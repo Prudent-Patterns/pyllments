@@ -1,6 +1,7 @@
 import functools
 from importlib.util import spec_from_file_location, module_from_spec
 import inspect
+import sys
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -9,7 +10,7 @@ from panel.io.fastapi import add_application
 from uvicorn import run as uvicorn_run
 
 from pyllments.common.registry import AppRegistry
-from pyllments.logging import setup_logging
+from pyllments.logging import setup_logging, logger
 
 def server_setup(): 
     setup_logging(log_file='file_loader.log', stdout_log_level='INFO', file_log_level='INFO')
@@ -44,21 +45,65 @@ def server_setup():
     """
     ]
 
-def serve(filename: str):
+@logger.catch
+def serve(filename: str=None, inline: bool=True):
+    """
+    Serves a Pyllments application either from a file or from the calling module.
+    
+    Parameters
+    ----------
+    filename : str, optional
+        Path to the Python file containing the flow-decorated function
+    inline : bool, default=True
+        If True, looks for flow-decorated functions in the calling module
+        If False, loads the function from the specified file
+    """
     server_setup()
-    app = AppRegistry.get_app()
-    app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
+    
+    try:
+        app = AppRegistry.get_app()
+    except Exception as e:
+        logger.error(f"Failed to get FastAPI app: {e}")
 
-    spec = spec_from_file_location('loaded_module', filename)
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
+    except Exception as e:
+        logger.error(f"Failed to mount static files: {e}")
 
-    for name, obj in inspect.getmembers(module):
-        if inspect.isfunction(obj) and hasattr(obj, 'contains_view'):
-            passed_func = obj
-            @add_application('/', app=app, title='Pyllments')
-            def serve_gui():
-                return passed_func()
+    def view_check(obj):
+        return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
+    
+    func_list = []
+    if not inline:
+        if not filename:
+            raise ValueError("filename must be provided when inline=False")
+        try:
+            spec = spec_from_file_location('loaded_module', filename)
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            func_list = inspect.getmembers(module, view_check)
+        except Exception as e:
+            logger.error(f"Failed to load module from file {filename}: {e}")
+            raise
+    else:
+        # Walk up the call stack to find the caller's frame
+        frame = sys._getframe(1)
+        while frame:
+            # Check if we've found a module with flow-decorated functions
+            module = sys.modules.get(frame.f_globals.get('__name__'))
+            if module:
+                func_list = inspect.getmembers(module, view_check)
+                if func_list:
+                    break
+            frame = frame.f_back
+
+    if len(func_list) > 1:
+        logger.warning('Multiple flow wrapped functions found in script, using first found')
+    elif len(func_list) == 1:
+        name, obj = func_list[0]
+        @add_application('/', app=app, title='Pyllments')
+        def serve_gui():
+            return obj()
 
     uvicorn_run(app, host='0.0.0.0', port=8000)
 
