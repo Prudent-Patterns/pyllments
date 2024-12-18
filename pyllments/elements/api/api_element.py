@@ -1,6 +1,6 @@
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
-from pyllments.common.registry import AppRegistry
+from pyllments.serve.registry import AppRegistry
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import InputPort
 # from pyllments.ports import Ports
@@ -93,7 +93,7 @@ class APIElement(Element):
     outgoing_input_port = param.ClassSelector(class_=InputPort, doc="""
         An optional input port to connect upon initialization.""")
 
-    app = param.ClassSelector(default=AppRegistry.get_app(), class_=FastAPI, doc="""
+    app = param.ClassSelector(class_=FastAPI, doc="""
         The FastAPI app object for the API. Defaults to the FastAPI app in AppRegistry.""")
 
     endpoint = param.String(default="api", doc="""
@@ -110,6 +110,7 @@ class APIElement(Element):
 
     def __init__(self, **params):
         super().__init__(**params)
+        self.app = AppRegistry.get_app()
         # self.model = APIModel(**params)
         if not self.test:   
             self._flow_controller_setup()

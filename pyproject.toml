@@ -49,7 +49,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pyllments = "pyllments.__main__:main"
+pyllments = "pyllments.__main__:typer_app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pyllments"]

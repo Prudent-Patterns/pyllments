@@ -170,7 +170,6 @@ def create_pyllments_app():
             await asyncio.sleep(0.1)
         return payload.model.message.content
     api_element = APIElement(
-        app=app,
         endpoint='api',
         connected_input_map={
             'message_input': llm_chat_element.ports.output['message_output']

@@ -1,5 +1,4 @@
+from .cli import typer_app
 
 
-
-def main():
-    pass
+typer_app()

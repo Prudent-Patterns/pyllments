@@ -1,4 +1,5 @@
 import functools
+from importlib import resources
 from importlib.util import spec_from_file_location, module_from_spec
 import inspect
 import sys
@@ -8,12 +9,14 @@ from fastapi.staticfiles import StaticFiles
 import panel as pn
 from panel.io.fastapi import add_application
 from uvicorn import run as uvicorn_run
+from dotenv import load_dotenv
 
-from pyllments.common.registry import AppRegistry
+from . import AppRegistry
 from pyllments.logging import setup_logging, logger
 
-def server_setup(): 
-    setup_logging(log_file='file_loader.log', stdout_log_level='INFO', file_log_level='INFO')
+def server_setup(logging: bool = False): 
+    if logging:
+        setup_logging(log_file='file_loader.log', stdout_log_level='INFO', file_log_level='INFO')
     pn.config.css_files = ['assets/file_icons/tabler-icons-outline.min.css']
     pn.config.global_css = [
         """
@@ -46,7 +49,7 @@ def server_setup():
     ]
 
 @logger.catch
-def serve(filename: str=None, inline: bool=True):
+def serve(filename: str=None, inline: bool=True, logging: bool=False):
     """
     Serves a Pyllments application either from a file or from the calling module.
     
@@ -58,7 +61,8 @@ def serve(filename: str=None, inline: bool=True):
         If True, looks for flow-decorated functions in the calling module
         If False, loads the function from the specified file
     """
-    server_setup()
+    server_setup(logging=logging)
+    load_dotenv('/workspaces/pyllments/.env')
     
     try:
         app = AppRegistry.get_app()
@@ -66,7 +70,8 @@ def serve(filename: str=None, inline: bool=True):
         logger.error(f"Failed to get FastAPI app: {e}")
 
     try:
-        app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
+        with resources.files('pyllments').joinpath('assets') as f:
+            app.mount('/assets', StaticFiles(directory=f), name='assets')
     except Exception as e:
         logger.error(f"Failed to mount static files: {e}")
 
@@ -74,6 +79,7 @@ def serve(filename: str=None, inline: bool=True):
         return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
     
     func_list = []
+    # Use with `pyllments serve <filename>`
     if not inline:
         if not filename:
             raise ValueError("filename must be provided when inline=False")
@@ -85,7 +91,7 @@ def serve(filename: str=None, inline: bool=True):
         except Exception as e:
             logger.error(f"Failed to load module from file {filename}: {e}")
             raise
-    else:
+    elif inline:
         # Walk up the call stack to find the caller's frame
         frame = sys._getframe(1)
         while frame:
@@ -98,8 +104,9 @@ def serve(filename: str=None, inline: bool=True):
             frame = frame.f_back
 
     if len(func_list) > 1:
-        logger.warning('Multiple flow wrapped functions found in script, using first found')
+        logger.warning('Multiple @flow wrapped functions found in script, using first found')
     elif len(func_list) == 1:
+        logger.info(f"Found {len(func_list)} @flow wrapped functions in script, using first found")
         name, obj = func_list[0]
         @add_application('/', app=app, title='Pyllments')
         def serve_gui():
