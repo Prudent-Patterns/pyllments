@@ -1,3 +1,14 @@
+import asyncio
+from asyncio import Future
+from inspect import signature
+from typing import Any
+
+import param
+from fastapi import FastAPI, HTTPException
+from loguru import logger
+from pydantic import BaseModel, create_model
+from pydantic._internal._model_construction import ModelMetaclass
+
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.serve.registry import AppRegistry
@@ -5,13 +16,6 @@ from pyllments.elements.flow_control import FlowController
 from pyllments.ports import InputPort
 # from pyllments.ports import Ports
 # from .api_model import APIModel
-
-import param
-from asyncio import Future
-from fastapi import FastAPI, HTTPException
-import asyncio
-from inspect import signature
-from loguru import logger
 
 
 class APIElement(Element):
@@ -82,13 +86,19 @@ class APIElement(Element):
     flow_controller = param.ClassSelector(class_=FlowController, doc="""
         The underlying FlowController managing the routing logic.""")
 
-    output_pack_fn = param.Callable(default=None, doc="""
-        A function used to package the output dictionary into the desired payload type. e.g.
-        def output_pack_fn(request_dict):
-            return MessagePayload(
-            mode='system',
-            message= )
-        """)
+    request_output_fn = param.Callable(default=None, doc="""
+        A function used to package the request dictionary into the desired payload type.
+        def request_output_fn(key1, key2) -> MessagePayload:
+            role = do_something(key1)
+            message = do_something_else(key2)
+            return MessagePayload(role=role, message=message)
+        """
+    )
+
+    request_pydantic_model = param.ClassSelector(class_=ModelMetaclass, doc="""
+        A Pydantic model used to validate the request dictionary. By default,
+        this is dynamically created based on the argument names of request_output_fn.
+        """)                                 
 
     outgoing_input_port = param.ClassSelector(class_=InputPort, doc="""
         An optional input port to connect upon initialization.""")
@@ -102,7 +112,9 @@ class APIElement(Element):
     response_future = param.ClassSelector(class_=Future, doc="""
         The future object for the API response.""")
     
-    test = param.Boolean(default=False)
+    test = param.Boolean(default=False, doc="""
+        Used to test the API route, minimally.
+        """)
 
     stored_kwargs = param.Dict(default={}, doc="Storage for complete kwargs from flow_fn")
 
@@ -114,6 +126,8 @@ class APIElement(Element):
         # self.model = APIModel(**params)
         if not self.test:   
             self._flow_controller_setup()
+            if not self.request_pydantic_model:
+                self._create_request_pydantic_model()
             self._route_setup()
         else:
             @self.app.post(f"/{self.endpoint}")
@@ -233,15 +247,23 @@ class APIElement(Element):
 
         return flow_fn
 
+    def _create_request_pydantic_model(self):
+        """Dynamically create a Pydantic model based on the argument names of request_output_fn."""
+        sig = signature(self.request_output_fn)
+        fields = {param.name: (Any, ...) for param in sig.parameters.values()}
+        self.request_pydantic_model = create_model('RequestModel', **fields)   
+
     def _route_setup(self):
-        output_port_payload_type = signature(self.output_pack_fn).return_annotation
+        output_port_payload_type = signature(self.request_output_fn).return_annotation
         # Set up the output port for the Element
         def pack_payload_callback(request_dict: dict) -> output_port_payload_type:
-            return self.output_pack_fn(request_dict)
+            return self.request_output_fn(**request_dict)
         self.ports.add_output('api_output', pack_payload_callback=pack_payload_callback)
-
+        
         @self.app.post(f"/{self.endpoint}")
-        async def post_return(item: dict):
+        async def post_return(item: self.request_pydantic_model):
+        # async def post_return(item: dict):
+            item = item.dict()
             # Check if there's already a request being processed
             logger.info(f"[APIElement] Request received: {item}")
             if self.response_future and not self.response_future.done():
