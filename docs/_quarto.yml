@@ -20,43 +20,22 @@ website:
     style: "docked"
     contents:
       - text: "📚 Introduction"
-        href: index.qmd
+        href: introduction.qmd
       - text: "🔧 Installation"
         href: installation.qmd
-      - section: "🎓 Getting Started Tutorial"
-        href: basics-summary.qmd
-        contents:
-          - 1. Creating your first element
-          - 2. Connecting elements
-          - 3. Building your first flow
-          - 4. Testing your flow
-          - 5. Deploying your flow
+      - text: "🎓 Getting Started Tutorial"
+        href: getting_started.qmd
       - section: "📋 How To"
-        contents:
-          - How to build a chat interface
-          - How to use conversation history
-          - How to use a retriever
-      - section: 💡 Explanation
-        contents:
-          - Architecture
-          - Elements
-          - Ports
-          - Payloads
-          - Persistence
-          - Server
+        contents: how_to/*
       - section: "🧩 Elements"
-        contents:
-          - elements-summary.qmd
-          - LLMChatElement.qmd
-          - FileLoaderElement.qmd
-          - EmbedderElement.qmd
-          - RetrieverElement.qmd
-      - text: 🔌 API
-      - 💝 acknowlegment.qmd
-
+        contents: elements/*
+      - section: "💡 Explanation"
+        contents: explanation/*
 format:
   html:
-    theme: cosmo
+    theme:
+      - solar
+      - custom.scss
     css: styles.css
     toc: true
 

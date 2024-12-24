@@ -69,6 +69,9 @@ import asyncio
 # app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
 
 # @add_application('/', app=app, title='Pyllments')
+load_dotenv('/workspaces/pyllments/.env')
+
+
 @flow
 def create_pyllments_app():
 
@@ -159,10 +162,10 @@ def create_pyllments_app():
     chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
     switch_view = switch_element.create_switch_view(orientation='horizontal')
 
-    def output_pack_fn(request_dict) -> MessagePayload:
+    def request_output_fn(message: str, role: str) -> MessagePayload:
         return MessagePayload(**{
-            'message': HumanMessage(content=request_dict['message']),
-            'role': request_dict['role']
+            'message': HumanMessage(content=message),
+            'role': role
         })
     
     async def message_callback(payload):
@@ -180,7 +183,7 @@ def create_pyllments_app():
                 'role': 'role'
             }
         },
-        output_pack_fn=output_pack_fn, 
+        request_output_fn=request_output_fn,
         outgoing_input_port=chat_interface_element.ports.input['message_emit_input']
     )
     

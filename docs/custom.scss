@@ -1,0 +1,29 @@
+/*-- scss:defaults --*/
+$primary-background-color: #0C1314 !default;  // Primary background color
+$secondary-background-color: #111926 !default; // Secondary background color
+$light-outline-color: #455368 !default;        // Light outline color
+$primary-accent-color: #D33A4B !default;       // Primary accent color
+$secondary-accent-color: #EDB737 !default;     // Secondary accent color
+$tertiary-accent-color: #12B86C !default;      // Tertiary accent color
+$white: #F4F6F8 !default;                       // White color
+$black: #353839 !default;                       // Black color
+$faded-text-color: #6083B8 !default;           
+
+/*-- bootstrap overrides --*/
+$body-bg: $primary-background-color;
+$body-color: $white;
+$bs-link-color: $primary-accent-color;
+$fontcolor: $white;
+
+/*-- scss:rules --*/
+.navbar {
+  background-color: $secondary-background-color;
+}
+
+/*-- sidebar font color --*/
+#quarto-sidebar .sidebar-item-container {
+color: $faded-text-color;
+} 
+#quarto-sidebar .sidebar-item-container .active {
+  color: $primary-accent-color;
+  } 

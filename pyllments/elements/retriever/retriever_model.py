@@ -45,9 +45,9 @@ class RetrieverModel(Model):
     retrieval_tokenizer_model = param.String(default="gpt-4o-mini", doc="""
         The model used to tokenize the text""")
     # Temporary storage of retrieved and added chunks
-    retrieved_chunks = param.List(class_=ChunkPayload, doc="""
+    retrieved_chunks = param.List(item_type=ChunkPayload, doc="""
         The chunks retrieved from the collection""")
-    created_chunks = param.List(class_=ChunkPayload, doc="""
+    created_chunks = param.List(item_type=ChunkPayload, doc="""
         The chunks created by the model""")
 
     def __init__(self, retrieval_token_limit=None, **params):

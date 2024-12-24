@@ -1,0 +1,34 @@
+      # - text: "📚 Introduction"
+      #   href: index.qmd
+      # - text: "🔧 Installation"
+      #   href: installation.qmd
+      # - section: "🎓 Getting Started Tutorial"
+      #   href: basics-summary.qmd
+      #   contents:
+      #     - 1. Creating your first element
+      #     - 2. Connecting elements
+      #     - 3. Building your first flow
+      #     - 4. Testing your flow
+      #     - 5. Deploying your flow
+      # - section: "📋 How To"
+      #   contents:
+      #     - How to build a chat interface
+      #     - How to use conversation history
+      #     - How to use a retriever
+      # - section: 💡 Explanation
+      #   contents:
+      #     - Architecture
+      #     - Elements
+      #     - Ports
+      #     - Payloads
+      #     - Persistence
+      #     - Server
+      # - section: "elements"
+      #   contents: auto
+      #       # - elements-summary.qmd
+      #       # - LLMChatElement.qmd
+      #       # - FileLoaderElement.qmd
+      #       # - EmbedderElement.qmd
+      #       # - RetrieverElement.qmd
+      # - text: 🔌 API
+      # - 💝 acknowlegment.qmd

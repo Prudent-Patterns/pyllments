@@ -4,12 +4,10 @@ from importlib.util import spec_from_file_location, module_from_spec
 import inspect
 import sys
 
-from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import panel as pn
 from panel.io.fastapi import add_application
 from uvicorn import run as uvicorn_run
-from dotenv import load_dotenv
 
 from . import AppRegistry
 from pyllments.logging import setup_logging, logger
@@ -43,8 +41,12 @@ def server_setup(logging: bool = False):
         /* Centering Body */
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: center;    
     }
+    h3 {
+        font-family
+    }
+
     """
     ]
 
@@ -62,7 +64,6 @@ def serve(filename: str=None, inline: bool=True, logging: bool=False):
         If False, loads the function from the specified file
     """
     server_setup(logging=logging)
-    load_dotenv('/workspaces/pyllments/.env')
     
     try:
         app = AppRegistry.get_app()

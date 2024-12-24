@@ -67,6 +67,7 @@ import asyncio
 
 # app = FastAPI()
 # app.mount('/assets', StaticFiles(directory='/workspaces/pyllments/pyllments/assets'), name='assets')
+load_dotenv('/workspaces/pyllments/.env')
 
 # @add_application('/', app=app, title='Pyllments')
 def create_pyllments_app():
