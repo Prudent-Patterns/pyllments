@@ -1045,7 +1045,8 @@ $light-outline-color: #455368 !default;        // Light outline color
 $primary-accent-color: #D33A4B !default;       // Primary accent color
 $secondary-accent-color: #EDB737 !default;     // Secondary accent color
 $tertiary-accent-color: #12B86C !default;      // Tertiary accent color
-$white: #F4F6F8 !default;                       // White color
+$white: #F4F6F8 !default;
+$lesser-white: hsl(210, 22%, 73%) !default;                       // White color
 $black: #353839 !default;                       // Black color
 $faded-text-color: #6083B8 !default;           
 
@@ -1053,6 +1054,8 @@ $faded-text-color: #6083B8 !default;
 $body-bg: $primary-background-color;
 $body-color: $white;
 $bs-link-color: $primary-accent-color;
+$fontcolor: $white;
+$navbar-fg: $white;
 
 // Heading font size customization
 $h1-font-size: 2rem !default;
@@ -13035,8 +13038,15 @@ $web-font-path: "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@4
   background-color: $secondary-background-color;
 }
 
-#quarto-sidebar {
-color: $light-outline-color
+/*-- sidebar font color --*/
+#quarto-sidebar .sidebar-item-container {
+color: $lesser-white;
 } 
+#quarto-sidebar .sidebar-item-container .active {
+  color: $primary-accent-color;
+  } 
+.sidebar-section {
+  padding-left
+}
 
 // quarto-scss-analysis-annotation { "origin": null }

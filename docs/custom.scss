@@ -5,7 +5,8 @@ $light-outline-color: #455368 !default;        // Light outline color
 $primary-accent-color: #D33A4B !default;       // Primary accent color
 $secondary-accent-color: #EDB737 !default;     // Secondary accent color
 $tertiary-accent-color: #12B86C !default;      // Tertiary accent color
-$white: #F4F6F8 !default;                       // White color
+$white: #F4F6F8 !default;
+$lesser-white: hsl(210, 22%, 73%) !default;                       // White color
 $black: #353839 !default;                       // Black color
 $faded-text-color: #6083B8 !default;           
 
@@ -14,16 +15,40 @@ $body-bg: $primary-background-color;
 $body-color: $white;
 $bs-link-color: $primary-accent-color;
 $fontcolor: $white;
+$navbar-fg: $white;
+$breadcrumb-bg: $secondary-background-color;
+$breadcrumb-active-color: $lesser-white;
 
 /*-- scss:rules --*/
 .navbar {
   background-color: $secondary-background-color;
 }
 
+ol.breadcrumb {
+  // Assign a color to all breadcrumb items except the last one
+  .breadcrumb-item {
+    a {
+      color: $lesser-white; // Color for preceding items
+    }
+  }
+
+  // Assign a different color to the last breadcrumb item
+  .breadcrumb-item:last-child {
+    a {
+      color: $primary-accent-color; // Color for the last item
+    }
+  }
+}
+
 /*-- sidebar font color --*/
 #quarto-sidebar .sidebar-item-container {
-color: $faded-text-color;
+color: $lesser-white;
 } 
 #quarto-sidebar .sidebar-item-container .active {
   color: $primary-accent-color;
+  border-left: 3px solid $primary-accent-color; // Combined border properties for brevity
+  padding-left: 5px;
   } 
+.sidebar-section {
+  padding-left: 2.3em
+}

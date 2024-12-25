@@ -1,4 +1,6 @@
 *.ipynb linguist-documentation
 # Start Generation Here
 /assets/** linguist-ignore
+/docs/_site/** linguist-ignore
+/docs/.quarto/** linguist-ignore
 # End Generation Here
