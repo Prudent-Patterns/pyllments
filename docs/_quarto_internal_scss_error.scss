@@ -1056,6 +1056,11 @@ $body-color: $white;
 $bs-link-color: $primary-accent-color;
 $fontcolor: $white;
 $navbar-fg: $white;
+$breadcrumb-bg: $secondary-background-color;
+$breadcrumb-active-color: $lesser-white;
+$mainfont: 'Hanken Grotesk';
+$decofont: 'Ubuntu';
+
 
 // Heading font size customization
 $h1-font-size: 2rem !default;
@@ -13034,19 +13039,78 @@ $web-font-path: "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@4
 
 // quarto-scss-analysis-annotation { "origin": null }
 
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+
 .navbar {
   background-color: $secondary-background-color;
+  font-family: $decofont;
+  font-weight: 500;
+
+  // Change the color of spans to the primary accent color on hover
+  span:hover {
+    color: $primary-accent-color;
+  }
+}
+
+ol.breadcrumb {
+  // Assign a color to all breadcrumb items except the last one
+  .breadcrumb-item {
+    a {
+      color: $lesser-white; // Color for preceding items
+    }
+  }
+
+  // Assign a different color to the last breadcrumb item
+  .breadcrumb-item:last-child {
+    a {
+      color: $primary-accent-color; // Color for the last item
+    }
+  }
 }
 
 /*-- sidebar font color --*/
 #quarto-sidebar .sidebar-item-container {
-color: $lesser-white;
+  color: $lesser-white;
+  
+  // Change text color to yellow on hover
+  &:hover {
+    color: $secondary-accent-color; // Use the yellow color for hover effect
+  }
 } 
+
 #quarto-sidebar .sidebar-item-container .active {
   color: $primary-accent-color;
+  border-left: 3px solid $primary-accent-color; // Combined border properties for brevity
+  padding-left: 5px;
   } 
 .sidebar-section {
-  padding-left
+  padding-left: 2.3em
+}
+
+# Start of Selection
+#quarto-margin-sidebar .navlink {
+  // Change the color to yellow on hover
+  &:hover {
+    color: $secondary-accent-color; // Use yellow color for hover effect
+  }
+
+  // Change the color to red when the navlink has an active class
+  &.active {
+    color: $primary-accent-color; // Use red color for active state
+  }
+}
+
+// Adjusting the selector to ensure it captures .navlink elements nested within #quarto-margin-sidebar
+#quarto-margin-sidebar .navlink {
+  // Change the color to yellow on hover
+  &:hover {
+    color: $secondary-accent-color; // Use yellow color for hover effect
+  }
+
+  // Change the color to red when the navlink has an active class
+  &.active {
+    color: $primary-accent-color; // Use red color for active state
+  }
 }
 
 // quarto-scss-analysis-annotation { "origin": null }

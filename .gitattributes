@@ -3,4 +3,5 @@
 /assets/** linguist-ignore
 /docs/_site/** linguist-ignore
 /docs/.quarto/** linguist-ignore
+/dev/** linguist-ignore
 # End Generation Here

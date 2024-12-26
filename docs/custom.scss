@@ -1,19 +1,21 @@
 /*-- scss:defaults --*/
-$primary-background-color: #0C1314 !default;  // Primary background color
-$secondary-background-color: #111926 !default; // Secondary background color
-$light-outline-color: #455368 !default;        // Light outline color
-$primary-accent-color: #D33A4B !default;       // Primary accent color
-$secondary-accent-color: #EDB737 !default;     // Secondary accent color
-$tertiary-accent-color: #12B86C !default;      // Tertiary accent color
-$white: #F4F6F8 !default;
-$lesser-white: hsl(210, 22%, 73%) !default;                       // White color
-$black: #353839 !default;                       // Black color
-$faded-text-color: #6083B8 !default;           
+$primary-background-color: #0C1314;  // Primary background color
+$secondary-background-color: #111926; // Secondary background color
+$light-outline-color: #455368;        // Light outline color
+$primary-accent-color: #D33A4B;       // Primary accent color
+$secondary-accent-color: #EDB737;     // Secondary accent color
+$tertiary-accent-color: #12B86C;      // Tertiary accent color
+$white: #F4F6F8;
+$lesser-white: hsl(210, 22%, 73%);                       // White color
+$black: #353839;                       // Black color
+$faded-text-color: #6083B8;           
 
 /*-- bootstrap overrides --*/
 $body-bg: $primary-background-color;
 $body-color: $white;
 $bs-link-color: $primary-accent-color;
+$link-color: $primary-accent-color;
+$link-hover-color: $secondary-accent-color;
 $fontcolor: $white;
 $navbar-fg: $white;
 $breadcrumb-bg: $secondary-background-color;
@@ -28,6 +30,11 @@ $decofont: 'Ubuntu';
   background-color: $secondary-background-color;
   font-family: $decofont;
   font-weight: 500;
+
+  // Change the color of spans to the primary accent color on hover
+  span:hover {
+    color: $primary-accent-color;
+  }
 }
 
 ol.breadcrumb {
@@ -48,8 +55,14 @@ ol.breadcrumb {
 
 /*-- sidebar font color --*/
 #quarto-sidebar .sidebar-item-container {
-color: $lesser-white;
+  color: $lesser-white;
+  
+  // Change text color to yellow on hover
+  &:hover {
+    color: $secondary-accent-color; // Use the yellow color for hover effect
+  }
 } 
+
 #quarto-sidebar .sidebar-item-container .active {
   color: $primary-accent-color;
   border-left: 3px solid $primary-accent-color; // Combined border properties for brevity
@@ -57,4 +70,16 @@ color: $lesser-white;
   } 
 .sidebar-section {
   padding-left: 2.3em
+}
+
+.sidebar nav[role="doc-toc"] ul > li > a {
+  color: $lesser-white;
+  
+  &:hover {
+      color: $secondary-accent-color !important;
+  }
+  
+  &.active {
+      color: $primary-accent-color;
+  }
 }

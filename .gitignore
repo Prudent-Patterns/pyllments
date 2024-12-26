@@ -159,14 +159,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Local storage of the corpus metadata and/or db
-corpus_local/*
-!corpus_local/simple_rag/
-!corpus_local/default_directory2/
-!corpus_local/default_directory3/
-
 # Other
 .ignore*
 *.lance
 .lance/
 # Ignore all files and folders with a lance extension
+
+# Development
+dev/private/

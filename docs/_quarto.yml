@@ -8,7 +8,7 @@ website:
   title: "Pyllments Documentation"
   navbar:
     left:
-      - href: index.qmd
+      - href: getting_started.qmd
         text: Getting Started
       - How-To
       - Elements
