@@ -101,7 +101,7 @@ class APIElement(Element):
         """)                                 
 
     outgoing_input_port = param.ClassSelector(class_=InputPort, doc="""
-        An optional input port to connect upon initialization.""")
+        An optional input port to connect upon initialization that connects to the api_output port of the APIElement.""")
 
     app = param.ClassSelector(class_=FastAPI, doc="""
         The FastAPI app object for the API. Defaults to the FastAPI app in AppRegistry.""")
@@ -250,6 +250,7 @@ class APIElement(Element):
     def _create_request_pydantic_model(self):
         """Dynamically create a Pydantic model based on the argument names of request_output_fn."""
         sig = signature(self.request_output_fn)
+        # TODO: Add type validation
         fields = {param.name: (Any, ...) for param in sig.parameters.values()}
         self.request_pydantic_model = create_model('RequestModel', **fields)   
 

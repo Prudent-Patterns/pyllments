@@ -120,13 +120,20 @@ def create_pyllments_app():
             'query': ('human', [embedder_element.ports.output['processed_message_output'], switch_element.ports.output['without_retrieval']])
         },
         build_map={
-            'query': [
+             'query': [
+                'main_system_prompt',
+                'system_query_prompt',
+                'query'
+            ],
+            # When history exists
+            'history': [
                 'main_system_prompt', 
                 'system_history_prompt', 
                 'history', 
                 'system_query_prompt',
                 'query'
             ],
+            # When history exists and retrieval is needed
             'retrieved': [
                 'main_system_prompt', 
                 'system_history_prompt', 

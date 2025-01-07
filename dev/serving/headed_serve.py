@@ -74,7 +74,6 @@ load_dotenv('/workspaces/pyllments/.env')
 
 @flow
 def create_pyllments_app():
-
     file_loader_element = FileLoaderElement(file_dir='loaded_files')
     chunker_element = TextChunkerElement(chunk_size=200, chunk_overlap=20)
     embedder_element = EmbedderElement()
@@ -87,12 +86,9 @@ def create_pyllments_app():
         receive_callback=lambda p: [i.model.text for i in p]
     )
 
-
     file_loader_element.ports.output['file_list_output'] > chunker_element.ports.input['file_input']
     chunker_element.ports.output['chunk_output'] > embedder_element.ports.input['chunk_input']
     embedder_element.ports.output['processed_chunks_output'] > retriever_element.ports.input['chunk_input']
-
-
 
     switch_element = Switch(
         payload_type=MessagePayload, 
@@ -128,12 +124,19 @@ def create_pyllments_app():
         },
         build_map={
             'query': [
+                'main_system_prompt',
+                'system_query_prompt',
+                'query'
+            ],
+            # When history exists
+            'history': [
                 'main_system_prompt', 
                 'system_history_prompt', 
                 'history', 
                 'system_query_prompt',
                 'query'
             ],
+            # When history exists and retrieval is needed
             'retrieved': [
                 'main_system_prompt', 
                 'system_history_prompt', 
@@ -162,30 +165,7 @@ def create_pyllments_app():
     chat_interface_view = chat_interface_element.create_interface_view(feed_height=500, input_height=150)
     switch_view = switch_element.create_switch_view(orientation='horizontal')
 
-    def request_output_fn(message: str, role: str) -> MessagePayload:
-        return MessagePayload(**{
-            'message': HumanMessage(content=message),
-            'role': role
-        })
-    
-    async def message_callback(payload):
-        while not payload.model.streamed:
-            await asyncio.sleep(0.1)
-        return payload.model.message.content
-    api_element = APIElement(
-        endpoint='api',
-        connected_input_map={
-            'message_input': llm_chat_element.ports.output['message_output']
-        },
-        response_dict={
-            'message_input': {
-                'message': message_callback,
-                'role': 'role'
-            }
-        },
-        request_output_fn=request_output_fn,
-        outgoing_input_port=chat_interface_element.ports.input['message_emit_input']
-    )
+
     
     return pn.Row(
         pn.Column(
@@ -208,7 +188,3 @@ def create_pyllments_app():
         pn.Spacer(width=10),
         history_handler_element.create_context_view(height=900, width=500),
     )
-
-# panel serve 10_retrieval_flow.py --static-dirs assets=/workspaces/pyllments/pyllments/assets
-# from uvicorn import run as uvicorn_run
-# uvicorn_run(app, host='0.0.0.0', port=8000)

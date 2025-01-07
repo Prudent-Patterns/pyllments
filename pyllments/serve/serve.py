@@ -4,6 +4,7 @@ from importlib.util import spec_from_file_location, module_from_spec
 import inspect
 import sys
 
+from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 import panel as pn
 from panel.io.fastapi import add_application
@@ -51,7 +52,7 @@ def server_setup(logging: bool = False):
     ]
 
 @logger.catch
-def serve(filename: str=None, inline: bool=True, logging: bool=False):
+def serve(filename: str=None, inline: bool=True, logging: bool=False, env: str=None, port: int=8000, find_gui: bool=True):
     """
     Serves a Pyllments application either from a file or from the calling module.
     
@@ -64,7 +65,10 @@ def serve(filename: str=None, inline: bool=True, logging: bool=False):
         If False, loads the function from the specified file
     """
     server_setup(logging=logging)
-    
+    if env:
+        load_dotenv(env)
+    else:
+        load_dotenv()
     try:
         app = AppRegistry.get_app()
     except Exception as e:
@@ -76,44 +80,46 @@ def serve(filename: str=None, inline: bool=True, logging: bool=False):
     except Exception as e:
         logger.error(f"Failed to mount static files: {e}")
 
-    def view_check(obj):
-        return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
-    
-    func_list = []
-    # Use with `pyllments serve <filename>`
-    if not inline:
-        if not filename:
-            raise ValueError("filename must be provided when inline=False")
-        try:
-            spec = spec_from_file_location('loaded_module', filename)
-            module = module_from_spec(spec)
-            spec.loader.exec_module(module)
-            func_list = inspect.getmembers(module, view_check)
-        except Exception as e:
-            logger.error(f"Failed to load module from file {filename}: {e}")
-            raise
-    elif inline:
-        # Walk up the call stack to find the caller's frame
-        frame = sys._getframe(1)
-        while frame:
-            # Check if we've found a module with flow-decorated functions
-            module = sys.modules.get(frame.f_globals.get('__name__'))
-            if module:
+    if find_gui:
+        def view_check(obj):
+            return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
+        
+        func_list = []
+        # Use with `pyllments serve <filename>`
+        if not inline:
+            if not filename:
+                raise ValueError("filename must be provided when inline=False")
+            try:
+                spec = spec_from_file_location('loaded_module', filename)
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
                 func_list = inspect.getmembers(module, view_check)
-                if func_list:
-                    break
-            frame = frame.f_back
+            except Exception as e:
+                logger.error(f"Failed to load module from file {filename}: {e}")
+                raise
+        elif inline:
+            # Walk up the call stack to find the caller's frame
+            frame = sys._getframe(1)
+            while frame:
+                # Check if we've found a module with flow-decorated functions
+                module = sys.modules.get(frame.f_globals.get('__name__'))
+                if module:
+                    func_list = inspect.getmembers(module, view_check)
+                    if func_list:
+                        break
+                frame = frame.f_back
 
-    if len(func_list) > 1:
-        logger.warning('Multiple @flow wrapped functions found in script, using first found')
-    elif len(func_list) == 1:
-        logger.info(f"Found {len(func_list)} @flow wrapped functions in script, using first found")
-        name, obj = func_list[0]
-        @add_application('/', app=app, title='Pyllments')
-        def serve_gui():
-            return obj()
+        if func_list_len := len(func_list) >= 1:
+            if func_list_len > 1:
+                logger.warning(f'{func_list_len} @flow wrapped functions found in script, using first found')
+            elif func_list_len == 1:
+                logger.info(f"Found @flow wrapped function in script")
+            name, obj = func_list[0]
+            @add_application('/', app=app, title='Pyllments')
+            def serve_gui():
+                return obj()
 
-    uvicorn_run(app, host='0.0.0.0', port=8000)
+    uvicorn_run(app, host='0.0.0.0', port=port)
 
 
 def flow(func):
@@ -128,4 +134,4 @@ def flow(func):
         return func(*args, **kwargs)
     return wrapper
 
-
+#TODO: if no elements and no @flow deco, output an error or warning

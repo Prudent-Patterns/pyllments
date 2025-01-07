@@ -1,5 +1,6 @@
 from typing import Generator, AsyncGenerator
 from uuid import uuid4
+import asyncio
 
 import param
 from langchain_core.messages.base import BaseMessage
@@ -77,3 +78,29 @@ class MessageModel(Model):
         
     #     self.tokenization_map[model] = token_length
     #     return token_length
+
+    async def streamed_message(self) -> str:
+        """Wait for streaming to complete and return the final message content.
+        
+        Returns
+        -------
+        str
+            The complete message content after streaming
+        """
+        if self.mode != 'stream':
+            return self.message
+            
+        if self.streamed:
+            return self.message
+            
+        done_future = asyncio.Future()
+        
+        def on_streamed_change(event):
+            if event.new and not done_future.done():
+                done_future.set_result(self.message)
+        
+        watcher = self.param.watch(on_streamed_change, 'streamed')
+        try:
+            return await done_future
+        finally:
+            self.param.unwatch(watcher)
