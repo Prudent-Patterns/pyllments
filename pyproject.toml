@@ -45,7 +45,8 @@ dependencies = [
     "bokeh-fastapi",
     "loguru",
     "lancedb",
-    "typer"
+    "typer",
+    "litellm>=1.57.3",
 ]
 
 [project.scripts]

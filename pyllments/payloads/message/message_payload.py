@@ -17,31 +17,40 @@ class MessagePayload(Payload):
     @Component.view
     def create_static_view(
         self,
-        human_markdown_css: list = [],
-        human_row_css: list = [],
-        ai_markdown_css: list = [],
-        ai_row_css: list = [],
+        user_markdown_css: list = [],
+        user_row_css: list = [],
+        assistant_markdown_css: list = [],
+        assistant_row_css: list = [],
         role_css: list = [],
         show_role: bool = True
         ) -> pn.Row:
         """Creates a message container"""
         match self.model.role:
-            case 'human':
-                markdown_css = human_markdown_css
-                row_css = human_row_css
-                role_str = 'Human'
-            case 'ai':
-                markdown_css = ai_markdown_css
-                row_css = ai_row_css
-                role_str = 'AI'
+            case 'user':
+                markdown_css = user_markdown_css
+                row_css = user_row_css
+                role_str = 'User'
+            case 'assistant':
+                markdown_css = assistant_markdown_css
+                row_css = assistant_row_css
+                role_str = 'Assistant'
+            case 'system':
+                markdown_css = user_markdown_css
+                row_css = user_row_css
+                role_str = 'System'
+            case _:  # Handle other roles
+                markdown_css = user_markdown_css
+                row_css = user_row_css
+                role_str = self.model.role.capitalize()
+
         markdown = pn.pane.Markdown(
-            self.model.message.content,
+            self.model.content,  # Changed from message.content
             stylesheets=markdown_css)
- 
 
         def _update_message_view(event):
-            view[0].object = self.model.message.content
-        self.model.param.watch(_update_message_view, 'message')
+            view[0].object = self.model.content
+        self.model.param.watch(_update_message_view, 'content')
+        
         if show_role:
             role_md = pn.pane.Markdown(
                 role_str, stylesheets=role_css)
@@ -53,14 +62,14 @@ class MessagePayload(Payload):
                 markdown, stylesheets=row_css,
                 sizing_mode='stretch_width')
         return view
-    
+
     @Component.view
     def create_collapsible_view(
         self,
-        human_markdown_css: list = [],
-        human_row_css: list = [],
-        ai_markdown_css: list = [],
-        ai_row_css: list = [],
+        user_markdown_css: list = [],
+        user_row_css: list = [],
+        assistant_markdown_css: list = [],
+        assistant_row_css: list = [],
         role_css: list = [],
         button_css: list = [],
         show_role: bool = True,
@@ -68,19 +77,22 @@ class MessagePayload(Payload):
         ) -> pn.Row:
         """Creates a message container"""
         match self.model.role:
-            case 'human':
-                markdown_css = human_markdown_css
-                row_css = human_row_css
-                role_str = 'Human'
-            case 'ai':
-                markdown_css = ai_markdown_css
-                row_css = ai_row_css
-                role_str = 'AI'
+            case 'user':
+                markdown_css = user_markdown_css
+                row_css = user_row_css
+                role_str = 'User'
+            case 'assistant':
+                markdown_css = assistant_markdown_css
+                row_css = assistant_row_css
+                role_str = 'Assistant'
             case 'system':
-                markdown_css = human_markdown_css
-                row_css = human_row_css
+                markdown_css = user_markdown_css
+                row_css = user_row_css
                 role_str = 'System'
-            
+            case _:  # Handle other roles
+                markdown_css = user_markdown_css
+                row_css = user_row_css
+                role_str = self.model.role.capitalize()
 
         expand_button = pn.widgets.Toggle(
             icon='plus',
@@ -90,25 +102,23 @@ class MessagePayload(Payload):
             stylesheets=button_css)
 
         markdown = pn.pane.Markdown(
-            self.model.message.content[:truncation_length],
+            self.model.content[:truncation_length],  # Changed from message.content
             stylesheets=markdown_css)
  
         def _update_message_view(event):
-            #TODO Handle for streaming scenarios
-            view[0].object = self.model.message.content
-        self.model.param.watch(_update_message_view, 'message')
+            view[0].object = self.model.content
+        self.model.param.watch(_update_message_view, 'content')
 
         def toggle_visibility(event):
             if event.new:  # If the toggle is activated
                 expand_button.icon = 'minus'
-                markdown.object = self.model.message.content
+                markdown.object = self.model.content
             else:  # If the toggle is deactivated
                 expand_button.icon = 'plus'
-                markdown.object = self.model.message.content[:truncation_length]
+                markdown.object = self.model.content[:truncation_length]
         expand_button.param.watch(toggle_visibility, 'value')
 
         row_args = [expand_button, markdown]
-        # row_args = [markdown]
         if show_role:
             role_md = pn.pane.Markdown(
                 role_str, stylesheets=role_css)
@@ -117,4 +127,3 @@ class MessagePayload(Payload):
             *row_args, stylesheets=row_css,
             sizing_mode='stretch_width')    
         return view 
-    

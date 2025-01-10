@@ -18,9 +18,12 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 RUN uv venv
 
-# Set the virtual environment path
-ENV VIRTUAL_ENV=/.venv
+# Create and set virtual environment (Fix for first warning)
+ENV VIRTUAL_ENV=/workspaces/pyllments/.venv 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Set UV link mode to avoid hardlink warning (Fix for second warning)
+ENV UV_LINK_MODE=copy
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-install-workspace

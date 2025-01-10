@@ -205,18 +205,20 @@ class ChatInterfaceElement(Element):
         clearing the input field, and updating the chat feed view.
         """
         
-        if event.obj is self.send_button_view: # When send button is clicked
+        if event.obj is self.send_button_view:
             if self.chat_input_view:
                 input_text = self.chat_input_view.value_input
                 self.chat_input_view.value_input = ''
                 new_message = MessagePayload(
-                    message=HumanMessage(input_text),
+                    role='user',
+                    content=input_text,
                     mode='atomic')
                 self.model.new_message = new_message
             
-        elif event.obj is self.chat_input_view: # When value changes on 'enter'
+        elif event.obj is self.chat_input_view:
             input_text = self.chat_input_view.value
             new_message = MessagePayload(
-                message=HumanMessage(input_text),
+                role='user',
+                content=input_text,
                 mode='atomic')
             self.model.new_message = new_message

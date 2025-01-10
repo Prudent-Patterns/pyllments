@@ -8,7 +8,7 @@ Pyllments is a Python library for building graphical and API-based LLM applicati
  I am currently working on making this a fully-fledged framework.
 
 # Project Organization
-Here is an example of the file structure of an individual element:
+Here is an example of the file structure of a typical element:
 chat_interface:
    - __init__.py
    - chat_interface_element.py
@@ -22,11 +22,11 @@ chat_interface:
 
 # Primary Libraries Used
 - Panel is used to create the visualization layer and run the GUI. Views tend to consist of Panel objects which can be styled with Python and CSS.
-- Param is used to create parameterized classes which help create parameters that handle type validation, default values, constraints, and most importantly, reactivity(setting event handlers to catch changes).
+- Param is used to create parameterized classes which help create parameters(attributes) that handle type validation, default values, constraints, and most importantly, reactivity(setting event handlers to catch changes).
 - Langchain is responsible for the specific functions pertaining to incorporating LLM workflows.
 
 # Development Priorities
-Pyllments code is prioritized on being developer-friendly, where extensibility and modularity are first-class citizens. Elements should be customizeable with clean and intuitive interfaces. It should also be easy to create new elements depending on the needs of the developer. 
+Pyllments code is prioritized on being developer-friendly, where extensibility and modularity are first-class citizens. Patterns should be used for intuitive development flows. Elements should be customizeable with clean and intuitive interfaces. It should also be easy to create new elements depending on the needs of the developer. 
 
 # Documentation
 Docstrings should use a NumPy/SciPy style.
