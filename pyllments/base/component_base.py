@@ -47,9 +47,34 @@ class Component(param.Parameterized):
 
     @classmethod
     def view(cls, func):
-        """Load CSS from the component's own CSS folder, cache it, and use it appropriately."""
+        """
+        Decorator that:
+        1. Loads and caches CSS from the component's CSS folder
+        2. Handles automatic sizing mode determination for Panel Layoutable objects
+        3. Manages view instance caching
+        4. Passes through Panel-specific parameters
+        5. Applies custom attributes to the returned Panel object
+        """
+        PANEL_PARAMS = {
+            'width', 'height', 'min_width', 'max_width', 'min_height', 'max_height',
+            'margin', 'sizing_mode', 'aspect_ratio', 'align',
+            'css_classes', 'styles', 'disabled', 'name', 'visible', 'design'
+        }
+        
         @wraps(func)
         def wrapper(self, *args, **kwargs):
+            # Get method signature parameters and their defaults
+            sig = inspect.signature(func)
+            sig_params = sig.parameters
+            
+            # Merge default values with provided kwargs
+            defaults = {
+                name: param.default 
+                for name, param in sig_params.items() 
+                if param.default is not inspect.Parameter.empty
+            }
+            merged_kwargs = {**defaults, **kwargs}
+            
             # Get the view attribute name from the function name
             view_attr_name = func.__name__.replace('create_', '') + '_view'
             # The expected class is checked due to Row and Column layouts using __len__ in if statements
@@ -63,51 +88,108 @@ class Component(param.Parameterized):
             # If the view doesn't exist, proceed with CSS loading and view creation
             view_name = func.__name__.replace('create_', '')
 
-            sig = inspect.signature(func)
-            # Identify parameters that end with '_css' to load corresponding CSS files
-            css_kwargs = [param for param in sig.parameters if param.endswith('_css')]
-
-            # Initialize the css_cache for this view if it doesn't exist
+            # Initialize cache for this view if needed
             if view_name not in self.css_cache:
                 self.css_cache[view_name] = {}
 
-            # Determine the CSS folder for the component
-            css_folder = Path(self._get_module_path(), 'css')
+            # Split kwargs into Panel params and custom attributes early
+            # Panel params are either in PANEL_PARAMS or defined in the signature
+            panel_kwargs = {k: v for k, v in merged_kwargs.items() 
+                          if k in PANEL_PARAMS}
+            custom_attrs = {k: v for k, v in merged_kwargs.items() 
+                          if k not in PANEL_PARAMS}
 
+            # Process _css arguments first
+            css_kwargs = [param for param in inspect.signature(func).parameters 
+                         if param.endswith('_css')]
+            
+            logger.debug(f"CSS kwargs found in {func.__name__}: {css_kwargs}")
+            
+            # First load all potential CSS files for this view
             for key in css_kwargs:
-                # Extract the CSS name by removing the '_css' suffix
-                # Example: 'button_css' becomes '{view_name}_button'
                 css_name = key[:-4]
-                # Create the new CSS filename structure
-                css_filename = f"{view_name}_{css_name}.css"
-                
-                # Load CSS from file if not in cache
                 if css_name not in self.css_cache[view_name]:
-                    css_file_path = css_folder / css_filename
+                    # Get the css folder path
+                    css_folder = self._get_module_path() / 'css'
+                    css_file_path = css_folder / f"{view_name}_{css_name}.css"
+                    logger.debug(f"Looking for component CSS file: {css_file_path}")
                     try:
                         with open(css_file_path, 'r') as f:
-                            # Store the loaded CSS in the cache
                             self.css_cache[view_name][css_name] = f.read()
+                            logger.debug(f"Loaded component CSS from {css_file_path}")
                     except FileNotFoundError:
-                        logger.warning(f"CSS file not found: {css_file_path}")
+                        logger.debug(f"Component CSS file not found: {css_file_path}")
                         self.css_cache[view_name][css_name] = ''
                     except Exception as e:
                         logger.warning(f"Error loading CSS: {str(e)}")
                         self.css_cache[view_name][css_name] = ''
 
-                # Get the cached CSS (which might be an empty string if no file was found)
-                cached_css = self.css_cache[view_name][css_name]
-
-                # Combine cached CSS with provided CSS
+            # Now handle the CSS parameters
+            for key in css_kwargs:
+                css_name = key[:-4]
+                # Get the default value for this parameter
+                default_value = defaults.get(key, [])
+                # Start with component CSS if it exists
+                css_list = []
+                if self.css_cache[view_name][css_name]:
+                    css_list.append(self.css_cache[view_name][css_name])
+                # Add any passed CSS
                 if key in kwargs:
-                    if isinstance(kwargs[key], list):
-                        if cached_css:
-                            kwargs[key] = [cached_css] + kwargs[key]
+                    passed_css = kwargs[key]
+                    if isinstance(passed_css, list):
+                        css_list.extend(passed_css)
                     else:
-                        kwargs[key] = [cached_css, kwargs[key]] if cached_css else [kwargs[key]]
-                elif cached_css:
-                    kwargs[key] = [cached_css]
+                        css_list.append(passed_css)
+                # Update the custom_attrs with the combined CSS
+                custom_attrs[key] = css_list
 
-            return func(self, *args, **kwargs)
+            logger.debug(f"Final CSS kwargs: {[(k,v) for k,v in custom_attrs.items() if k.endswith('_css')]}")
+
+            # Handle sizing mode
+            has_height = 'height' in panel_kwargs
+            has_width = 'width' in panel_kwargs
+            if 'sizing_mode' not in panel_kwargs:
+                if has_height and has_width:
+                    panel_kwargs['sizing_mode'] = 'fixed'
+                elif has_height:
+                    panel_kwargs['sizing_mode'] = 'stretch_width'
+                elif has_width:
+                    panel_kwargs['sizing_mode'] = 'stretch_height'
+                else:
+                    panel_kwargs['sizing_mode'] = 'stretch_both'
+
+            # Create view with function parameters only
+            view = func(self, *args, **custom_attrs)
+            
+            # Apply Panel parameters to the returned view
+            for param_name, param_value in panel_kwargs.items():
+                setattr(view, param_name, param_value)
+            
+            # Default view CSS file check (no warning needed if not found)
+            if 'default' not in self.css_cache[view_name]:
+                css_folder = self._get_module_path() / 'css'
+                css_file_path = css_folder / f"{view_name}.css"
+                try:
+                    with open(css_file_path, 'r') as f:
+                        self.css_cache[view_name]['default'] = f.read()
+                except FileNotFoundError:
+                    self.css_cache[view_name]['default'] = ''
+                except Exception as e:
+                    logger.warning(f"Error loading CSS: {str(e)}")
+                    self.css_cache[view_name]['default'] = ''
+
+            # Apply view-specific CSS if it exists
+            if self.css_cache[view_name]['default']:
+                current_stylesheets = getattr(view, 'stylesheets', [])
+                if isinstance(current_stylesheets, list):
+                    view.stylesheets = [self.css_cache[view_name]['default']] + current_stylesheets
+                else:
+                    view.stylesheets = [self.css_cache[view_name]['default'], current_stylesheets]
+
+            # Apply custom attributes
+            for attr, value in custom_attrs.items():
+                setattr(view, attr, value)
+            
+            return view
 
         return wrapper

@@ -85,61 +85,93 @@ class Element(Component):
     
     def inject_payload_css(self, create_view_method: Callable, name=None, **kwargs):
         """
-        Used to wrap and run a create_*_view method of a Payload subclass in order
-        to insert custom CSS from the Element's CSS folder into the kwargs
-        of the view creation method.
-        e.g. self.inject_payload_css(some_payload.create_custom_view)
-        The name argument is used if the Element needs to style more than
-        one *variety* of Payload.
-        payload_css_cache is a dictionary that stores the CSS for each of
-        the specified payload names (if provided). It is used to cache
-        CSS so that it doesn't have to be loaded from the disk for each
-        view creation method.
-        If name remains None, the default key is just 'default'.
-        Otherwise, the key is set as the name provided as one of the kwargs
-        to the create_view_method.
-        CSS is loaded from the Element's CSS folder, and has the pattern:
-        "payload_{name}_{kwarg name without _css}.css". If the name kwarg
-        isn't provided, just use the template "payload_{kwarg name without
-        _css}.css".
+        Wraps payload view creation methods to inject CSS from the Element's CSS folder.
+        
+        Always looks for and applies a default view CSS file:
+            - With name: payload_{name}_{view_name}.css
+            - Without name: payload_{view_name}.css
+        
+        For each CSS kwarg (ending in _css), looks for:
+            - With name: payload_{name}_{kwarg}.css
+            - Without name: payload_{kwarg}.css
+        
+        Warns if no CSS files are found when using this method.
         """
+        view_name = create_view_method.__name__.split('create_')[1]
         sig = inspect.signature(create_view_method)
         css_kwargs = [param for param in sig.parameters if param.endswith('_css')]
-
+        
+        # Get module path early
+        module_path = type(self)._get_module_path()
+        
+        # Initialize cache
         cache_key = name or 'default'
         if cache_key not in self.payload_css_cache:
             self.payload_css_cache[cache_key] = {}
-
-        # Extract view name from the method name
-        view_name = create_view_method.__name__.split('create_')[1]
         if view_name not in self.payload_css_cache[cache_key]:
             self.payload_css_cache[cache_key][view_name] = {}
-
+        
+        # Track if any CSS files are found and which ones we tried to load
+        css_files_found = False
+        attempted_files = []
+        
+        # Load default view CSS
+        if 'default' not in self.payload_css_cache[cache_key][view_name]:
+            default_css_filename = f"payload_{name+'_' if name else ''}{view_name}.css"
+            css_path = Path(module_path, 'css', default_css_filename)
+            try:
+                with open(css_path, 'r') as f:
+                    self.payload_css_cache[cache_key][view_name]['default'] = f.read()
+                    css_files_found = True
+            except FileNotFoundError:
+                self.payload_css_cache[cache_key][view_name]['default'] = ''
+                attempted_files.append(default_css_filename)
+        
+        # Process CSS kwargs
         for key in css_kwargs:
+            css_name = key[:-4]
             if key not in self.payload_css_cache[cache_key][view_name]:
-                module_path = type(self)._get_module_path()
-                css_filename = f"payload_{name+'_' if name else ''}{key[:-4]}.css"
+                css_filename = f"payload_{name+'_' if name else ''}{css_name}.css"
                 css_path = Path(module_path, 'css', css_filename)
                 try:
                     with open(css_path, 'r') as f:
                         self.payload_css_cache[cache_key][view_name][key] = f.read()
+                        css_files_found = True
                 except FileNotFoundError:
-                    logger.warning(f"CSS file not found: {css_path}")
                     self.payload_css_cache[cache_key][view_name][key] = ''
-                except Exception as e:
-                    logger.warning(f"Error loading CSS: {str(e)}")
-                    self.payload_css_cache[cache_key][view_name][key] = ''
-
-        # Prepare the kwargs with the loaded CSS
-        for key in css_kwargs:
-            cached_css = self.payload_css_cache[cache_key][view_name][key]
-            if key in kwargs:
-                # If CSS kwarg is explicitly provided
-                existing_css = kwargs[key] if isinstance(kwargs[key], list) else [kwargs[key]]
-                kwargs[key] = [cached_css] + existing_css if cached_css else existing_css
+                    if Path(module_path, 'css').exists():  # Only track if CSS folder exists
+                        attempted_files.append(css_filename)
+            
+            # Add cached CSS to kwargs if it exists
+            if self.payload_css_cache[cache_key][view_name][key]:
+                if key not in kwargs:
+                    kwargs[key] = []
+                if isinstance(kwargs[key], list):
+                    kwargs[key] = [self.payload_css_cache[cache_key][view_name][key]] + kwargs[key]
+                else:
+                    kwargs[key] = [self.payload_css_cache[cache_key][view_name][key], kwargs[key]]
+        
+        # Create view with processed kwargs
+        view = create_view_method(**kwargs)
+        
+        # Apply default view CSS if it exists
+        default_css = self.payload_css_cache[cache_key][view_name]['default']
+        if default_css:
+            current_stylesheets = getattr(view, 'stylesheets', [])
+            if isinstance(current_stylesheets, list):
+                view.stylesheets = [default_css] + current_stylesheets
             else:
-                # If CSS kwarg is not provided, use only the cached CSS
-                kwargs[key] = [cached_css] if cached_css else []
-
-        # Call the create_view_method and return the view
-        return create_view_method(**kwargs)
+                view.stylesheets = [default_css, current_stylesheets]
+        
+        # Only warn if we actually tried to load files and none were found
+        if not css_files_found and attempted_files and Path(module_path, 'css').exists():
+            element_name = type(self).__name__
+            name_str = f" with name='{name}'" if name else ""
+            expected_files = " or ".join(attempted_files)
+            
+            logger.warning(
+                f"No CSS files found for {element_name}'s inject_payload_css call{name_str}. "
+                f"Expected files in {module_path}/css/: {expected_files}"
+            )
+        
+        return view

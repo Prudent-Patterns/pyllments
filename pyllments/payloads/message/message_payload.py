@@ -2,6 +2,7 @@ import param
 import panel as pn
 from typing import Literal, Optional, Generator, AsyncGenerator
 from langchain_core.messages import BaseMessage
+from loguru import logger
 
 from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
@@ -22,7 +23,8 @@ class MessagePayload(Payload):
         assistant_markdown_css: list = [],
         assistant_row_css: list = [],
         role_css: list = [],
-        show_role: bool = True
+        show_role: bool = True,
+        sizing_mode: Literal['fixed', 'stretch_width', 'stretch_height', 'stretch_both'] = 'stretch_width'
         ) -> pn.Row:
         """Creates a message container"""
         match self.model.role:
@@ -52,15 +54,13 @@ class MessagePayload(Payload):
         self.model.param.watch(_update_message_view, 'content')
         
         if show_role:
+            logger.debug(f"Creating role view with CSS: {role_css}")
             role_md = pn.pane.Markdown(
                 role_str, stylesheets=role_css)
-            view = pn.Row(
-                markdown, role_md, stylesheets=row_css,
-                sizing_mode='stretch_width')
+            view = pn.Row(markdown, role_md, stylesheets=row_css)
+            logger.debug(f"Created role_md with stylesheets: {role_md.stylesheets}")
         else:
-            view = pn.Row(
-                markdown, stylesheets=row_css,
-                sizing_mode='stretch_width')
+            view = pn.Row(markdown, stylesheets=row_css)
         return view
 
     @Component.view

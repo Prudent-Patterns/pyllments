@@ -72,10 +72,6 @@ class ChatInterfaceElement(Element):
     @Component.view
     def create_chatfeed_view(
         self,
-        column_css: list[str] = [],
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        sizing_mode: str = 'stretch_both',
         **kwargs
         ) -> pn.Column:
         """
@@ -83,10 +79,6 @@ class ChatInterfaceElement(Element):
         contains the visual components of the message payloads.
         """
         self.chatfeed_view = pn.Column(
-            stylesheets=column_css,
-            height=height,
-            width=width,
-            sizing_mode=sizing_mode,
             scroll=True,
             view_latest=True,
             auto_scroll_limit=1,
@@ -112,91 +104,50 @@ class ChatInterfaceElement(Element):
         return self.chatfeed_view
 
     @Component.view
-    def create_chat_input_view(
-        self,
-        input_css: list[str] = [],
-        sizing_mode: str = 'stretch_both',
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        margin: Optional[tuple[int, int, int, int]] = None,
-        **kwargs):
+    def create_chat_input_view(self, placeholder: str = 'Yap Here'):
         """
         Creates and returns a new instance of ChatAreaInput view.
         """
         self.chat_input_view = pn.chat.ChatAreaInput(
-            placeholder='Yap Here',
-            auto_grow=True,
-            stylesheets=input_css,
-            sizing_mode=sizing_mode,
-            height=height,
-            width=width,
-            margin=margin,
-            **kwargs)
+            placeholder=placeholder,
+            auto_grow=True)
         self.chat_input_view.param.watch(self._on_send, 'value')
         return self.chat_input_view
     
     @Component.view
     def create_send_button_view(
-            self,
-            button_css: list = [], 
-            sizing_mode: str = 'stretch_height',
-            width: Optional[int] = 38,
-            height: Optional[int] = None,
-            margin: Optional[tuple[int, int, int, int]] = None,
-            **kwargs
-            ) -> pn.widgets.Button:
+        self,
+        width: Optional[int] = 38) -> pn.widgets.Button:
         """Creates and returns a new instance of Button view for sending messages."""
         self.send_button_view = pn.widgets.Button(
             icon='send-2',
-            stylesheets=button_css,
-            sizing_mode=sizing_mode,
-            width=width,
-            height=height,
-            margin=margin,
-            icon_size='1.3em',
-            **kwargs)
+            icon_size='1.3em')
         self.send_button_view.on_click(self._on_send)
 
         return self.send_button_view
     
-    def create_chat_input_row_view(
-        self,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        margin: Optional[tuple[int, int, int, int]] = None,
-        **kwargs
-        ) -> pn.Row:
+    @Component.view
+    def create_chat_input_row_view(self) -> pn.Row:
         """Creates a row containing the chat area input and send button"""
         return pn.Row(
             self.create_chat_input_view(margin=(0, 0, 0, 0)),
-            self.create_send_button_view(margin=(0, 0, 0, 10)),
-            sizing_mode='stretch_width',
-            width=width,
-            height=height,
-            margin=margin,
-            **kwargs)
-        
+            self.create_send_button_view(margin=(0, 0, 0, 10))
+            )
+
+    @Component.view
     def create_interface_view(
         self,
         feed_height: Optional[int] = None,
         input_height: Optional[int] = None,
-        width: Optional[int] = None,
-        margin: Optional[tuple[int, int, int, int]] = None,
-        **kwargs
         ) -> pn.Column:
         """Creates a column containing the chat feed and chat input row"""
         return pn.Column(
-            self.create_chatfeed_view(
-                height=feed_height,
-                sizing_mode='stretch_width',
-            ),
+            self.create_chatfeed_view(height=feed_height),
             self.create_chat_input_row_view(
                 height=input_height,
                 margin=(10, 0, 0, 0)
-            ),
-            width=width,
-            margin=margin,
-            **kwargs)
+                )
+        )
     
     @Element.port_stage_emit('message_output', 'new_message')
     def _on_send(self, event):
@@ -204,7 +155,6 @@ class ChatInterfaceElement(Element):
         Handles the send button event by appending the user's message to the chat model,
         clearing the input field, and updating the chat feed view.
         """
-        
         if event.obj is self.send_button_view:
             if self.chat_input_view:
                 input_text = self.chat_input_view.value_input

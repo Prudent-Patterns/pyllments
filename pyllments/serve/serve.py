@@ -13,9 +13,9 @@ from uvicorn import run as uvicorn_run
 from . import AppRegistry
 from pyllments.logging import setup_logging, logger
 
-def server_setup(logging: bool = False): 
+def server_setup(logging: bool = False, logging_level: str = 'INFO'): 
     if logging:
-        setup_logging(log_file='file_loader.log', stdout_log_level='INFO', file_log_level='INFO')
+        setup_logging(log_file='file_loader.log', stdout_log_level=logging_level, file_log_level=logging_level)
     pn.config.css_files = ['assets/file_icons/tabler-icons-outline.min.css']
     pn.config.global_css = [
         """
@@ -52,7 +52,15 @@ def server_setup(logging: bool = False):
     ]
 
 @logger.catch
-def serve(filename: str=None, inline: bool=True, logging: bool=False, env: str=None, port: int=8000, find_gui: bool=True):
+def serve(
+    filename: str=None,
+    inline: bool=True,
+    logging: bool=False,
+    logging_level: str='INFO',
+    env: str=None,
+    port: int=8000,
+    find_gui: bool=True
+    ):
     """
     Serves a Pyllments application either from a file or from the calling module.
     
@@ -64,7 +72,7 @@ def serve(filename: str=None, inline: bool=True, logging: bool=False, env: str=N
         If True, looks for flow-decorated functions in the calling module
         If False, loads the function from the specified file
     """
-    server_setup(logging=logging)
+    server_setup(logging=logging, logging_level=logging_level)
     if env:
         load_dotenv(env)
     else:
