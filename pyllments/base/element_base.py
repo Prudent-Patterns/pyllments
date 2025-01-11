@@ -84,18 +84,71 @@ class Element(Component):
         return decorator
     
     def inject_payload_css(self, create_view_method: Callable, name=None, **kwargs):
-        """
-        Wraps payload view creation methods to inject CSS from the Element's CSS folder.
-        
-        Always looks for and applies a default view CSS file:
+        """Injects CSS from the Element's CSS folder into Payload view methods.
+
+        This method wraps Payload view creation methods to automatically load and inject
+        CSS from the Element's CSS directory. It supports both default view CSS and
+        part-specific CSS files, with optional naming prefixes.
+
+        Parameters
+        ----------
+        create_view_method : callable
+            The Payload's view creation method to be wrapped
+        name : str, optional
+            Optional prefix for CSS file names, allowing multiple CSS sets
+            for different instances of the same Payload type
+        **kwargs
+            Arguments to pass to the view creation method
+
+        Returns
+        -------
+        panel.viewable.Viewable
+            The created view with injected CSS
+
+        Notes
+        -----
+        CSS File Loading Priority:
+        1. Default view CSS file:
             - With name: payload_{name}_{view_name}.css
             - Without name: payload_{view_name}.css
-        
-        For each CSS kwarg (ending in _css), looks for:
-            - With name: payload_{name}_{kwarg}.css
-            - Without name: payload_{kwarg}.css
-        
-        Warns if no CSS files are found when using this method.
+        2. Part-specific CSS files (for each _css parameter):
+            - With name: payload_{name}_{part}.css
+            - Without name: payload_{part}.css
+        3. User-provided CSS in kwargs
+
+        CSS File Structure:
+            css/
+            ├── payload_main.css           # Default CSS for unnamed main view
+            ├── payload_custom_main.css    # Default CSS for main view with name='custom'
+            ├── payload_button.css         # CSS for unnamed button parts
+            └── payload_custom_button.css  # CSS for button parts with name='custom'
+
+        CSS Caching:
+            - CSS files are cached at the instance level in payload_css_cache
+            - Cache structure: {name: {view_name: {css_type: content}}}
+            - Files are loaded only once per name/view combination
+
+        Examples
+        --------
+        >>> class MyElement(Element):
+        ...     def create_payload_view(self):
+        ...         # Basic usage
+        ...         return self.inject_payload_css(
+        ...             payload.create_main
+        ...         )
+        ...
+        ...     def create_named_payload_view(self):
+        ...         # With name prefix and custom CSS
+        ...         return self.inject_payload_css(
+        ...             payload.create_main,
+        ...             name='custom',
+        ...             button_css=['additional.css']
+        ...         )
+
+        Warnings
+        --------
+        Logs a warning if no CSS files are found when the CSS directory exists
+        and files were expected based on the view method's parameters.
         """
         view_name = create_view_method.__name__.split('create_')[1]
         sig = inspect.signature(create_view_method)
