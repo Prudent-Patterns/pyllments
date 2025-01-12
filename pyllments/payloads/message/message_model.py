@@ -1,11 +1,10 @@
 import asyncio
 
 from loguru import logger
-from litellm.litellm_core_utils.streaming_handler import CustomStreamWrapper
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.common.tokenizers import get_token_len
+# from pyllments.common.tokenizers import get_token_len
 
 
 class MessageModel(Model):
@@ -31,11 +30,6 @@ class MessageModel(Model):
 
     def __init__(self, **params):
         super().__init__(**params)
-        
-        # Convert from legacy Langchain format if provided
-        if 'message' in params:
-            self.content = params['message'].content
-            self.role = self._convert_role(params['message'].type)
 
     async def stream(self):
         if self.mode != 'stream':
