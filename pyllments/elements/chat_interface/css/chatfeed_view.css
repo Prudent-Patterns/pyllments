@@ -3,6 +3,6 @@
     border: 1px solid var(--light-outline-color);
     scrollbar-width: thin;
     scrollbar-color: var(--primary-accent-color) transparent;
-    border-radius: 9px;
+    border-radius: var(--radius);
 }
 

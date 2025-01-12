@@ -32,11 +32,12 @@ def server_setup(logging: bool = False, logging_level: str = 'INFO'):
         --faded-text-color: #6083B8;
 
         --base-font: 'Hanken Grotesk', sans-serif;
-        --bokeh-base-font: 'Hanken Grotesk', sans-serif;
+        --bokeh-base-font: var(--base-font), sans-serif;
         --bokeh-font-size: 16px;
+        --title-font: 'Ubuntu', sans-serif;
         --line-height: 1.55;
         --design-background-text-color: var(--white);
-
+        --radius: 9px;
         
         background-color: var(--primary-background-color);
         /* Centering Body */
@@ -45,7 +46,7 @@ def server_setup(logging: bool = False, logging_level: str = 'INFO'):
         align-items: center;    
     }
     h3 {
-        font-family
+        font-family: var(--base-font);
     }
 
     """

@@ -70,10 +70,7 @@ class ChatInterfaceElement(Element):
             unpack_payload_callback=unpack)
 
     @Component.view
-    def create_chatfeed_view(
-        self,
-        **kwargs
-        ) -> pn.Column:
+    def create_chatfeed_view(self) -> pn.Column:
         """
         Creates and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
@@ -82,7 +79,7 @@ class ChatInterfaceElement(Element):
             scroll=True,
             view_latest=True,
             auto_scroll_limit=1,
-            **kwargs)
+            )
         message_views = [
             self.inject_payload_css(
                 message.create_static_view,

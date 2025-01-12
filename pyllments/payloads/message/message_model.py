@@ -42,14 +42,21 @@ class MessageModel(Model):
             raise ValueError("Cannot stream: Mode is not set to 'stream'")
             
         self.content = ''
-        logger.info("Starting message stream")
+        buffer = ''
         
         message_stream = await self.message_coroutine
         async for chunk in message_stream:
             delta = chunk['choices'][0].get('delta', {}).get('content', '')
             if delta:
-                self.content += delta
-                self.param.trigger('content') # TODO: Remove if not needed
+                buffer += delta
+                # Only update content and trigger redraws every N characters or on certain conditions
+                if len(buffer) >= 10 or '\n' in buffer:  
+                    self.content += buffer
+                    buffer = ''
+        
+        # Flush any remaining content in the buffer
+        if buffer:
+            self.content += buffer
                 
         logger.info("Completed message stream")
         self.streamed = True

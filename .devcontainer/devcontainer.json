@@ -30,7 +30,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "apt-get install -y nano && uv pip install jupyter_bokeh ipykernel ipython && python -m ipykernel install --user --name=pyllments && uv pip install -e . --no-build"
+	"postCreateCommand": "apt-get install -y nano && uv pip install jupyter_bokeh ipykernel ipython ipywidgets && uv pip install -e . --no-build"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

@@ -1,0 +1,10 @@
+:host .bk-input {
+    scrollbar-color: var(--primary-accent-color);
+    scrollbar-width: thin;
+    border-color: var(--primary-accent-color);
+    background-color: var(--secondary-background-color);
+}
+
+:host .bk-input-group > label {
+    font-size: .9em;
+}
