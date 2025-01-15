@@ -21,8 +21,8 @@
     },
     "search.exclude": {
         "**/assets/**": true,
-        "/dev/**": true,
-        "/docs/**": true
+        "dev/**": true,
+        "docs/**": true
     },
     "remote.localPortHost": "allInterfaces",
     "remote.autoForwardPorts": true,

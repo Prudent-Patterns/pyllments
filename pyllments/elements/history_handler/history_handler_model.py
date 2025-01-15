@@ -30,7 +30,7 @@ class HistoryHandlerModel(Model):
         """Batch load multiple messages efficiently."""
         # Calculate token estimates for all messages first
         message_tokens = [
-            (msg, get_token_len(msg.model.message.content, self.tokenizer_model))
+            (msg, get_token_len(msg.model.content, self.tokenizer_model))
             for msg in messages
         ]
         

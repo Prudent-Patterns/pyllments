@@ -1,7 +1,7 @@
 from typing import Literal, Union
 
 import panel as pn
-
+import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads.message import MessagePayload
@@ -10,6 +10,8 @@ from pyllments.elements.llm_chat import LLMChatModel
 
 class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
+    model_selector_view = param.ClassSelector(class_=(pn.widgets.Select, pn.Column, pn.Row))
+    
     def __init__(self, **params):
         super().__init__(**params)
 
@@ -35,6 +37,8 @@ class LLMChatElement(Element):
     def create_model_selector_view(
         self,
         models: list[str] = None,
+        provider: str = 'OpenAI',
+        model: str = 'gpt-4o-mini',
         orientation: Literal['vertical', 'horizontal'] = 'horizontal',
         model_selector_width: int = None,
         provider_selector_width: int = None,
@@ -74,6 +78,9 @@ class LLMChatElement(Element):
                 sizing_mode='stretch_width',
                 margin=0
                 )
+            if provider:
+                provider_selector.value = provider
+
             model_selector = pn.widgets.Select(
                 name='Model Selector',
                 options=provider_map[provider_selector.value],
@@ -82,7 +89,11 @@ class LLMChatElement(Element):
                 sizing_mode='stretch_width',
                 margin=0
                 )
-            self.model.model_name = model_selector.value
+            if model:
+                model_selector.value = model
+                self.model.model_name = model
+            else:
+                self.model.model_name = model_selector.value
 
             def on_provider_change(event):
                 model_selector.options = provider_map[event.new]
@@ -90,4 +101,7 @@ class LLMChatElement(Element):
             def on_model_change(event):
                 self.model.model_name = event.new
             model_selector.param.watch(on_model_change, 'value')
-            return pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
+            self.model_selector_view = pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
+            return self.model_selector_view
+
+        

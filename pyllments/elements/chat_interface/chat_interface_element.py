@@ -34,9 +34,9 @@ class ChatInterfaceElement(Element):
     chat_input_view = param.ClassSelector(class_=pn.chat.ChatAreaInput, is_instance=True)
     send_button_view = param.ClassSelector(class_=pn.widgets.Button, is_instance=True)
 
-    def __init__(self, persist=False, **params):
+    def __init__(self, **params):
         super().__init__(**params)
-        self.model = ChatInterfaceModel(persist=persist)
+        self.model = ChatInterfaceModel(**params)
         
         self._message_output_setup()
         self._message_input_setup()

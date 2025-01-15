@@ -1,6 +1,6 @@
 from collections import deque
 from itertools import islice
-
+from typing import Union
 import param
 import panel as pn
 
@@ -8,6 +8,7 @@ from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads.message.message_payload import MessagePayload
 from .history_handler_model import HistoryHandlerModel
+
 
 # TODO: Allow support of other payload types
 class HistoryHandlerElement(Element):
@@ -22,7 +23,8 @@ class HistoryHandlerElement(Element):
     - current context column
     Ports:
     - input:
-        - message_input: MessagePayload - Human and AI messages handled
+        - message_input: MessagePayload - Human and AI messages handled - triggers output of the current context
+        - messages_input: list[MessagePayload] - Messages to add to context
     - output:
         - messages_output: list[MessagePayload]
     """
@@ -55,6 +57,13 @@ class HistoryHandlerElement(Element):
 
         self.ports.add_input(name='message_input', unpack_payload_callback=unpack)
 
+    def _messages_input_setup(self): # TODO: need better port naming
+        def unpack(payload: Union[list[MessagePayload], MessagePayload]):
+            payloads = [payload] if not isinstance(payload, list) else payload
+            self.model.load_messages(payloads)
+
+        self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
+
     def _messages_output_setup(self):
         def pack(context: list[MessagePayload]) -> list[MessagePayload]:
             return context
@@ -64,11 +73,7 @@ class HistoryHandlerElement(Element):
             pack_payload_callback=pack
         )
 
-    def _messages_input_setup(self):
-        def unpack(payload: list[MessagePayload]):
-            self.model.load_messages(payload)
 
-        self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
     @Component.view
     def create_context_view(
