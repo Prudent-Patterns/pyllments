@@ -1,0 +1,27 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "docs",
+    "section": "",
+    "text": "This is a Quarto website.\nTo learn more about Quarto websites visit https://quarto.org/docs/websites."
+  },
+  {
+    "objectID": "getting_started.html",
+    "href": "getting_started.html",
+    "title": "Getting Started Tutorial",
+    "section": "",
+    "text": "1. Creating your first element\n\n\n2. Connecting elements\n\n\n3. Building your first flow\n\n\n4. Testing your flow\n\n\n5. Deploying your flow",
+    "crumbs": [
+      "Getting Started",
+      "🎓 Getting Started Tutorial"
+    ]
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this site\npyllments serve flow.py --logging=True"
+  }
+]
