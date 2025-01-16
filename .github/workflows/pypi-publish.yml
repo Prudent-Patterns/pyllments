@@ -1,0 +1,32 @@
+name: Publish Releaseto PyPI
+on:
+  push:
+    tags:
+      - 'v*'     
+jobs:
+  uv-build-publish:
+    name: Build with UV and Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pyllments/
+    permissions:
+      id-token: write
+      contents: read
+      
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build Package
+        run: uv build --no-sources
+
+      - name: Publish package distributions to PyPI
+        run: uv publish
+      # retrieve your distributions here
+      # - name: Publish package distributions to PyPI
+      #   uses: pypa/gh-action-pypi-publish@release/v1
