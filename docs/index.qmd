@@ -4,4 +4,5 @@ title: "docs"
 
 # Welcome to the Pyllments Documentation
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+*Here be dragons.*
+
