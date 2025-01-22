@@ -4,7 +4,7 @@ import param
 
 from pyllments.base.element_base import Element
 from loguru import logger
-
+# TODO: rename InteractElement
 class TestElement(Element):
     """
     Element used to test the inputs and outputs of other elements.

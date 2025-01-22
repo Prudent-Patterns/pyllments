@@ -1,8 +1,136 @@
 ---
-title: "docs"
+format:
+  html:
+    toc: false
+    page-layout: full
+code-annotations: true
+# mermaid:
+#   theme: dark
 ---
 
-# Welcome to the Pyllments Documentation
 
-*Here be dragons.*
+<div style="display: flex; justify-content: space-between; margin-bottom: 18px;">
 
+<div style="width: 30%; display: flex; justify-content: flex-start; align-items: center;">
+<i>Build Modular, LLM-Powered Applications with Ease.</i>
+</div>
+
+<div style="width: 20%; display: flex; justify-content: center; align-items: center;">
+<video autoplay loop muted playsinline 
+onloadstart="this.playbackRate = 4.6" 
+style="display: block; max-width: 100px; margin: 0 auto;">
+<source src="assets/logo/pyllments_logo_spin_300.mp4" type="video/mp4">
+</video>
+</div>
+
+<div style="width: 30%; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; line-height: 1em;">
+<div style="display: grid; grid-template-columns: 1em 1fr; gap: 0.7em;">
+<div>🧩</div><div>Modular Components</div>
+<div>⚡</div><div>Flow-Based Programming</div>
+<div>🎨</div><div>Front End Framework</div>
+<div>🔌</div><div>LLM + vDB Integrations</div>
+</div>
+</div>
+
+</div>
+
+---
+
+::: {.columns}
+# What is Pyllments?
+:::
+
+
+Pyllments consists of a prebuilt set of components(which we call **Elements**) with a consistent interface that allows you to connect them in an endless amount of ways through their respective ports using simple flow-based programming.
+
+
+### Elements work together to create *composable* and *modular* flows
+
+::: {.column-page}
+![A full screen image](assets/introduction/wide_img.jpg)
+:::
+
+### Simple API generation
+
+::: {.column-screen}
+![A full screen image](assets/introduction/wide_img.jpg)
+:::
+
+### Integration with models and vector stores
+
+::: {.column-screen}
+![A full screen image](assets/introduction/wide_img.jpg)
+:::
+
+# Example
+```python
+from pyllments.elements.chat_interface import ChatInterfaceElement, LLMChatElement
+
+chat_interface = ChatInterfaceElement() # <1>
+llm_chat = LLMChatElement() # <1>
+
+chat_interface.ports.output['message_output'] > llm_chat.ports.input['message_input'] # <2>
+```
+1. \(**👈 Press Me**\) Create a the chat interface and LLM chat elements 
+2. Connect the chat interface element's output port to the LLM chat element's input port
+
+something something
+
+```{mermaid}
+flowchart LR
+subgraph chat_interface_el [ChatInterfaceElement]
+  direction TB
+  subgraph chat_interface_el_views [Views]
+    direction LR
+    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View
+  end
+  subgraph chat_interface_el_Ports [Ports]
+      direction LR
+      subgraph chat_interface_el_input [Input]
+          direction TB
+          message_input:::InputPort ~~~ message_emit_input:::InputPort
+      end
+      subgraph chat_interface_el_output [Output]
+          direction TB
+          message_output:::OutputPort
+      end
+      chat_interface_el_input ~~~ chat_interface_el_output
+  end
+  chat_interface_el_views ~~~ chat_interface_el_Ports
+end
+
+subgraph llm_chat_el [LLMChatElement]
+  direction TB
+  subgraph llm_Views [Views]
+    direction LR
+    model_selector_view:::View
+  end
+  subgraph llm_Ports [Ports]
+      direction LR
+      subgraph llm_chat_input [Input]
+          direction TB
+          messages_input:::InputPort
+      end
+      subgraph llm_chat_output [Output]
+          direction TB
+          llm_message_output[message_output]:::OutputPort
+      end
+      llm_chat_input ~~~ llm_chat_output
+  end
+  llm_Views ~~~ llm_Ports
+end
+
+message_output --MessagePayload--> messages_input
+```
+
+Key Features:
+
+-   Modular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.
+
+-   Reactive Design: Utilizes the Param library for reactive programming, ensuring seamless updates between models and views.
+
+-   Visualization Support: Leverages the Panel library for creating interactive web-based user interfaces.
+
+-   LLM Integration: Easily incorporate Large Language Models into your applications.
+
+-   Flexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.

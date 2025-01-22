@@ -2,11 +2,13 @@ project:
   type: website
 
 website:
+  favicon: /assets/logo/pyllments_logo_32.png
   search:
     location: navbar
     type: textbox
   title: "Pyllments Documentation"
   navbar:
+    logo: /assets/logo/pyllments_logo_128.png
     left:
       - href: getting_started.qmd
         text: Getting Started
@@ -17,10 +19,10 @@ website:
       - icon: github
         href: https://github.com/prudent-patterns/pyllments
   sidebar:
-    style: "docked"
+    style: floating
     contents:
       - text: "📚 Introduction"
-        href: introduction.qmd
+        href: index.qmd
       - text: "🔧 Installation"
         href: installation.qmd
       - text: "🎓 Getting Started Tutorial"

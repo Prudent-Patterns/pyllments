@@ -1040,7 +1040,7 @@ $theme-name: null !default;
 // quarto-scss-analysis-annotation { "origin": "Defaults from user-defined SCSS" }
 
 $primary-background-color: #0C1314;  // Primary background color
-$secondary-background-color:#162030;// #111926; // Secondary background color
+$secondary-background-color: #111926; // Secondary background color
 $light-outline-color: #455368;        // Light outline color
 $primary-accent-color: #D33A4B;       // Primary accent color
 $secondary-accent-color: #EDB737;     // Secondary accent color
@@ -1062,37 +1062,6 @@ $breadcrumb-bg: $secondary-background-color;
 $breadcrumb-active-color: $lesser-white;
 $mainfont: 'Hanken Grotesk';
 $decofont: 'Ubuntu';
-
-/*-- Mermaid styling --*/
-$mermaid-bg-color: $primary-background-color;
-// $mermaid-fg-color: $white;
-$mermaid-fg-color--lightest: $secondary-background-color;
-$mermaid-edge-color: $white;
-$mermaid-label-fg-color: $white;
-$mermaid-label-bg-color: $primary-background-color;
-$mermaid-font-family: $mainfont;
-$mermaid-node-bg-color: $primary-background-color;
-$mermaid-node-fg-color: $;
-
-// .edgeLabel,
-// .edgeLabel rect,
-// .label div .edgeLabel {
-//   background-color: $mermaid-label-bg-color !important;
-// }
-
-.View > rect {
-  stroke: $light-outline-color !important;
-  fill: $light-outline-color !important;
-}
-.InputPort > rect {
-  stroke: $primary-accent-color !important;
-}
-.OutputPort > rect {
-  stroke: $tertiary-accent-color !important;
-}
-.cluster-label {
-  font-weight: bold;
-}
 
 
 // Heading font size customization
@@ -1351,7 +1320,7 @@ $btn-code-copy-color-active: #4758AB !default;
 $code-copy-selector: "pre.sourceCode:hover > " !default;
 $code-white-space: pre !default;
 $tbl-cap-location: top !default;
-$sidebar-border: false !default;
+$sidebar-border: true !default;
 $sidebar-bg: if(variable-exists(body-bg), $body-bg, #fff) !default;
 // Default the theme name
 $theme-name: if(variable-exists(theme), $theme, "");
@@ -13085,10 +13054,6 @@ $web-font-path: "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@4
   }
 }
 
-.navbar-logo {
-  max-height: 38px;
-}
-
 ol.breadcrumb {
   // Assign a color to all breadcrumb items except the last one
   .breadcrumb-item {
@@ -13137,7 +13102,7 @@ ol.breadcrumb {
 }
 
 .navbar {
-  border-bottom: 1px solid $light-outline-color;
+  border-bottom
 }
 
 // quarto-scss-analysis-annotation { "origin": null }
