@@ -1,6 +1,6 @@
 /*-- scss:defaults --*/
 $primary-background-color: #0C1314;  // Primary background color
-$secondary-background-color:#162030;// #111926; // Secondary background color
+$secondary-background-color: #162030;
 $light-outline-color: #455368;        // Light outline color
 $primary-accent-color: #D33A4B;       // Primary accent color
 $secondary-accent-color: #EDB737;     // Secondary accent color
@@ -9,6 +9,8 @@ $white: #F4F6F8;
 $lesser-white: hsl(210, 22%, 73%);                       // White color
 $black: #353839;                       // Black color
 $faded-text-color: #6083B8;           
+$mainfont: 'Hanken Grotesk';
+$decofont: 'Ubuntu';
 
 /*-- bootstrap overrides --*/
 $body-bg: $primary-background-color;
@@ -20,8 +22,6 @@ $fontcolor: $white;
 $navbar-fg: $white;
 $breadcrumb-bg: $secondary-background-color;
 $breadcrumb-active-color: $lesser-white;
-$mainfont: 'Hanken Grotesk';
-$decofont: 'Ubuntu';
 
 /*-- Mermaid styling --*/
 $mermaid-bg-color: $primary-background-color;
@@ -49,9 +49,13 @@ $mermaid-node-fg-color: $light-outline-color;
 .OutputPort > rect {
   stroke: $tertiary-accent-color !important;
 }
+.Model > rect {
+  fill: $primary-accent-color !important;
+}
 .cluster-label {
   font-weight: bold;
 }
+
 
 /*-- scss:rules --*/
 @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');

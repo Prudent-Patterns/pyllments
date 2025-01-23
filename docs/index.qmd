@@ -4,12 +4,10 @@ format:
     toc: false
     page-layout: full
 code-annotations: true
-# mermaid:
-#   theme: dark
 ---
 
 
-<div style="display: flex; justify-content: space-between; margin-bottom: 18px;">
+<div class="column-body" style="display: flex; justify-content: space-between; margin-bottom: 18px;">
 
 <div style="width: 30%; display: flex; justify-content: flex-start; align-items: center;">
 <i>Build Modular, LLM-Powered Applications with Ease.</i>
@@ -31,7 +29,6 @@ style="display: block; max-width: 100px; margin: 0 auto;">
 <div>🔌</div><div>LLM + vDB Integrations</div>
 </div>
 </div>
-
 </div>
 
 ---
@@ -40,9 +37,24 @@ style="display: block; max-width: 100px; margin: 0 auto;">
 # What is Pyllments?
 :::
 
+Pyllments consists of a set of **Elements** with a consistent interface that allows you to connect them in a near infinite amount of ways through their respective ports using simple flow-based programming.
 
-Pyllments consists of a prebuilt set of components(which we call **Elements**) with a consistent interface that allows you to connect them in an endless amount of ways through their respective ports using simple flow-based programming.
+#### Elements:
+* Easily integrate into your own projects
+* Built to have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows
+* Can individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)
 
+### Elements are building blocks with a consistent interface and easily composable front-end components.
+<div class="column-page">
+<video autoplay loop muted playsinline 
+style="display: block; max-width: 100%; margin: 0 auto;" 
+playbackRate="1" 
+controls 
+onmouseover="this.controls = true;" 
+onmouseout="this.controls = false;">
+<source src="assets/introduction/wide_vid_test.mp4" type="video/mp4">
+</video>
+</div>
 
 ### Elements work together to create *composable* and *modular* flows
 
@@ -52,13 +64,13 @@ Pyllments consists of a prebuilt set of components(which we call **Elements**) w
 
 ### Simple API generation
 
-::: {.column-screen}
+::: {.column-page}
 ![A full screen image](assets/introduction/wide_img.jpg)
 :::
 
 ### Integration with models and vector stores
 
-::: {.column-screen}
+::: {.column-page}
 ![A full screen image](assets/introduction/wide_img.jpg)
 :::
 
