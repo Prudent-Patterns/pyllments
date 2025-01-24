@@ -82,4 +82,8 @@ exclude = [
 
 [tool.hatch.version]
 source = "vcs"
-fallback-version = "0.0.0"
+tag-pattern = "^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)((a|b|rc)(0|[1-9]\\d*))?(\\.post(0|[1-9]\\d*))?(\\.dev(0|[1-9]\\d*))?$"
+fallback-version = "0.0.1"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "__version__.py"
