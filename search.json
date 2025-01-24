@@ -1,19 +1,5 @@
 [
   {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "docs",
-    "section": "",
-    "text": "Welcome to the Pyllments Documentation\nHere be dragons."
-  },
-  {
-    "objectID": "about.html",
-    "href": "about.html",
-    "title": "About",
-    "section": "",
-    "text": "About this site\npyllments serve flow.py --logging=True"
-  },
-  {
     "objectID": "getting_started.html",
     "href": "getting_started.html",
     "title": "Getting Started Tutorial",
@@ -23,5 +9,30 @@
       "Getting Started",
       "🎓 Getting Started Tutorial"
     ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "What is Pyllments?",
+    "section": "",
+    "text": "Build Modular, LLM-Powered Applications with Ease.\n\n\n\n\n\n\n\n\n\n🧩\n\n\nModular Components\n\n\n⚡\n\n\nFlow-Based Programming\n\n\n🎨\n\n\nFront End Framework\n\n\n🔌\n\n\nLLM + vDB Integrations\n\n\n\n\n\n\n\n\n\n\nPyllments consists of a set of Elements with a consistent interface that allows you to connect them in a near infinite amount of ways through their respective ports using simple flow-based programming.\n\nElements:\n\nEasily integrate into your own projects\nBuilt to have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows\nCan individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)\n\n\n\nElements are building blocks with a consistent interface and easily composable front-end components.\n\n\n\n\n\n\nElements work together to create composable and modular flows\n\n\n\n\nA full screen image\n\n\n\n\n\nSimple API generation\n\n\n\n\nA full screen image\n\n\n\n\n\nIntegration with models and vector stores\n\n\n\n\nA full screen image\n\n\n\n\n\nExample\nfrom pyllments.elements.chat_interface import ChatInterfaceElement, LLMChatElement\n\n1chat_interface = ChatInterfaceElement()\nllm_chat = LLMChatElement()\n\n2chat_interface.ports.output['message_output'] &gt; llm_chat.ports.input['message_input']\n\n1\n\n(👈 Press Me) Create a the chat interface and LLM chat elements\n\n2\n\nConnect the chat interface element’s output port to the LLM chat element’s input port\n\n\nsomething something\n\n\n\n\n\nflowchart LR\nsubgraph chat_interface_el [ChatInterfaceElement]\n  direction TB\n  subgraph chat_interface_el_views [Views]\n    direction LR\n    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View\n  end\n  subgraph chat_interface_el_Ports [Ports]\n      direction LR\n      subgraph chat_interface_el_input [Input]\n          direction TB\n          message_input:::InputPort ~~~ message_emit_input:::InputPort\n      end\n      subgraph chat_interface_el_output [Output]\n          direction TB\n          message_output:::OutputPort\n      end\n      chat_interface_el_input ~~~ chat_interface_el_output\n  end\n  chat_interface_el_views ~~~ chat_interface_el_Ports\nend\n\nsubgraph llm_chat_el [LLMChatElement]\n  direction TB\n  subgraph llm_Views [Views]\n    direction LR\n    model_selector_view:::View\n  end\n  subgraph llm_Ports [Ports]\n      direction LR\n      subgraph llm_chat_input [Input]\n          direction TB\n          messages_input:::InputPort\n      end\n      subgraph llm_chat_output [Output]\n          direction TB\n          llm_message_output[message_output]:::OutputPort\n      end\n      llm_chat_input ~~~ llm_chat_output\n  end\n  llm_Views ~~~ llm_Ports\nend\n\nmessage_output --MessagePayload--&gt; messages_input\n\n\n\n\n\n\nKey Features:\n\nModular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.\nReactive Design: Utilizes the Param library for reactive programming, ensuring seamless updates between models and views.\nVisualization Support: Leverages the Panel library for creating interactive web-based user interfaces.\nLLM Integration: Easily incorporate Large Language Models into your applications.\nFlexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.",
+    "crumbs": [
+      "Getting Started",
+      "📚 Introduction"
+    ]
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this site\npyllments serve flow.py --logging=True"
+  },
+  {
+    "objectID": "introduction.html",
+    "href": "introduction.html",
+    "title": "Introduction",
+    "section": "",
+    "text": "This be my introduction"
   }
 ]
