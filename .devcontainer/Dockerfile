@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 debian:bookworm-slim as main
+FROM --platform=linux/amd64 debian:bookworm-slim AS main
 
 # Update and upgrade system packages, install all required dependencies in one layer
 RUN apt-get -y update && \
@@ -17,7 +17,7 @@ RUN sh /uv-installer.sh && rm /uv-installer.sh
 ENV PATH="/root/.local/bin/:$PATH"
 
 
-RUN uv venv
+# RUN uv venv
 
 # Create and set virtual environment (Fix for first warning)
 # ENV VIRTUAL_ENV=/workspaces/pyllments/.venv 
@@ -28,9 +28,12 @@ RUN uv venv
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=../uv.lock,target=uv.lock \
+    --mount=type=bind,source=../pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project
+
+# Copy both the pyproject.toml and uv.lock files into the container
+COPY ../pyproject.toml ../uv.lock ./
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
