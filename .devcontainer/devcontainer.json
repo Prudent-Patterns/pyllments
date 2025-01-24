@@ -30,7 +30,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "uv pip install -e .[dev] --no-build"
+	// "postCreateCommand": "uv pip install -e .[dev] --no-build"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
