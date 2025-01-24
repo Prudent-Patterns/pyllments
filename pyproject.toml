@@ -86,4 +86,4 @@ tag-pattern = "^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)((a|b|rc)(0|[1-9]\
 fallback-version = "0.0.1"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "__version__.py"
+version-file = "_version.py"
