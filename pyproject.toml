@@ -82,3 +82,4 @@ exclude = [
 
 [tool.hatch.version]
 source = "vcs"
+tag-pattern = "^(?!docs-)(?:[\w-]+-)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$"
