@@ -49,6 +49,14 @@ dependencies = [
     "litellm>=1.57.3",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "jupyter_bokeh",
+    "ipykernel",
+    "ipython",
+    "ipywidgets",
+]
+
 [project.scripts]
 pyllments = "pyllments.__main__:typer_app"
 
