@@ -18,9 +18,13 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 # RUN uv venv
 
-# Create and set virtual environment (Fix for first warning)
-# ENV VIRTUAL_ENV=/workspaces/pyllments/.venv 
-# ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Create and set working directory
+WORKDIR /workspaces/pyllments
+
+# Create virtual environment in container-local directory
+RUN mkdir -p /opt/venv && uv venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Set UV link mode to avoid hardlink warning (Fix for second warning)
 # ENV UV_LINK_MODE=copy
