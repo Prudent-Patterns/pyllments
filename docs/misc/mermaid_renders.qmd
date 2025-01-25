@@ -59,3 +59,51 @@ subgraph llm_chat_el [LLMChatElement]
 end
 
 ```
+
+```{mermaid}
+block
+subgraph history_el [HistoryElement]
+  direction TB
+  history_model[HistoryModel]:::Model
+  subgraph history_Views [Views]
+    direction LR
+    history_display_view:::View --> history_input_view:::View
+  end
+  subgraph history_Ports [Ports]
+      direction LR
+      subgraph history_input [Input]
+          direction TB
+          history_message_input:::InputPort
+      end
+      subgraph history_output [Output]
+          direction TB
+          history_message_output:::OutputPort
+      end
+      history_input --> history_output
+  end
+  history_model --> history_Views --> history_Ports
+end
+
+subgraph payload_el [Payload]
+  direction TB
+  payload_model[PayloadModel]:::Model
+  subgraph payload_Views [Views]
+    direction LR
+    payload_display_view:::View
+  end
+  subgraph payload_Ports [Ports]
+      direction LR
+      subgraph payload_input [Input]
+          direction TB
+          payload_data_input:::InputPort
+      end
+      subgraph payload_output [Output]
+          direction TB
+          payload_data_output:::OutputPort
+      end
+      payload_input --> payload_output
+  end
+  payload_model --> payload_Views --> payload_Ports
+end
+
+```

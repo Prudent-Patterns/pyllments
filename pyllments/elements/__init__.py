@@ -1,5 +1,19 @@
 import importlib
+from typing import TYPE_CHECKING
 
+
+# Type hints for IDE support
+if TYPE_CHECKING:
+    from .chat_interface import ChatInterfaceElement
+    from .file_loader import FileLoaderElement
+    from .embedder import EmbedderElement
+    from .retriever import RetrieverElement
+    from .llm_chat import LLMChatElement
+    from .history_handler import HistoryHandlerElement
+    from .chunker import TextChunkerElement
+    from .api import APIElement
+    from .context_builder import ContextBuilder
+    
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
     "ChatInterfaceElement": ".chat_interface",
