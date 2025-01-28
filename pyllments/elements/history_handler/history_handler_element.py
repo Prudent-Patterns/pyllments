@@ -73,17 +73,13 @@ class HistoryHandlerElement(Element):
             pack_payload_callback=pack
         )
 
-
-
     @Component.view
     def create_context_view(
-        self, 
+        self,
+        title: str = 'Current History',
         column_css: list = [], 
         container_css: list = [],
         title_css: list = [],
-        width: int = None,
-        height: int = None,
-        sizing_mode: str = 'stretch_both',
         title_visible: bool = True
     ) -> pn.Column:
         """Creates a view for displaying the message history."""
@@ -95,31 +91,16 @@ class HistoryHandlerElement(Element):
             sizing_mode='stretch_both',
             stylesheets=container_css
         )
-
-        # Handle sizing mode
-        match (width, height):
-            case (None, None):
-                pass
-            case (_, None):
-                sizing_mode = 'stretch_height'
-            case (None, _):
-                sizing_mode = 'stretch_width'
-            case (_, _):
-                sizing_mode = 'fixed'
-
         # Main view column
         self.context_view = pn.Column(
             pn.pane.Markdown(
-                "### Current History", 
+                f"### {title}", 
                 visible=title_visible,
                 stylesheets=title_css,
                 sizing_mode='stretch_width'
             ),
             self.context_container,
             stylesheets=column_css,
-            width=width,
-            height=height,
-            sizing_mode=sizing_mode,
             scroll=False
         )
 

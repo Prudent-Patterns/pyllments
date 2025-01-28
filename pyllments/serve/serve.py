@@ -22,7 +22,7 @@ def server_setup(logging: bool = False, logging_level: str = 'INFO'):
     @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
     body {
         --primary-background-color: #0C1314;
-        --secondary-background-color: #111926;
+        --secondary-background-color: #162030;
         --light-outline-color: #455368;
         --primary-accent-color: #D33A4B;
         --secondary-accent-color: #EDB737;

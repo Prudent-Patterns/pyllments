@@ -54,11 +54,8 @@ class MessagePayload(Payload):
         self.model.param.watch(_update_message_view, 'content')
         
         if show_role:
-            logger.debug(f"Creating role view with CSS: {role_css}")
-            role_md = pn.pane.Markdown(
-                role_str, stylesheets=role_css)
+            role_md = pn.pane.Markdown(role_str, stylesheets=role_css)
             view = pn.Row(markdown, role_md, stylesheets=row_css)
-            logger.debug(f"Created role_md with stylesheets: {role_md.stylesheets}")
         else:
             view = pn.Row(markdown, stylesheets=row_css)
         return view
@@ -66,31 +63,27 @@ class MessagePayload(Payload):
     @Component.view
     def create_collapsible_view(
         self,
-        user_markdown_css: list = [],
+        markdown_css: list = [],
         user_row_css: list = [],
-        assistant_markdown_css: list = [],
         assistant_row_css: list = [],
         role_css: list = [],
         button_css: list = [],
         show_role: bool = True,
-        truncation_length: int = 40
+        truncation_length: int = 65,
+        sizing_mode = 'stretch_width'
         ) -> pn.Row:
         """Creates a message container"""
         match self.model.role:
             case 'user':
-                markdown_css = user_markdown_css
                 row_css = user_row_css
                 role_str = 'User'
             case 'assistant':
-                markdown_css = assistant_markdown_css
                 row_css = assistant_row_css
                 role_str = 'Assistant'
             case 'system':
-                markdown_css = user_markdown_css
                 row_css = user_row_css
                 role_str = 'System'
             case _:  # Handle other roles
-                markdown_css = user_markdown_css
                 row_css = user_row_css
                 role_str = self.model.role.capitalize()
 
@@ -102,7 +95,8 @@ class MessagePayload(Payload):
             stylesheets=button_css)
 
         markdown = pn.pane.Markdown(
-            self.model.content[:truncation_length],  # Changed from message.content
+            self.model.content if len(self.model.content) <= truncation_length 
+            else f"{self.model.content[:truncation_length]}...",  # Add ellipsis to show truncation
             stylesheets=markdown_css)
  
         def _update_message_view(event):
@@ -115,7 +109,8 @@ class MessagePayload(Payload):
                 markdown.object = self.model.content
             else:  # If the toggle is deactivated
                 expand_button.icon = 'plus'
-                markdown.object = self.model.content[:truncation_length]
+                markdown.object = (self.model.content if len(self.model.content) <= truncation_length 
+                                 else f"{self.model.content[:truncation_length]}...")
         expand_button.param.watch(toggle_visibility, 'value')
 
         row_args = [expand_button, markdown]

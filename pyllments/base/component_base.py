@@ -77,10 +77,10 @@ class Component(param.Parameterized):
             - Custom attributes are passed to the view creation function
 
         CSS Loading and Priority:
-            1. Default view CSS (viewname.css):
+            1. Default view CSS (css/viewname.css):
                 - Loaded automatically if exists
                 - Applied as the first stylesheet
-            2. Part-specific CSS (viewname_part.css):
+            2. Part-specific CSS (css/viewname_part.css):
                 - Loaded for each parameter ending in '_css'
                 - Applied in order of parameter definition
             3. User-provided CSS:

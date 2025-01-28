@@ -21,7 +21,7 @@ class HistoryHandlerModel(Model):
     context_token_count = param.Integer(default=0, bounds=(0, None), doc="""
         The amount of tokens in the context window""")
 
-    tokenizer_model = param.String(default="gpt-4o-mini")
+    tokenizer_model = param.String(default="gpt-4o")
 
     def __init__(self, **params):
         super().__init__(**params)

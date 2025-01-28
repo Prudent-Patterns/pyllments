@@ -43,6 +43,7 @@ class LLMChatElement(Element):
         model_selector_width: int = None,
         provider_selector_width: int = None,
         selector_css: list[str] = [],
+        height = 57
         ) -> pn.widgets.Select | pn.Column | pn.Row:
     
         if models:

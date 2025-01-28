@@ -44,7 +44,7 @@ Pyllments consists of a set of **Elements** with a consistent interface that all
 * Built to have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows
 * Can individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)
 
-### Elements are building blocks with a consistent interface and easily composable front-end components.
+### Elements are building blocks with a consistent interface
 <div class="column-page">
 <video autoplay loop muted playsinline 
 style="display: block; max-width: 100%; margin: 0 auto;" 
@@ -52,10 +52,25 @@ playbackRate="1"
 controls 
 onmouseover="this.controls = true;" 
 onmouseout="this.controls = false;">
-<source src="assets/introduction/wide_vid_test.mp4" type="video/mp4">
+<source src="assets/introduction/pyllments_intro_pg_vid1.mp4" type="video/mp4">
 </video>
 </div>
 
+---
+
+### Elements can create and manage easily composable front-end components called Views
+<div class="column-page">
+<video autoplay loop muted playsinline 
+style="display: block; max-width: 100%; margin: 0 auto;" 
+playbackRate="1" 
+controls 
+onmouseover="this.controls = true;" 
+onmouseout="this.controls = false;">
+<source src="assets/introduction/pyllments_intro_pg_vid2.mp4" type="video/mp4">
+</video>
+</div>
+
+---
 ### Elements work together to create *composable* and *modular* flows
 
 ::: {.column-page}

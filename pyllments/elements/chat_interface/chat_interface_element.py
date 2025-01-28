@@ -135,7 +135,7 @@ class ChatInterfaceElement(Element):
     def create_interface_view(
         self,
         feed_height: Optional[int] = None,
-        input_height: Optional[int] = None,
+        input_height: Optional[int] = 120,
         ) -> pn.Column:
         """Creates a column containing the chat feed and chat input row"""
         return pn.Column(
