@@ -58,7 +58,7 @@ dev = [
 ]
 
 [project.scripts]
-pyllments = "pyllments.__main__:typer_app"
+pyllments = "pyllments.__main__:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pyllments"]

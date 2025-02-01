@@ -100,7 +100,18 @@ class MessagePayload(Payload):
             stylesheets=markdown_css)
  
         def _update_message_view(event):
-            view[0].object = self.model.content
+            current_content = self.model.content
+            if not current_content:
+                return
+                
+            if expand_button.value:
+                # Show full content if expanded
+                markdown.object = current_content
+            else:
+                # Show beginning of content with ellipsis if needed
+                markdown.object = (current_content if len(current_content) <= truncation_length 
+                                else f"{current_content[:truncation_length]}...")
+
         self.model.param.watch(_update_message_view, 'content')
 
         def toggle_visibility(event):

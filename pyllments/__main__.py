@@ -1,4 +1,5 @@
-from .cli import typer_app
+"""Main entry point for the pyllments CLI."""
+from pyllments.cli.app import app
 
-
-typer_app()
+if __name__ == "__main__":
+    app()

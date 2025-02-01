@@ -40,6 +40,7 @@ format:
       - custom.scss
     css: styles.css
     toc: true
+    highlight-style: github
 execute:
   freeze: auto
 

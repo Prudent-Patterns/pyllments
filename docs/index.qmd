@@ -37,14 +37,17 @@ style="display: block; max-width: 100px; margin: 0 auto;">
 # What is Pyllments?
 :::
 
-Pyllments consists of a set of **Elements** with a consistent interface that allows you to connect them in a near infinite amount of ways through their respective ports using simple flow-based programming.
+Pyllments consists of a set of **Elements** with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.
 
 #### Elements:
 * Easily integrate into your own projects
 * Built to have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows
 * Can individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)
 
-### Elements are building blocks with a consistent interface
+::: {.column-page}
+# Elements are building blocks with a consistent interface
+:::
+
 <div class="column-page">
 <video autoplay loop muted playsinline 
 style="display: block; max-width: 100%; margin: 0 auto;" 
@@ -56,9 +59,12 @@ onmouseout="this.controls = false;">
 </video>
 </div>
 
+
 ---
 
-### Elements can create and manage easily composable front-end components called Views
+::: {.column-page}
+# Elements can create and manage easily composable front-end components called Views
+:::
 <div class="column-page">
 <video autoplay loop muted playsinline 
 style="display: block; max-width: 100%; margin: 0 auto;" 
@@ -71,23 +77,33 @@ onmouseout="this.controls = false;">
 </div>
 
 ---
-### Elements work together to create *composable* and *modular* flows
 
-::: {.column-page}
-![A full screen image](assets/introduction/wide_img.jpg)
-:::
+# Using their `Ports` interface, Elements can be connected in endless permutations.
+<div class="column-page">
+<video autoplay loop muted playsinline 
+style="display: block; max-width: 100%; margin: 0 auto;" 
+playbackRate="1" 
+controls 
+onmouseover="this.controls = true;" 
+onmouseout="this.controls = false;">
+<source src="assets/introduction/pyllments_intro_pg_vid3.mp4" type="video/mp4">
+</video>
+</div>
 
-### Simple API generation
+---
 
-::: {.column-page}
-![A full screen image](assets/introduction/wide_img.jpg)
-:::
+# Attach API endpoints to any part of the flow
+<div class="column-page">
+<video autoplay loop muted playsinline 
+style="display: block; max-width: 100%; margin: 0 auto;" 
+playbackRate="1" 
+controls 
+onmouseover="this.controls = true;" 
+onmouseout="this.controls = false;">
+<source src="assets/introduction/pyllments_intro_pg_vid4.mp4" type="video/mp4">
+</video>
+</div>
 
-### Integration with models and vector stores
-
-::: {.column-page}
-![A full screen image](assets/introduction/wide_img.jpg)
-:::
 
 # Example
 ```python
@@ -101,7 +117,7 @@ chat_interface.ports.output['message_output'] > llm_chat.ports.input['message_in
 1. \(**👈 Press Me**\) Create a the chat interface and LLM chat elements 
 2. Connect the chat interface element's output port to the LLM chat element's input port
 
-something something
+
 
 ```{mermaid}
 flowchart LR
@@ -149,6 +165,7 @@ end
 
 message_output --MessagePayload--> messages_input
 ```
+
 
 Key Features:
 

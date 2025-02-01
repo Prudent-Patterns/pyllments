@@ -1,0 +1,71 @@
+---
+format:
+  html:
+    page-layout: custom
+---
+
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    text-align: center; /* Center content simply */
+}
+</style>
+
+```{mermaid}
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
+subgraph chat_interface_el [ChatInterfaceElement]
+  direction LR
+  subgraph chat_interface_el_Ports [Ports]
+      direction LR
+      subgraph chat_interface_el_input [Input]
+          direction LR
+          chat_interface_message_input[message_input]:::InputPort ~~~ chat_interface_message_emit_input[message_emit_input]:::InputPort
+      end
+      subgraph chat_interface_el_output [Output]
+          direction LR
+          chat_interface_message_output[message_output]:::OutputPort
+      end
+      chat_interface_el_input ~~~ chat_interface_el_output
+  end
+end
+
+subgraph llm_chat_el [LLMChatElement]
+  direction TB
+  subgraph llm_Ports [Ports]
+      direction LR
+      subgraph llm_chat_input [Input]
+          direction TB
+          llm_chat_messages_input[messages_input]:::InputPort
+      end
+      subgraph llm_chat_output [Output]
+          direction TB
+          llm_chat_message_output[message_output]:::OutputPort
+      end
+      llm_chat_input ~~~ llm_chat_output
+  end
+end
+
+subgraph history_handler_el [HistoryHandlerElement]
+  direction TB
+  subgraph history_handler_el_Ports [Ports]
+      direction TB
+      subgraph history_handler_el_input [Input]
+          direction TB
+          history_handler_el_message_input[message_input]:::InputPort ~~~ history_handler_el_messages_input[messages_input]:::InputPort
+      end
+      subgraph history_handler_el_output [Output]
+          direction TB
+          history_handler_el_messages_output[messages_output]:::OutputPort
+      end
+      history_handler_el_input ~~~ history_handler_el_output
+  end
+end
+chat_interface_el ~~~ llm_chat_el ~~~ history_handler_el
+
+chat_interface_message_output --> history_handler_el_message_input
+history_handler_el_messages_output --> llm_chat_messages_input
+llm_chat_message_output --> chat_interface_message_input
+llm_chat_message_output --> history_handler_el_messages_input
+```
