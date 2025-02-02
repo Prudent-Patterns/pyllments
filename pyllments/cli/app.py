@@ -2,7 +2,7 @@
 import cProfile
 import pstats
 from io import StringIO
-from typing import Optional, Dict, Any, Annotated
+from typing import Optional, Dict, Any, List, Annotated
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -26,8 +26,15 @@ def serve(
     logging_level: str = 'INFO', 
     no_gui: bool = False, 
     port: int = 8000, 
-    env: str = None,
-    profile: bool = False
+    env: Optional[str] = None,
+    profile: bool = False,
+    config: List[str] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Additional configuration options for the served file. Provide either multiple key=value pairs or a single dictionary literal (e.g. '{\"key\": \"value\", \"key1\": \"value1\"}').",
+        show_default=False
+    )
 ):
     """Start a Pyllments server.
     
@@ -39,15 +46,45 @@ def serve(
         port: Port to run server on
         env: Path to .env file
         profile: Enable profiling output
+        config: Additional configuration options (key=value pairs) for the served file
     """
     logger.info(f"Starting Pyllments server for {filename}...")
+    
+    config_dict: Dict[str, Any] = {}
+    if config:
+        # Check if a single argument is provided and it is a dict literal.
+        if len(config) == 1 and config[0].strip().startswith("{") and config[0].strip().endswith("}"):
+            import ast
+            try:
+                parsed = ast.literal_eval(config[0])
+                if not isinstance(parsed, dict):
+                    raise ValueError("Provided config is not a dictionary")
+                config_dict = parsed
+            except Exception as e:
+                raise typer.BadParameter(f"Invalid config dictionary: {e}")
+        else:
+            for item in config:
+                if "=" in item:
+                    key, value = item.split("=", 1)
+                    config_dict[key] = value
+                else:
+                    raise typer.BadParameter(f"Invalid config option format: {item}. Expected key=value.")
     
     if profile:
         pr = cProfile.Profile()
         pr.enable()
         
     try:
-        serve_file(filename=filename, inline=False, logging=logging, logging_level=logging_level, find_gui=not no_gui, port=port, env=env)
+        serve_file(
+            filename=filename,
+            inline=False,
+            logging=logging,
+            logging_level=logging_level,
+            find_gui=not no_gui,
+            port=port,
+            env=env,
+            config=config_dict
+        )
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}")
         raise  # Re-raise to show full traceback

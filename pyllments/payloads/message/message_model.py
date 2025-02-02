@@ -36,6 +36,7 @@ class MessageModel(Model):
             raise ValueError("Cannot stream: Mode is not set to 'stream'")
             
         self.content = ''
+        # Buffer to store the streamed content and help not overwhelm redraws in the UI
         buffer = ''
         
         message_stream = await self.message_coroutine

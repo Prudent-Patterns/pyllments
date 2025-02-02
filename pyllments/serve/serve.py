@@ -62,12 +62,16 @@ def extract_config_class(filename: str) -> Optional[Dict]:
     Parameters
     ----------
     filename : str
-        Path to the Python file
+        Path to the Python file.
         
     Returns
     -------
     Optional[Dict]
-        Config class information if found, None otherwise
+        If a Config class decorated as a dataclass is found, returns a dictionary with the following keys:
+            'docstring': (str or None) The docstring of the Config class if available.
+            'fields': (dict) A dictionary mapping each field name (str) to a sub-dictionary with:
+                'default': The default value of the field if it is specified and is a basic type (number or string); otherwise, None.
+        Returns None if no appropriate Config class is found.
     """
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -75,7 +79,7 @@ def extract_config_class(filename: str) -> Optional[Dict]:
             
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and node.name == 'Config':
-                # Check if it's a dataclass
+                # Check if the class is decorated with @dataclass
                 for decorator in node.decorator_list:
                     if isinstance(decorator, ast.Name) and decorator.id == 'dataclass':
                         return {

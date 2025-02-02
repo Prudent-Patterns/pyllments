@@ -49,14 +49,28 @@ Pyllments consists of a set of **Elements** with a consistent interface that all
 :::
 
 <div class="column-page">
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
 <video autoplay loop muted playsinline 
 style="display: block; max-width: 100%; margin: 0 auto;" 
-playbackRate="1" 
-controls 
-onmouseover="this.controls = true;" 
-onmouseout="this.controls = false;">
+playbackRate="1">
 <source src="assets/introduction/pyllments_intro_pg_vid1.mp4" type="video/mp4">
 </video>
+<button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;">
+&#9655;
+</button>
+</div>
 </div>
 
 
@@ -65,43 +79,88 @@ onmouseout="this.controls = false;">
 ::: {.column-page}
 # Elements can create and manage easily composable front-end components called Views
 :::
-<div class="column-page">
-<video autoplay loop muted playsinline 
-style="display: block; max-width: 100%; margin: 0 auto;" 
-playbackRate="1" 
-controls 
-onmouseover="this.controls = true;" 
-onmouseout="this.controls = false;">
+
+<div class="video-container column-page" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video playsinline controls style="width: 100%; display: block;">
 <source src="assets/introduction/pyllments_intro_pg_vid2.mp4" type="video/mp4">
+Your browser does not support the video tag.
 </video>
+<!-- Custom play button overlay -->
+<button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;">
+&#9655;
+</button>
 </div>
 
 ---
 
+::: {.column-page}
 # Using their `Ports` interface, Elements can be connected in endless permutations.
+:::
+
 <div class="column-page">
-<video autoplay loop muted playsinline 
-style="display: block; max-width: 100%; margin: 0 auto;" 
-playbackRate="1" 
-controls 
-onmouseover="this.controls = true;" 
-onmouseout="this.controls = false;">
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video playsinline controls style="width: 100%; display: block;">
 <source src="assets/introduction/pyllments_intro_pg_vid3.mp4" type="video/mp4">
+Your browser does not support the video tag.
 </video>
+<button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;">
+&#9655;
+</button>
+</div>
 </div>
 
 ---
 
+::: {.column-page}
 # Attach API endpoints to any part of the flow
+:::
+
 <div class="column-page">
-<video autoplay loop muted playsinline 
-style="display: block; max-width: 100%; margin: 0 auto;" 
-playbackRate="1" 
-controls 
-onmouseover="this.controls = true;" 
-onmouseout="this.controls = false;">
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video playsinline controls style="width: 100%; display: block;">
 <source src="assets/introduction/pyllments_intro_pg_vid4.mp4" type="video/mp4">
+Your browser does not support the video tag.
 </video>
+<button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;">
+&#9655;
+</button>
+</div>
 </div>
 
 
@@ -178,3 +237,39 @@ Key Features:
 -   LLM Integration: Easily incorporate Large Language Models into your applications.
 
 -   Flexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.
+
+<!-- Global script to attach play button functionality to all video containers -->
+<script>
+// This script finds every video container and adds a central play overlay behavior.
+document.querySelectorAll('.video-container').forEach(container => {
+// Select the video element within the current container.
+const video = container.querySelector('video');
+// Select the overlay play button.
+const playButton = container.querySelector('.custom-play-button');
+
+// When playback begins, hide the play button.
+video.addEventListener('play', () => {
+playButton.style.display = 'none';
+});
+
+// When playback is paused, show the play button.
+video.addEventListener('pause', () => {
+playButton.style.display = 'block';
+});
+
+// Clicking on the overlay play button resumes playback.
+playButton.addEventListener('click', () => {
+video.play();
+});
+
+// For videos without native controls (like our first video), 
+// add a click event to pause the video when clicked.
+if (!video.hasAttribute('controls')) {
+video.addEventListener('click', () => {
+if (!video.paused) {
+video.pause();
+}
+});
+}
+});
+</script>
