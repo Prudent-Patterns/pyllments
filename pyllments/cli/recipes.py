@@ -1,13 +1,34 @@
-"""Recipe command creation and discovery."""
+"""Recipe Command Creation and Discovery
+===========================================
+
+This module is responsible for discovering and registering recipes as dynamic CLI
+commands for the Pyllments framework. A recipe is a pre-built workflow defined in a Python
+file. The framework extracts metadata (such as docstrings and configuration options specified
+via a dataclass 'Config') to automatically create Typer commands that execute the recipes.
+
+Usage Examples:
+---------------
+To list all available recipes:
+    $ pyllments recipe list
+
+To run a recipe called "example_recipe" with default options:
+    $ pyllments recipe run example_recipe
+
+To run a recipe with additional configuration options:
+    $ pyllments recipe run example_recipe --logging True --port 8080 --custom_option value
+
+The automatically generated commands allow developers to quickly experiment with different
+workflows and configurations.
+"""
+
 import ast
-import inspect
 from pathlib import Path
-from typing import Optional, Any, Dict, Type
-from dataclasses import fields, is_dataclass, dataclass
+from typing import Optional, Any, Dict
+from dataclasses import dataclass
 
 import typer
 from pyllments.logging import logger
-from pyllments.recipes.runner import load_recipe_module, run_recipe
+from pyllments.recipes.runner import run_recipe
 from .state import recipe_app
 
 

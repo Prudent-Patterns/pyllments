@@ -6,18 +6,15 @@ from typing import Optional, Dict, Any, List, Annotated
 import typer
 from rich.console import Console
 from rich.table import Table
-import click  # Directly import Click to construct options
-import inspect
 from inspect import Parameter, Signature
 from typing_extensions import Annotated
 
 from pyllments.serve import serve as serve_file
 from pyllments.logging import logger
-from pyllments.recipes import discover_recipes, get_recipe_metadata, run_recipe
+from pyllments.recipes import discover_recipes, run_recipe
 
 
 app = typer.Typer(no_args_is_help=True)
-
 
 @app.command('serve')
 def serve(

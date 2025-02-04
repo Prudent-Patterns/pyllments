@@ -47,24 +47,36 @@ class Component(param.Parameterized):
 
     @classmethod
     def view(cls, func):
-        """Decorator for Component view methods that handles CSS loading, sizing, and Panel parameters.
+        """
+        Decorator for Component view methods that handles CSS loading, sizing,
+        and Panel parameters.
 
-        This decorator provides several key features for view methods:
-        1. Automatic CSS loading and caching from the component's CSS directory
-        2. Smart sizing mode determination for Panel objects
-        3. View instance caching to prevent duplicate creation
-        4. Panel-specific parameter handling
-        5. Custom attribute management
+        This decorator provides several key functionalities:
+
+        - Automatic loading and caching of CSS files associated with the view.
+        - Merging of default function parameters with user-provided overrides.
+        - Splitting of keyword arguments into:
+            • Panel parameters: e.g., 'width', 'height', 'margin', etc., used by Panel
+              to control the layout of components. 
+              **Note:** Any Panel parameter that is explicitly set to `None` is filtered out,
+              ensuring that only defined values override Panel's default responsive behavior.
+            • Custom attributes: All additional parameters that are not recognized as Panel parameters.
+        - Applying the filtered Panel parameters to the created view after its instantiation.
+
+        **Important:**
+        Parameters such as `height` or `width` will only affect the view if they are explicitly set.
+        If they are passed as `None`, they are ignored, allowing Panel's default behavior
+        (for example, "stretch_both") to take effect.
 
         Parameters
         ----------
         func : callable
-            The view method to be decorated. Should return a Panel object.
+            The view method to be decorated.
 
         Returns
         -------
         callable
-            Wrapped view method that includes CSS and parameter handling.
+            The wrapped view method with enhanced CSS, sizing, and parameter handling.
 
         Notes
         -----
@@ -159,8 +171,7 @@ class Component(param.Parameterized):
 
             # Split kwargs into Panel params and custom attributes early
             # Panel params are either in PANEL_PARAMS or defined in the signature
-            panel_kwargs = {k: v for k, v in merged_kwargs.items() 
-                          if k in PANEL_PARAMS}
+            panel_kwargs = {k: v for k, v in merged_kwargs.items() if k in PANEL_PARAMS and v is not None}
             custom_attrs = {k: v for k, v in merged_kwargs.items() 
                           if k not in PANEL_PARAMS}
 

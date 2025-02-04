@@ -15,9 +15,13 @@ class LLMChatModel(Model):
         objects=['atomic', 'stream'],
         default='stream',
         doc="Whether to stream the response or return it all at once")
+    
+    base_url = param.String(doc="Base URL for the model", )
 
     def __init__(self, **params):
         super().__init__(**params)
+        if self.base_url:
+            self.model_args['base_url'] = self.base_url
 
     def _messages_to_litellm(self, messages: list[MessagePayload]) -> list[dict[str, str]]:
         """Convert MessagePayloads to LiteLLM format"""

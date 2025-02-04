@@ -17,6 +17,37 @@ from pyllments.logging import setup_logging, logger
 from .registry import AppRegistry
 
 
+def parse_dict_value(value):
+    """
+    Convert a string representation of a dictionary to a Python dictionary using ast.literal_eval.
+    If the value is already a dict, return it unchanged.
+
+    Parameters
+    ----------
+    value : str or dict
+        The value to parse.
+
+    Returns
+    -------
+    dict
+        The parsed dictionary.
+
+    Raises
+    ------
+    ValueError
+        If the provided literal is not a valid dictionary.
+    """
+    if isinstance(value, dict):
+        return value
+    try:
+        result = ast.literal_eval(value)
+        if not isinstance(result, dict):
+            raise ValueError("Provided literal is not a dictionary")
+        return result
+    except Exception as e:
+        raise ValueError(f"Invalid dictionary literal: {value}. Error: {e}")
+
+
 def server_setup(logging: bool = False, logging_level: str = 'INFO'): 
     if logging:
         setup_logging(log_file='file_loader.log', stdout_log_level=logging_level, file_log_level=logging_level)
@@ -67,11 +98,8 @@ def extract_config_class(filename: str) -> Optional[Dict]:
     Returns
     -------
     Optional[Dict]
-        If a Config class decorated as a dataclass is found, returns a dictionary with the following keys:
-            'docstring': (str or None) The docstring of the Config class if available.
-            'fields': (dict) A dictionary mapping each field name (str) to a sub-dictionary with:
-                'default': The default value of the field if it is specified and is a basic type (number or string); otherwise, None.
-        Returns None if no appropriate Config class is found.
+        If a Config class decorated as a dataclass is found, returns a dictionary with its
+        docstring and fields (each with a default and type info).
     """
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -86,7 +114,8 @@ def extract_config_class(filename: str) -> Optional[Dict]:
                             'docstring': ast.get_docstring(node),
                             'fields': {
                                 item.target.id: {
-                                    'default': item.value.value if isinstance(item.value, (ast.Num, ast.Str)) else None
+                                    'default': item.value.value if isinstance(item.value, (ast.Num, ast.Str)) else None,
+                                    'type': ast.unparse(item.annotation) if item.annotation is not None else 'str'
                                 }
                                 for item in node.body
                                 if isinstance(item, ast.AnnAssign) and hasattr(item, 'value')
@@ -122,28 +151,53 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
     """
     spec = spec_from_file_location(module_name, filename)
     module = module_from_spec(spec)
-
     # Extract Config information from the module source code using AST.
     config_info = extract_config_class(filename)
-
     if config_info:
-        # Build the configuration dictionary by favoring provided configuration values.
-        config_dict = {}
-        if config:
-            for field_name, field_info in config_info['fields'].items():
-                config_dict[field_name] = config.get(field_name, field_info.get('default'))
-        else:
-            config_dict = {
-                name: info.get('default')
-                for name, info in config_info['fields'].items()
-            }
+         # Build the configuration dictionary by favoring provided configuration values.
+         config_dict = {}
+         if config:
+             for field_name, field_info in config_info['fields'].items():
+                 config_dict[field_name] = config.get(field_name, field_info.get('default'))
+         else:
+             config_dict = {
+                 name: info.get('default')
+                 for name, info in config_info['fields'].items()
+             }
+         
+         # Ensure that dictionary fields are properly parsed.
+         dict_fields = {
+             name for name, info in config_info['fields'].items()
+             if info.get("type", "str").lower().startswith("dict")
+         }
+         for key in dict_fields:
+             if key in config_dict and not isinstance(config_dict[key], dict):
+                 try:
+                     config_dict[key] = parse_dict_value(config_dict[key])
+                 except Exception as e:
+                     logger.error(f"Failed to parse dictionary for field '{key}': {e}")
+         
+         from dataclasses import make_dataclass
+         # Map known type strings to actual Python types.
+         type_mappings = {"int": int, "float": float, "bool": bool, "str": str}
+         fields_list = []
+         for field, info in config_info['fields'].items():
+             field_type_str = info.get("type", "str")
+             if field_type_str.lower().startswith("dict"):
+                 field_type = parse_dict_value  # Use the conversion function as the field type.
+             else:
+                 field_type = type_mappings.get(field_type_str.lower(), str)
+             default_value = info.get("default")
+             fields_list.append((field, field_type, default_value))
+         ConfigDynamic = make_dataclass("ConfigDynamic", fields_list)
+         config_instance = ConfigDynamic(**config_dict)
     else:
-        config_dict = config if config is not None else {}
+         config_instance = config if config is not None else {}
 
-    # Ensure that the configuration is available in the module's globals during execution.
-    module.config = config_dict
-    print(f"Executing module {module_name} with config {config_dict}")
-    # Execute the module with the modified globals.
+    # Ensure that the configuration is available in the module's globals BEFORE executing the module.
+    module.config = config_instance
+    
+    print(f"Executing module {module_name} with config {module.config}")
     spec.loader.exec_module(module)
     return module
 

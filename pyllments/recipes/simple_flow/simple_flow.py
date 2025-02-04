@@ -1,6 +1,5 @@
 """
 A simple example of a chat interface with an API endpoint.
-
 This recipe demonstrates how to create a basic chat interface with an LLM backend
 and expose it through an API endpoint.
 """
@@ -14,10 +13,8 @@ from pyllments import flow
 
 @dataclass
 class Config:
-    """Configuration for the simple flow recipe.
-    
-    This recipe creates a chat interface with an LLM backend. The interface can be customized
-    through various display parameters to match your application's needs.
+    """
+    Control the display parameters and api endpoint for the simple flow recipe.
     """
     feed_height: int = field(
         default=700,
@@ -46,8 +43,7 @@ class Config:
     api_endpoint: str = field(
         default='api',
         metadata={
-            "help": "Name of the API endpoint for external access. Must be URL-safe and unique.",
-            "pattern": r"^[a-zA-Z0-9_-]+$"
+            "help": "Name of the API endpoint for external access. Must be URL-safe and unique."
         }
     )
 
@@ -93,7 +89,7 @@ def create_pyllments_flow():
         The Panel interface for the chat application
     """
     return chat_interface_el.create_interface_view(
-        feed_height=config['feed_height'],
-        input_height=config['input_height'],
-        width=config['width']
+        feed_height=config.feed_height,
+        input_height=config.input_height,
+        width=config.width
     )
