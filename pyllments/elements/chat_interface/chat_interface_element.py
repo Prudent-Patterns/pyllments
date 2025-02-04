@@ -3,7 +3,6 @@ from typing import Optional
 import panel as pn
 import param
 from langchain_core.messages.human import HumanMessage
-from loguru import logger # TODO: remove after debugging
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
@@ -74,6 +73,8 @@ class ChatInterfaceElement(Element):
         """
         Creates and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
+        Needs a height to be set, otherwise it will collapse when
+        messages are added.
         """
         self.chatfeed_view = pn.Column(
             scroll=True,
@@ -134,16 +135,18 @@ class ChatInterfaceElement(Element):
     @Component.view
     def create_interface_view(
         self,
-        feed_height: Optional[int] = None,
+        height: int = 800,
         input_height: Optional[int] = 120,
         ) -> pn.Column:
         """Creates a column containing the chat feed and chat input row"""
+        margin_top = 10
         return pn.Column(
-            self.create_chatfeed_view(height=feed_height),
+            self.create_chatfeed_view(height=height - input_height - margin_top),
             self.create_chat_input_row_view(
                 height=input_height,
-                margin=(10, 0, 0, 0)
-                )
+                margin=(margin_top, 0, 0, 0)
+                ),
+            height=height
         )
     
     @Element.port_stage_emit('message_output', 'new_message')

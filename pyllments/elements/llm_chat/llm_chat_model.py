@@ -16,12 +16,16 @@ class LLMChatModel(Model):
         default='stream',
         doc="Whether to stream the response or return it all at once")
     
-    base_url = param.String(doc="Base URL for the model", )
+    base_url = param.String(doc="Base URL for the model", allow_None=True)
 
     def __init__(self, **params):
         super().__init__(**params)
         if self.base_url:
             self.model_args['base_url'] = self.base_url
+        self.param.watch(self._update_base_url, 'base_url')
+
+    def _update_base_url(self, event):
+        self.model_args['base_url'] = self.base_url
 
     def _messages_to_litellm(self, messages: list[MessagePayload]) -> list[dict[str, str]]:
         """Convert MessagePayloads to LiteLLM format"""
@@ -34,9 +38,9 @@ class LLMChatModel(Model):
         ]
 
     def generate_response(self, messages: list[MessagePayload]) -> MessagePayload:
-        """Generate a response using LiteLLM"""
+        """Generate a response using LiteLLM, ensuring that the current base_url is passed if provided."""
         litellm_messages = self._messages_to_litellm(messages)
-        
+
         if self.output_mode == 'atomic':
             response = litellm.acompletion(
                 model=self.model_name,
@@ -48,7 +52,6 @@ class LLMChatModel(Model):
                 message_coroutine=response,
                 mode='atomic'
             )
-            
         elif self.output_mode == 'stream':
             response_stream = litellm.acompletion(
                 model=self.model_name,
@@ -61,6 +64,5 @@ class LLMChatModel(Model):
                 message_coroutine=response_stream,
                 mode='stream'
             )
-            
         else:
             raise ValueError(f"Invalid output mode: {self.output_mode}")

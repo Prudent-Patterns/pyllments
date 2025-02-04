@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal, Union, Optional
 
 import panel as pn
 import param
@@ -36,31 +36,50 @@ class LLMChatElement(Element):
     @Component.view
     def create_model_selector_view(
         self,
-        models: list[str] = None,
+        models: Optional[list[Union[str, dict]]] = None,
+        show_provider_selector: bool = True,
         provider: str = 'OpenAI',
         model: str = 'gpt-4o-mini',
         orientation: Literal['vertical', 'horizontal'] = 'horizontal',
         model_selector_width: int = None,
         provider_selector_width: int = None,
         selector_css: list[str] = [],
-        height = 57
+        height: int = 57  # Default height in signature is enough
         ) -> pn.widgets.Select | pn.Column | pn.Row:
     
-        if models:
-            model_selector = pn.widgets.Select(
-                name='Model Selector',
-                stylesheets=selector_css,
-                options=models,
-                sizing_mode='stretch_width',
-                margin=0)
-            def on_model_change(event):
-                self.model.model_name = event.new
-            model_selector.param.watch(on_model_change, 'value')
-            self.model.model_name = model_selector.value
-            return pn.Row(model_selector)
-        else:
-            import litellm
+        # Helper to process models into a standardized dict with keys "name", "base_url"
+        def process_models(models_list: list[Union[str, dict]]) -> dict:
+            """
+            Processes a list of models into a standardized dictionary format with unique display names.
+            
+            Each model is represented as a dictionary with keys "name" and "base_url".
+            The dictionary is keyed by the display name, which is derived from the "display_name" field
+            if available, or it falls back to the model's "name".
 
+            Note:
+                - Display names must be unique, since they are used as dictionary keys.
+                  If multiple models share the same display name, later entries will override earlier ones.
+                - The "base_url" is defaulted to None if it is not provided.
+            """
+            processed = {}
+            for item in models_list:
+                if isinstance(item, dict):
+                    # "name" is required; "display_name" is optional.
+                    name_val = item.get("name")
+                    if not name_val:
+                        continue  # Skip models without a mandatory 'name'.
+                    # Determine the display name: use "display_name" when available, otherwise use the model's "name".
+                    display = item.get("display_name") or name_val
+                    base_url_val = item.get("base_url", None)  # Default to None if base_url isn't provided.
+                    # Note: Duplicate display names will be overwritten.
+                    processed[display] = {"name": name_val, "base_url": base_url_val}
+                else:
+                    # String items are treated as the model's "name"; display name is the same and base_url is None.
+                    processed[item] = {"name": item, "base_url": None}
+            return processed
+
+        if show_provider_selector:
+            import litellm
             provider_map = {
                 'OpenAI': litellm.open_ai_chat_completion_models,
                 'Anthropic': litellm.anthropic_models,
@@ -70,39 +89,77 @@ class LLMChatElement(Element):
                 'Mistral': litellm.mistral_chat_models,
                 'OpenRouter': litellm.openrouter_models
             }
+            if models is not None:
+                provider_map['Custom'] = models
+
             provider_selector = pn.widgets.Select(
                 name='Provider Selector',
-                value='OpenAI',
+                value=provider,
                 options=list(provider_map.keys()),
                 stylesheets=selector_css,
                 width=provider_selector_width,
                 sizing_mode='stretch_width',
                 margin=0
-                )
-            if provider:
-                provider_selector.value = provider
-
+            )
+            
+            initial_options = process_models(provider_map[provider_selector.value]) if provider_map[provider_selector.value] else {}
             model_selector = pn.widgets.Select(
                 name='Model Selector',
-                options=provider_map[provider_selector.value],
+                options=initial_options,
                 stylesheets=selector_css,
                 width=model_selector_width,
                 sizing_mode='stretch_width',
-                margin=0
-                )
-            if model:
-                model_selector.value = model
-                self.model.model_name = model
+                margin=0,
+            )
+
+            if model in initial_options:
+                model_selector.value = initial_options[model]
+                self.model.model_name = initial_options[model]["name"]
+                self.model.base_url = initial_options[model]["base_url"]
             else:
-                self.model.model_name = model_selector.value
+                initial_option = model_selector.value
+                if initial_option:
+                    self.model.model_name = initial_option["name"]
+                    self.model.base_url = initial_option["base_url"]
 
             def on_provider_change(event):
-                model_selector.options = provider_map[event.new]
+                new_options = process_models(provider_map[event.new]) if provider_map[event.new] else {}
+                model_selector.options = new_options
+                if new_options:
+                    first_option = next(iter(new_options.values()))
+                    model_selector.value = first_option
+                    self.model.model_name = first_option["name"]
+                    self.model.base_url = first_option["base_url"]
+
             provider_selector.param.watch(on_provider_change, 'value')
+
             def on_model_change(event):
-                self.model.model_name = event.new
+                self.model.model_name = event.new["name"]
+                self.model.base_url = event.new["base_url"]
+
             model_selector.param.watch(on_model_change, 'value')
             self.model_selector_view = pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
             return self.model_selector_view
+        else:
+            import litellm
+            if models is None:
+                models = litellm.open_ai_chat_completion_models
+            options = process_models(models)
+            model_selector = pn.widgets.Select(
+                name='Model Selector',
+                options=options,
+                stylesheets=selector_css,
+                sizing_mode='stretch_width',
+                margin=0
+            )
+            def on_model_change(event):
+                self.model.model_name = event.new["name"]
+                self.model.base_url = event.new["base_url"]
+            model_selector.param.watch(on_model_change, 'value')
+            initial_option = model_selector.value
+            if initial_option:
+                self.model.model_name = initial_option["name"]
+                self.model.base_url = initial_option["base_url"]
+            return pn.Row(model_selector)
 
         

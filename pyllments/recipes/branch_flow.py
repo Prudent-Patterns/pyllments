@@ -6,6 +6,7 @@ import re
 from copy import copy
 import uuid
 
+from jinja2 import Template
 import panel as pn
 
 from pyllments import flow
@@ -13,9 +14,7 @@ from pyllments.elements import ChatInterfaceElement, LLMChatElement, HistoryHand
 
 @dataclass
 class Config:
-    """
-    
-    """
+    """Configuration for the branching chat interface"""
     width: int = field(
         default=800,
         metadata={
@@ -24,9 +23,9 @@ class Config:
         }
     )
     height: int = field(
-        default=720,
+        default=942,  # Updated to account for all components
         metadata={
-            "help": "Overall height of the chat interface in pixels.",
+            "help": "Overall height of the application in pixels.",
             "min": 400
         }
     )
@@ -37,10 +36,20 @@ class Config:
         }
     )
 
-print(config.test_dict)
+# Constants for component heights
+new_tab_row_height = 64  # Height of the new chat/branch input row
+llm_selector_height = 57
+spacer_size = 10
+input_box_height = 110
 
-
-
+# Calculate the chat interface height by subtracting other components
+interface_height = (
+    config.height 
+    - new_tab_row_height    # New tab row
+    - spacer_size           # First spacer
+    - llm_selector_height   # Model selector
+    - spacer_size          # Second spacer
+)
 
 class ChatFlowManager:
     """Manages chat flows and their lifecycle"""
@@ -83,17 +92,29 @@ class ChatFlowManager:
         flow['llm_chat'].ports.output['message_output'] > flow['history_handler'].ports.input['messages_input']
         # Create view with unique name
         interface_view = flow['chat_interface'].create_interface_view(
-            input_height=110,
-            sizing_mode='stretch_both'
+            input_height=input_box_height,
+            height=interface_height
         )
+        models = [
+            {
+                "name": "ollama_chat/deepseek-r1:14b",
+                "display_name": "LOCAL DEEPSEEEK WASSSSUP",
+                "base_url": "http://172.17.0.3:11434"
+            }
+        ]
         if from_flow:
             provider_val = from_flow['llm_chat'].model_selector_view[0].value
             model_val = from_flow['llm_chat'].model_selector_view[2].value
-            model_selector_view = flow['llm_chat'].create_model_selector_view(provider=provider_val, model=model_val)
+            model_selector_view = flow['llm_chat'].create_model_selector_view(models=models, provider=provider_val, model=model_val)
         else:
-            model_selector_view = flow['llm_chat'].create_model_selector_view()
+            model_selector_view = flow['llm_chat'].create_model_selector_view(models=models)
             
-        view = pn.Column(model_selector_view, pn.Spacer(height=10), interface_view, name=tab_name)
+        view = pn.Column(
+            model_selector_view,
+            pn.Spacer(height=spacer_size),
+            interface_view,
+            name=tab_name,
+            )
         view.uuid = uuid.uuid4()  # Add UUID as attribute for identification
         
         self.flows[view.uuid] = flow
@@ -108,7 +129,7 @@ class ChatFlowManager:
         """Copies a model's parameters for insertion into a new element"""
         return {k: copy(v) for k, v in model.param.values().items()}
 
-tabs_stylesheet = """
+tabs_stylesheet = Template("""
 :host(.bk-left) {
     .bk-tab {
         overflow: hidden;
@@ -125,6 +146,7 @@ tabs_stylesheet = """
     }
 
     .bk-header {
+        height: {{ tab_bar_height }}px;
         width: 160px;
         background-color: var(--secondary-background-color); 
         margin-right: 10px; 
@@ -154,7 +176,8 @@ tabs_stylesheet = """
     }
 }
 
-"""
+""").render(tab_bar_height=config.height - new_tab_row_height - spacer_size)
+
 tab_input_stylesheet = """
 :host {
     .bk-input {
@@ -194,7 +217,7 @@ chat_button_stylesheet = """
     }
 }
 """
-tab_row_stylesheet = """
+new_tab_row_stylesheet = """
 :host {
     border-style: solid;
     border-color: var(--light-outline-color);
@@ -223,14 +246,15 @@ def create_branching_app():
     new_branch_button = pn.widgets.Button(name='New Branch', icon='hexagon-plus', height=42,stylesheets=[branch_button_stylesheet])
     new_chat_button = pn.widgets.Button(name='New Chat', icon='hexagon-plus', height=42,stylesheets=[chat_button_stylesheet])
     # 64px height of the row
-    new_tab_row = pn.Row(new_tab_name_input, new_chat_button,new_branch_button, stylesheets=[tab_row_stylesheet])
+    new_tab_row = pn.Row(new_tab_name_input, new_chat_button,new_branch_button, stylesheets=[new_tab_row_stylesheet])
 
     # Initialize tabs with first chat
     tabs = pn.Tabs(
         (initial_tab_name, initial_view),
         closable=True,
         tabs_location='left',
-        stylesheets=[tabs_stylesheet]
+        stylesheets=[tabs_stylesheet],
+        sizing_mode='stretch_both'
     )
 
     def create_new_tab(event):
@@ -289,4 +313,9 @@ def create_branching_app():
     tabs.param.watch(handle_tabs_change, 'objects')
 
     # Create main layout
-    return pn.Column(new_tab_row, pn.Spacer(height=10), tabs, width=config.width, height=config.height)
+    return pn.Column(
+        new_tab_row,
+        pn.Spacer(height=spacer_size),
+        tabs,
+        width=config.width
+        )
