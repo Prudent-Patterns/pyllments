@@ -1,0 +1,10 @@
+{% extends base %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="icon" type="image/x-icon" href="{{ app_favicon }}">
+{% endblock %}
+
+{% block contents %}
+    {{ embed(roots.app_main) }}
+{% endblock %}

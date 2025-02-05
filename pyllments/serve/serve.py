@@ -22,6 +22,9 @@ ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'
 FILE_ICONS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/file_icons/tabler-icons-outline.min.css'
 GLOBAL_CSS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/css/global.css'
 
+MAIN_TEMPLATE_PATH = 'templates/main.html'
+
+
 def parse_dict_value(value):
     """
     Convert a string representation of a dictionary to a Python dictionary using ast.literal_eval.
@@ -271,6 +274,11 @@ def serve(
             name, obj = func_list[0]
             @add_application('/', app=app, title='Pyllments')
             def serve_gui():
-                return obj()  # Config is already available at module level
+                with resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH) as f:
+                    main_tmpl_str = f.read_text()
+                tmpl = pn.Template(main_tmpl_str)
+                tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
+                tmpl.add_panel('app_main', obj())
+                return tmpl
 
     uvicorn_run(app, host='0.0.0.0', port=port)
