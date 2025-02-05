@@ -36,18 +36,49 @@ class LLMChatElement(Element):
     @Component.view
     def create_model_selector_view(
         self,
-        models: Optional[Union[list[Union[str, dict]], dict]] = None,  # Allow models as either a list or a dict.
+        models: Optional[Union[list[Union[str, dict]], dict]] = None,
         show_provider_selector: bool = True,
         provider: str = 'OpenAI',
-        model: str = 'gpt-4o-mini',
+        model: Union[str, dict] = 'gpt-4o-mini',
         orientation: Literal['vertical', 'horizontal'] = 'horizontal',
         model_selector_width: int = None,
         provider_selector_width: int = None,
         selector_css: list[str] = [],
-        height: int = 57  # Default height in signature is enough
-        ) -> pn.widgets.Select | pn.Column | pn.Row:
-    
-        # Process models input (list or dict) into a standardized dict with inner keys "model" and "base_url".
+        height: int = 57
+    ) -> Union[pn.widgets.Select, pn.Column, pn.Row]:
+        """
+        Creates a view for selecting an LLM model, optionally including a provider selector.
+
+        This implementation simplifies the processing of the models input by first normalizing
+        it into a standard mapping of display names to model configurations, which simplifies
+        subsequent widget setup and state management.
+
+        Parameters
+        ----------
+        models : list or dict, optional
+            A list or dict of models. If a dict, the keys are used as display names.
+        show_provider_selector : bool, default True
+            Whether to include a provider selection widget.
+        provider : str, default 'OpenAI'
+            The default provider value.
+        model : str or dict, default 'gpt-4o-mini'
+            The default model (can be a key or an entire config dict).
+        orientation : {'vertical', 'horizontal'}, default 'horizontal'
+            Layout orientation for the provider and model selectors.
+        model_selector_width : int, optional
+            Optional width for the model selector widget.
+        provider_selector_width : int, optional
+            Optional width for the provider selector widget.
+        selector_css : list of str, default []
+            Optional CSS stylesheets to be applied to the selectors.
+        height : int, default 57
+            The default height for the view, mainly for UI spacing.
+
+        Returns
+        -------
+        pn.widgets.Select or pn.Column or pn.Row
+            A Panel widget (or layout) representing the selector view.
+        """
         def process_models(models_input: Union[list[Union[str, dict]], dict]) -> dict:
             """
             Processes the provided models into a uniform dictionary format.
@@ -76,28 +107,45 @@ class LLMChatElement(Element):
             Returns:
                 Dictionary mapping unique display names to dictionaries with keys: "model" and "base_url".
             """
-            processed = {}
+            normalized = []
             if isinstance(models_input, dict):
-                for display, config in models_input.items():
-                    if isinstance(config, dict):
-                        model_val = config.get("model") if "model" in config else config.get("name")
+                for display, value in models_input.items():
+                    if isinstance(value, dict):
+                        model_val = value.get("model") or value.get("name")
                         if not model_val:
-                            continue  # Skip entries that lack a model identifier.
-                        processed[display] = {"model": model_val, "base_url": config.get("base_url", None)}
+                            continue
+                        normalized.append({
+                            "display_name": value.get("display_name", display),
+                            "model": model_val,
+                            "base_url": value.get("base_url")
+                        })
                     else:
-                        # When the value is directly a string.
-                        processed[display] = {"model": config, "base_url": None}
+                        normalized.append({
+                            "display_name": display,
+                            "model": value,
+                            "base_url": None
+                        })
             elif isinstance(models_input, list):
                 for item in models_input:
                     if isinstance(item, dict):
-                        model_val = item.get("model") if "model" in item else item.get("name")
+                        model_val = item.get("model") or item.get("name")
                         if not model_val:
                             continue
-                        display = item.get("display_name") or model_val
-                        processed[display] = {"model": model_val, "base_url": item.get("base_url", None)}
+                        normalized.append({
+                            "display_name": item.get("display_name", model_val),
+                            "model": model_val,
+                            "base_url": item.get("base_url")
+                        })
                     else:
-                        processed[item] = {"model": item, "base_url": None}
-            return processed
+                        normalized.append({
+                            "display_name": item,
+                            "model": item,
+                            "base_url": None
+                        })
+            return {
+                entry["display_name"]: {"model": entry["model"], "base_url": entry["base_url"]}
+                for entry in normalized
+            }
 
         if show_provider_selector:
             import litellm
@@ -110,9 +158,11 @@ class LLMChatElement(Element):
                 'Mistral': litellm.mistral_chat_models,
                 'OpenRouter': litellm.openrouter_models
             }
+            # Allow for custom models via the passed-in models argument.
             if models is not None:
                 provider_map['Custom'] = models
 
+            # Create a provider selector widget.
             provider_selector = pn.widgets.Select(
                 name='Provider Selector',
                 value=provider,
@@ -122,8 +172,9 @@ class LLMChatElement(Element):
                 sizing_mode='stretch_width',
                 margin=0
             )
-            
-            initial_options = process_models(provider_map[provider_selector.value]) if provider_map[provider_selector.value] else {}
+
+            # Initialize model options based on the selected provider.
+            initial_options = process_models(provider_map.get(provider, {}))
             model_selector = pn.widgets.Select(
                 name='Model Selector',
                 options=initial_options,
@@ -133,18 +184,34 @@ class LLMChatElement(Element):
                 margin=0,
             )
 
-            if model in initial_options:
-                model_selector.value = initial_options[model]
-                self.model.model_name = initial_options[model]["model"]
-                self.model.base_url = initial_options[model]["base_url"]
-            else:
-                initial_option = model_selector.value
-                if initial_option:
-                    self.model.model_name = initial_option["model"]
-                    self.model.base_url = initial_option["base_url"]
+            # Function to set the default model selection—matching either by key or config.
+            def set_model_defaults():
+                selected_config = None
+                if isinstance(model, dict):
+                    # Try to find a configuration that matches the provided dict.
+                    for config in initial_options.values():
+                        if config == model:
+                            selected_config = config
+                            break
+                else:
+                    selected_config = initial_options.get(model)
+                
+                if selected_config:
+                    model_selector.value = selected_config
+                    self.model.model_name = selected_config["model"]
+                    self.model.base_url = selected_config["base_url"]
+                else:
+                    # Fallback: if no match, use the current widget's value.
+                    current = model_selector.value
+                    if current:
+                        self.model.model_name = current["model"]
+                        self.model.base_url = current["base_url"]
 
+            set_model_defaults()
+
+            # Update available models when the provider changes.
             def on_provider_change(event):
-                new_options = process_models(provider_map[event.new]) if provider_map[event.new] else {}
+                new_options = process_models(provider_map.get(event.new, {}))
                 model_selector.options = new_options
                 if new_options:
                     first_option = next(iter(new_options.values()))
@@ -154,12 +221,19 @@ class LLMChatElement(Element):
 
             provider_selector.param.watch(on_provider_change, 'value')
 
+            # Update the underlying model when model selection changes.
             def on_model_change(event):
                 self.model.model_name = event.new["model"]
                 self.model.base_url = event.new["base_url"]
 
             model_selector.param.watch(on_model_change, 'value')
-            self.model_selector_view = pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
+
+            # Construct the overall layout based on requested orientation.
+            if orientation == 'vertical':
+                self.model_selector_view = pn.Column(provider_selector, model_selector)
+            else:
+                self.model_selector_view = pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
+
             return self.model_selector_view
         else:
             import litellm
@@ -181,6 +255,4 @@ class LLMChatElement(Element):
             if initial_option:
                 self.model.model_name = initial_option["model"]
                 self.model.base_url = initial_option["base_url"]
-            return pn.Row(model_selector)
-
-        
+            return pn.Row(model_selector)    
