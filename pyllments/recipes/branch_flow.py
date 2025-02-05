@@ -29,10 +29,13 @@ class Config:
             "min": 400
         }
     )
-    test_dict: dict = field(
+    custom_models: dict = field(
         default_factory=dict,
         metadata={
-            "help": "A test dictionary field",
+            "help": """The custom models you wish to add to the model selector. Will be visible in the Provider dropdown.
+            The format is a dictionary with the keys as the model display names. (On a single line - Use single quotes)
+            '{"LOCAL DEEPSEEK": {"name": "ollama_chat/deepseek-r1:14b", "base_url": "http://172.17.0.3:11434"}, "OpenAI GPT-4o-mini": {"name": "gpt4o-mini"}}'
+            """
         }
     )
 
@@ -95,19 +98,16 @@ class ChatFlowManager:
             input_height=input_box_height,
             height=interface_height
         )
-        models = [
-            {
-                "name": "ollama_chat/deepseek-r1:14b",
-                "display_name": "LOCAL DEEPSEEEK WASSSSUP",
-                "base_url": "http://172.17.0.3:11434"
-            }
-        ]
+
         if from_flow:
             provider_val = from_flow['llm_chat'].model_selector_view[0].value
             model_val = from_flow['llm_chat'].model_selector_view[2].value
-            model_selector_view = flow['llm_chat'].create_model_selector_view(models=models, provider=provider_val, model=model_val)
+            model_selector_view = flow['llm_chat'].create_model_selector_view(
+                models=config.custom_models,
+                provider=provider_val, 
+                model=model_val)
         else:
-            model_selector_view = flow['llm_chat'].create_model_selector_view(models=models)
+            model_selector_view = flow['llm_chat'].create_model_selector_view(models=config.custom_models)
             
         view = pn.Column(
             model_selector_view,

@@ -148,6 +148,7 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
                      config_dict[key] = parse_dict_value(config_dict[key])
                  except Exception as e:
                      logger.error(f"Failed to parse dictionary for field '{key}': {e}")
+                     raise ValueError(f"Invalid dictionary literal for field '{key}': {config_dict[key]} Error: {e}")
          
          from dataclasses import make_dataclass
          # Map known type strings to actual Python types.

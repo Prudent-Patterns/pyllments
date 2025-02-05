@@ -36,7 +36,7 @@ class LLMChatElement(Element):
     @Component.view
     def create_model_selector_view(
         self,
-        models: Optional[list[Union[str, dict]]] = None,
+        models: Optional[Union[list[Union[str, dict]], dict]] = None,  # Allow models as either a list or a dict.
         show_provider_selector: bool = True,
         provider: str = 'OpenAI',
         model: str = 'gpt-4o-mini',
@@ -47,35 +47,56 @@ class LLMChatElement(Element):
         height: int = 57  # Default height in signature is enough
         ) -> pn.widgets.Select | pn.Column | pn.Row:
     
-        # Helper to process models into a standardized dict with keys "name", "base_url"
-        def process_models(models_list: list[Union[str, dict]]) -> dict:
+        # Process models input (list or dict) into a standardized dict with inner keys "model" and "base_url".
+        def process_models(models_input: Union[list[Union[str, dict]], dict]) -> dict:
             """
-            Processes a list of models into a standardized dictionary format with unique display names.
-            
-            Each model is represented as a dictionary with keys "name" and "base_url".
-            The dictionary is keyed by the display name, which is derived from the "display_name" field
-            if available, or it falls back to the model's "name".
+            Processes the provided models into a uniform dictionary format.
 
-            Note:
-                - Display names must be unique, since they are used as dictionary keys.
-                  If multiple models share the same display name, later entries will override earlier ones.
-                - The "base_url" is defaulted to None if it is not provided.
+            For list inputs:
+                Each item can be a string or dict. In the dict case, the function uses "model" if present;
+                otherwise, it falls back to "name". Optionally, a "display_name" may override the default display.
+                e.g.
+                [
+                    "claude-3-5-sonnet-20240620",
+                    "gpt4o-mini",
+                    "mistral_chat/mistral-large-latest"
+                ]
+            For dict inputs:
+                The keys are assumed to be display names and the corresponding values are either a dict or a string.
+                If the value is a dict, "model" is used (or "name" as a fallback) alongside an optional "base_url".
+            e.g.
+            {
+                "LOCAL DEEPSEEK": {
+                    "model": "ollama_chat/deepseek-r1:14b",
+                    "base_url": "http://172.17.0.3:11434"
+                },
+                "OpenAI GPT-4o-mini": {
+                    "model": "gpt4o-mini"
+                }
+            Returns:
+                Dictionary mapping unique display names to dictionaries with keys: "model" and "base_url".
             """
             processed = {}
-            for item in models_list:
-                if isinstance(item, dict):
-                    # "name" is required; "display_name" is optional.
-                    name_val = item.get("name")
-                    if not name_val:
-                        continue  # Skip models without a mandatory 'name'.
-                    # Determine the display name: use "display_name" when available, otherwise use the model's "name".
-                    display = item.get("display_name") or name_val
-                    base_url_val = item.get("base_url", None)  # Default to None if base_url isn't provided.
-                    # Note: Duplicate display names will be overwritten.
-                    processed[display] = {"name": name_val, "base_url": base_url_val}
-                else:
-                    # String items are treated as the model's "name"; display name is the same and base_url is None.
-                    processed[item] = {"name": item, "base_url": None}
+            if isinstance(models_input, dict):
+                for display, config in models_input.items():
+                    if isinstance(config, dict):
+                        model_val = config.get("model") if "model" in config else config.get("name")
+                        if not model_val:
+                            continue  # Skip entries that lack a model identifier.
+                        processed[display] = {"model": model_val, "base_url": config.get("base_url", None)}
+                    else:
+                        # When the value is directly a string.
+                        processed[display] = {"model": config, "base_url": None}
+            elif isinstance(models_input, list):
+                for item in models_input:
+                    if isinstance(item, dict):
+                        model_val = item.get("model") if "model" in item else item.get("name")
+                        if not model_val:
+                            continue
+                        display = item.get("display_name") or model_val
+                        processed[display] = {"model": model_val, "base_url": item.get("base_url", None)}
+                    else:
+                        processed[item] = {"model": item, "base_url": None}
             return processed
 
         if show_provider_selector:
@@ -114,12 +135,12 @@ class LLMChatElement(Element):
 
             if model in initial_options:
                 model_selector.value = initial_options[model]
-                self.model.model_name = initial_options[model]["name"]
+                self.model.model_name = initial_options[model]["model"]
                 self.model.base_url = initial_options[model]["base_url"]
             else:
                 initial_option = model_selector.value
                 if initial_option:
-                    self.model.model_name = initial_option["name"]
+                    self.model.model_name = initial_option["model"]
                     self.model.base_url = initial_option["base_url"]
 
             def on_provider_change(event):
@@ -128,13 +149,13 @@ class LLMChatElement(Element):
                 if new_options:
                     first_option = next(iter(new_options.values()))
                     model_selector.value = first_option
-                    self.model.model_name = first_option["name"]
+                    self.model.model_name = first_option["model"]
                     self.model.base_url = first_option["base_url"]
 
             provider_selector.param.watch(on_provider_change, 'value')
 
             def on_model_change(event):
-                self.model.model_name = event.new["name"]
+                self.model.model_name = event.new["model"]
                 self.model.base_url = event.new["base_url"]
 
             model_selector.param.watch(on_model_change, 'value')
@@ -153,12 +174,12 @@ class LLMChatElement(Element):
                 margin=0
             )
             def on_model_change(event):
-                self.model.model_name = event.new["name"]
+                self.model.model_name = event.new["model"]
                 self.model.base_url = event.new["base_url"]
             model_selector.param.watch(on_model_change, 'value')
             initial_option = model_selector.value
             if initial_option:
-                self.model.model_name = initial_option["name"]
+                self.model.model_name = initial_option["model"]
                 self.model.base_url = initial_option["base_url"]
             return pn.Row(model_selector)
 
