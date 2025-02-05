@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+body {
+    --primary-background-color: #0C1314;
+    --secondary-background-color: #162030;
+    --light-outline-color: #455368;
+    --primary-accent-color: #D33A4B;
+    --secondary-accent-color: #EDB737;
+    --tertiary-accent-color: #12B86C;
+    --white: #F4F6F8;
+    --black: #353839;
+    --faded-text-color: #6083B8;
+
+    --base-font: 'Hanken Grotesk', sans-serif;
+    --bokeh-base-font: var(--base-font), sans-serif;
+    --bokeh-font-size: 16px;
+    --title-font: 'Ubuntu', sans-serif;
+    --line-height: 1.55;
+    --design-background-text-color: var(--white);
+    --radius: 9px;
+    
+    background-color: var(--primary-background-color);
+    /* Centering Body */
+    display: flex;
+    justify-content: center;
+    align-items: center;    
+}
+h3 {
+    font-family: var(--base-font);
+}

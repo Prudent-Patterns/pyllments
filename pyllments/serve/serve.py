@@ -14,8 +14,13 @@ from panel.io.fastapi import add_application
 from uvicorn import run as uvicorn_run
 
 from pyllments.logging import setup_logging, logger
+from pyllments.common.resource_loader import get_asset
 from .registry import AppRegistry
 
+ASSETS_PATH = 'assets'
+ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'
+FILE_ICONS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/file_icons/tabler-icons-outline.min.css'
+GLOBAL_CSS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/css/global.css'
 
 def parse_dict_value(value):
     """
@@ -51,40 +56,7 @@ def parse_dict_value(value):
 def server_setup(logging: bool = False, logging_level: str = 'INFO'): 
     if logging:
         setup_logging(log_file='file_loader.log', stdout_log_level=logging_level, file_log_level=logging_level)
-    pn.config.css_files = ['assets/file_icons/tabler-icons-outline.min.css']
-    pn.config.global_css = [
-        """
-    @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
-    body {
-        --primary-background-color: #0C1314;
-        --secondary-background-color: #162030;
-        --light-outline-color: #455368;
-        --primary-accent-color: #D33A4B;
-        --secondary-accent-color: #EDB737;
-        --tertiary-accent-color: #12B86C;
-        --white: #F4F6F8;
-        --black: #353839;
-        --faded-text-color: #6083B8;
-
-        --base-font: 'Hanken Grotesk', sans-serif;
-        --bokeh-base-font: var(--base-font), sans-serif;
-        --bokeh-font-size: 16px;
-        --title-font: 'Ubuntu', sans-serif;
-        --line-height: 1.55;
-        --design-background-text-color: var(--white);
-        --radius: 9px;
-        
-        background-color: var(--primary-background-color);
-        /* Centering Body */
-        display: flex;
-        justify-content: center;
-        align-items: center;    
-    }
-    h3 {
-        font-family: var(--base-font);
-    }
-    """
-    ]
+    pn.config.css_files = [GLOBAL_CSS_MOUNT_PATH, FILE_ICONS_MOUNT_PATH]
 
 
 def extract_config_class(filename: str) -> Optional[Dict]:
@@ -258,8 +230,8 @@ def serve(
         logger.error(f"Failed to get FastAPI app: {e}")
 
     try:
-        with resources.files('pyllments').joinpath('assets') as f:
-            app.mount('/assets', StaticFiles(directory=f), name='assets')
+        with resources.files('pyllments').joinpath(ASSETS_PATH) as f:
+            app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=f), name=ASSETS_PATH)
     except Exception as e:
         logger.error(f"Failed to mount static files: {e}")
 
