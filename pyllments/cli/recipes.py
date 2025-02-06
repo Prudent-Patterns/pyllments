@@ -23,7 +23,7 @@ workflows and configurations.
 
 import ast
 from pathlib import Path
-from typing import Optional, Any, Dict
+from typing import Optional, Dict, List
 from dataclasses import dataclass
 
 import typer
@@ -121,32 +121,39 @@ def get_recipe_metadata(recipe_path: Path) -> Optional[RecipeMetadata]:
 
 
 def create_recipe_command(metadata: RecipeMetadata) -> None:
-    """Create a Typer command for a recipe using its metadata.
-    
-    Parameters
-    ----------
-    metadata : RecipeMetadata
-        Metadata about the recipe
-    """
+    """Create a Typer command for a recipe using its metadata."""
     help_text = metadata.docstring or f"Run the {metadata.name} recipe"
-    
+
+    @recipe_app.command(name=metadata.name.replace('_', '-'), help=help_text)
     def recipe_command(
         logging: bool = typer.Option(False, help="Enable logging"),
-        logging_level: str = typer.Option('INFO', help="Set logging level"),
+        logging_level: str = typer.Option("INFO", help="Set logging level"),
         no_gui: bool = typer.Option(False, help="Don't look for GUI components"),
         port: int = typer.Option(8000, help="Port to run server on"),
         env: Optional[str] = typer.Option(None, help="Path to .env file"),
         profile: bool = typer.Option(False, help="Enable profiling output"),
-        **kwargs: Any
+        config: List[str] = typer.Option(
+            [],
+            help="Additional configuration options as key=value pairs"
+        )
     ):
+        # Combine key=value pairs into a config dictionary.
+        config_dict = {}
+        for pair in config:
+            try:
+                key, value = pair.split("=", 1)
+            except ValueError:
+                raise typer.BadParameter(
+                    f"Configuration option '{pair}' is not in key=value format."
+                )
+            config_dict[key] = value
+
         if profile:
-            import cProfile
-            import pstats
+            import cProfile, pstats
             from io import StringIO
-            
             pr = cProfile.Profile()
             pr.enable()
-        
+
         try:
             run_recipe(
                 recipe_name=metadata.name,
@@ -155,7 +162,7 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
                 no_gui=no_gui,
                 port=port,
                 env=env,
-                config=kwargs
+                config=config_dict
             )
         except Exception as e:
             logger.error(f"Failed to run recipe {metadata.name}: {str(e)}")
@@ -164,34 +171,9 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
             if profile:
                 pr.disable()
                 s = StringIO()
-                ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+                ps = pstats.Stats(pr, stream=s).sort_stats("cumulative")
                 ps.print_stats(30)
                 print(s.getvalue())
-    
-    # Add recipe-specific parameters if config metadata exists
-    if metadata.config_class:
-        # Add config class docstring to help
-        if metadata.config_class['docstring']:
-            help_text = f"{help_text}\n\nConfiguration:\n{metadata.config_class['docstring']}"
-        
-        # Add fields as Typer options
-        for field_name, field_data in metadata.config_class['fields'].items():
-            metadata_dict = field_data.get('metadata', {})
-            if metadata_dict:
-                option = typer.Option(
-                    default=...,  # Let Typer use the default from the dataclass
-                    help=metadata_dict.get('help'),
-                    min=metadata_dict.get('min'),
-                    max=metadata_dict.get('max'),
-                    regex=metadata_dict.get('pattern')
-                )
-                setattr(recipe_command, field_name, option)
-    
-    # Set the command's help text
-    recipe_command.__doc__ = help_text
-    
-    # Add the command to the recipe app
-    recipe_app.command(metadata.name.replace('_', '-'))(recipe_command)
 
 
 def discover_recipes():

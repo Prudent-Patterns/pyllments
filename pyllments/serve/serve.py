@@ -179,7 +179,8 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
 
 
 def flow(func):
-    """A decorator that adds the contains_view attribute to the function and wraps it.
+    """
+    A decorator that adds the contains_view attribute to the function and wraps it.
     It is used to indicate that the function being wrapped returns a view and can be
     served as a GUI.
     """
@@ -191,15 +192,16 @@ def flow(func):
 
 
 def serve(
-    filename: str=None,
-    inline: bool=False,
-    logging: bool=False,
-    logging_level: str='INFO',
-    env: str=None,
-    port: int=8000,
-    find_gui: bool=True,
-    config: Optional[Dict[str, Any]]=None
-    ):
+    filename: str = None,
+    inline: bool = False,
+    logging: bool = False,
+    logging_level: str = 'INFO',
+    env: str = None,
+    host: str = '0.0.0.0',
+    port: int = 8000,
+    find_gui: bool = True,
+    config: Optional[Dict[str, Any]] = None
+):
     """
     Serves a Pyllments application either from a file or from the calling module.
     
@@ -207,21 +209,23 @@ def serve(
     ----------
     filename : str, optional
         Path to the Python file containing the flow-decorated function
-    inline : bool, default=True
-        If True, looks for flow-decorated functions in the calling module
-        If False, loads the function from the specified file
+    inline : bool, default=False
+        If True, looks for flow-decorated functions in the calling module.
+        If False, loads the function from the specified file.
     logging : bool, optional
-        Enable logging, by default False
+        Enable logging, by default False.
     logging_level : str, optional
-        Set logging level, by default 'INFO'
+        Set logging level, by default 'INFO'.
     env : str, optional
-        Path to .env file, by default None
+        Path to .env file, by default None.
+    host : str, default '0.0.0.0'
+        The network interface to bind the server to. '0.0.0.0' means all interfaces.
     port : int, optional
-        Port to run server on, by default 8000
+        Port to run server on, by default 8000.
     find_gui : bool, optional
-        Whether to look for GUI components, by default True
+        Whether to look for GUI components, by default True.
     config : Optional[Dict[str, Any]], optional
-        Configuration parameters to pass to the flow function, by default None
+        Configuration parameters to pass to the flow function, by default None.
     """
     server_setup(logging=logging, logging_level=logging_level)
     if env:
@@ -244,7 +248,6 @@ def serve(
             return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
         
         func_list = []
-        # Use with `pyllments serve <filename>`
         if not inline:
             if not filename:
                 raise ValueError("filename must be provided when inline=False")
@@ -254,11 +257,9 @@ def serve(
             except Exception as e:
                 logger.error(f"Failed to load module from file {filename}: {e}")
                 raise
-        elif inline:
-            # Walk up the call stack to find the caller's frame
+        else:
             frame = sys._getframe(1)
             while frame:
-                # Check if we've found a module with flow-decorated functions
                 module = sys.modules.get(frame.f_globals.get('__name__'))
                 if module:
                     func_list = inspect.getmembers(module, view_check)
@@ -272,6 +273,7 @@ def serve(
             elif func_list_len == 1:
                 logger.info(f"Found @flow wrapped function in script")
             name, obj = func_list[0]
+
             @add_application('/', app=app, title='Pyllments')
             def serve_gui():
                 with resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH) as f:
@@ -281,4 +283,4 @@ def serve(
                 tmpl.add_panel('app_main', obj())
                 return tmpl
 
-    uvicorn_run(app, host='0.0.0.0', port=port)
+    uvicorn_run(app, host=host, port=port)

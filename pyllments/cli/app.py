@@ -19,32 +19,27 @@ app = typer.Typer(no_args_is_help=True)
 @app.command('serve')
 def serve(
     filename: str, 
-    logging: bool = False, 
-    logging_level: str = 'INFO', 
-    no_gui: bool = False, 
-    port: int = 8000, 
-    env: Optional[str] = None,
-    profile: bool = False,
+    logging: bool = typer.Option(False, help="Enable logging."),
+    logging_level: str = typer.Option("INFO", help="Set logging level."),
+    no_gui: bool = typer.Option(False, help="Don't look for GUI components."),
+    port: int = typer.Option(8000, help="Port to run server on."),
+    env: Optional[str] = typer.Option(None, help="Path to .env file."),
+    host: str = typer.Option(
+        '127.0.0.1', 
+        "--host", 
+        "-H", 
+        help="Network interface to bind the server to. Defaults to localhost (127.0.0.1) for safer local development."
+    ),
+    profile: bool = typer.Option(False, help="Enable profiling output."),
     config: List[str] = typer.Option(
         None,
         "--config",
         "-c",
-        help="Additional configuration options for the served file. Provide either multiple key=value pairs or a single dictionary literal (e.g. '{\"key\": \"value\", \"key1\": \"value1\"}').",
+        help="Additional configuration options for the served file. Provide either multiple key=value pairs or a single dictionary literal (e.g. '{\"key\": \"value\"}').",
         show_default=False
     )
 ):
-    """Start a Pyllments server.
-    
-    Args:
-        filename: Path to the Python file containing the flow
-        logging: Enable logging
-        logging_level: Set logging level
-        no_gui: Don't look for GUI components
-        port: Port to run server on
-        env: Path to .env file
-        profile: Enable profiling output
-        config: Additional configuration options (key=value pairs) for the served file
-    """
+    """Start a Pyllments server"""
     logger.info(f"Starting Pyllments server for {filename}...")
     
     config_dict: Dict[str, Any] = {}
@@ -80,7 +75,8 @@ def serve(
             find_gui=not no_gui,
             port=port,
             env=env,
-            config=config_dict
+            config=config_dict,
+            host=host
         )
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}")
@@ -143,24 +139,62 @@ def register_recipe_command(recipe_name: str, metadata: dict):
     Dynamically register a command for the given recipe.
     
     This version builds a dynamic function signature based on:
-      - fixed/common options (logging, logging_level, no_gui, port, env, profile)
+      - fixed/common options (logging, logging_level, no_gui, port, env, host, profile)
       - additional options extracted from metadata['config']['fields'].
-    
-    The resulting signature is assigned to the command callback so that
-    both `--help` and option parsing work as expected.
     """
     # Retrieve dynamic configuration info from metadata.
     config = metadata.get("config", {})
     fields = config.get("fields", {})
 
-    # Build a list of common parameters (as Keyword-Only parameters).
+    # Build a list of common parameters with the host option added.
     common_params = [
-       Parameter('logging', kind=Parameter.KEYWORD_ONLY, annotation=bool, default=False),
-       Parameter('logging_level', kind=Parameter.KEYWORD_ONLY, annotation=str, default="INFO"),
-       Parameter('no_gui', kind=Parameter.KEYWORD_ONLY, annotation=bool, default=False),
-       Parameter('port', kind=Parameter.KEYWORD_ONLY, annotation=int, default=8000),
-       Parameter('env', kind=Parameter.KEYWORD_ONLY, annotation=Optional[str], default=None),
-       Parameter('profile', kind=Parameter.KEYWORD_ONLY, annotation=bool, default=False),
+       Parameter(
+           'logging',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[bool, typer.Option(help="Enable logging.", show_default=True)],
+           default=False
+       ),
+       Parameter(
+           'logging_level',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[str, typer.Option(help="Set logging level.", show_default=True)],
+           default="INFO"
+       ),
+       Parameter(
+           'no_gui',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[bool, typer.Option(help="Don't look for GUI components.", show_default=True)],
+           default=False
+       ),
+       Parameter(
+           'port',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[int, typer.Option(help="Port to run server on.", show_default=True)],
+           default=8000
+       ),
+       Parameter(
+           'env',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[Optional[str], typer.Option(help="Path to .env file.", show_default=True)],
+           default=None
+       ),
+       Parameter(
+           'host',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[str, typer.Option(
+               "--host",
+               "-H",
+               help="Network interface to bind the server to. Defaults to localhost (127.0.0.1) for safer local development.",
+               show_default=True
+           )],
+           default="127.0.0.1"
+       ),
+       Parameter(
+           'profile',
+           kind=Parameter.KEYWORD_ONLY,
+           annotation=Annotated[bool, typer.Option(help="Enable profiling output.", show_default=True)],
+           default=False
+       ),
     ]
 
     # Build dynamic parameters based on the recipe's configuration fields.
@@ -171,7 +205,7 @@ def register_recipe_command(recipe_name: str, metadata: dict):
             continue
         param_name = field_name.replace("-", "_")
         
-        # Get the base type from metadata.
+        # Retrieve the base type from metadata.
         base_type = field_data.get("type")
         if base_type is None:
             base_type = str
@@ -188,20 +222,17 @@ def register_recipe_command(recipe_name: str, metadata: dict):
         # Get the default value. If the default is Ellipsis, mark it as required.
         default_value = field_data.get("default", None)
         if default_value is ...:
-            option_default = ...   # indicates required; the Parameter.default will be Parameter.empty
             param_default = Parameter.empty
         else:
-            option_default = default_value
             param_default = default_value
         
-        # Get the help text from the field metadata, if any.
+        # Retrieve the help text for this field.
         help_text = field_data.get("metadata", {}).get("help", "")
         
         # Build an Annotated type for this option.
-        # Note: We no longer pass a default here, so only the Parameter default is used.
         annotated_type = Annotated[
             base_type,
-            typer.Option(*[f"--{param_name}"], help=help_text, show_default=True)
+            typer.Option(f"--{param_name}", help=help_text, show_default=True)
         ]
         
         dynamic_params.append(
@@ -218,7 +249,6 @@ def register_recipe_command(recipe_name: str, metadata: dict):
     new_signature = Signature(parameters=all_params)
 
     # Define the command callback that uses **kwargs.
-    # Typer will inject the options based on the (fake) signature we assign.
     def command_impl(**kwargs):
         """
         Run the recipe.
@@ -229,6 +259,7 @@ def register_recipe_command(recipe_name: str, metadata: dict):
         no_gui_val = kwargs.get("no_gui")
         port_val = kwargs.get("port")
         env_val = kwargs.get("env")
+        host_val = kwargs.get("host")  # Extract host option.
         profile_val = kwargs.get("profile")
         
         # Build recipe-specific configuration from dynamic parameters.
@@ -249,6 +280,7 @@ def register_recipe_command(recipe_name: str, metadata: dict):
                 no_gui=no_gui_val,
                 port=port_val,
                 env=env_val,
+                host=host_val,  # Passing the host option.
                 config=recipe_config,
             )
         except Exception as e:
@@ -275,15 +307,12 @@ def register_recipe_command(recipe_name: str, metadata: dict):
     command_impl.__doc__ = doc
 
     # Finally, register the command callback with Typer.
-    # We use the public 'command' decorator on our 'run_app' Typer instance.
     command_impl = run_app.command(
         name=recipe_name,
-        # Pass context_settings if needed.
         context_settings={"allow_extra_args": True, "ignore_unknown_options": False},
     )(command_impl)
 
     return command_impl
-
 
 # Add recipe commands dynamically
 recipes = discover_recipes()
