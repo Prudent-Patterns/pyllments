@@ -1,0 +1,26 @@
+---
+title: Recipes
+listing:
+    id: recipes-listing   
+    contents:
+        - /*.qmd
+        - /*/*.qmd
+    fields:
+        - title
+        - description
+    type: table
+    filter-ui: false
+    sort-ui: false
+---
+
+Recipes are pre-made flows that you can run straight from the command line.
+
+Click on a recipe to see more details and configuration options.
+
+```bash
+pyllments recipe run <recipe-name> [<args>...]
+```
+
+::: {#recipes-listing}
+:::
+

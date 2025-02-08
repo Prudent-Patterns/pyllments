@@ -1,4 +1,16 @@
 ---
-title: "Installation"
+title: "Installation Instructions"
 ---
 
+You can install Pyllments using either of the following methods:
+
+::: {.panel-tabset}
+## Using pip
+```{.bash}
+pip install pyllments
+```
+## Using uv pip
+```{.bash}
+uv pip install pyllments
+```
+:::

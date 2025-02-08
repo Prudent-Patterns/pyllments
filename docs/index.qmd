@@ -41,7 +41,7 @@ Pyllments consists of a set of **Elements** with a consistent interface that all
 
 #### Elements:
 * Easily integrate into your own projects
-* Built to have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows
+* Have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows
 * Can individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)
 
 ::: {.column-page}

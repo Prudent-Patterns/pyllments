@@ -74,6 +74,7 @@ def run_recipe(
     no_gui: bool = False,
     port: int = 8000,
     env: Optional[str] = None,
+    host: str = "127.0.0.1",
     config: Optional[dict[str, Any]] = None
 ) -> None:
     """Run a recipe.
@@ -92,6 +93,8 @@ def run_recipe(
         Port to run server on, by default 8000
     env : Optional[str], optional
         Path to .env file, by default None
+    host : str, optional
+        Network interface to bind the server to, by default "127.0.0.1"
     config : Optional[dict[str, Any]], optional
         Configuration parameters for the recipe, by default None
     """
@@ -108,6 +111,7 @@ def run_recipe(
             find_gui=not no_gui,
             port=port,
             env=env,
+            host=host,
             config=config or {}
         )
     except Exception as e:

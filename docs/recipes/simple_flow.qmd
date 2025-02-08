@@ -1,0 +1,8 @@
+---
+title: "Simple Flow"
+description: "A simple flow recipe"
+---
+
+```bash
+pyllments recipe run simple_flow
+```

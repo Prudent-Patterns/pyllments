@@ -66,8 +66,8 @@ def extract_config_metadata(node: ast.ClassDef) -> Optional[Dict]:
 
     This function parses the AST (abstract syntax tree) of a Config class to retrieve:
       - The class-level docstring.
-      - A dictionary mapping each field name to its associated type, default value (if any),
-        and metadata (such as help text and numeric constraints).
+      - A dictionary mapping each field name to a dictionary with field information,
+        including its type, default value (if any), and metadata (such as help text and constraints).
 
     Parameters
     ----------
@@ -79,8 +79,7 @@ def extract_config_metadata(node: ast.ClassDef) -> Optional[Dict]:
     Optional[Dict]
         A dictionary with keys:
           - 'docstring': The docstring of the class.
-          - 'fields': A mapping from field names to a dictionary with field information,
-            including 'type' (str), and optionally 'default' and 'metadata'.
+          - 'fields': A mapping from field names to field information (type, default, metadata).
         Returns None if no fields are found.
     """
     # Retrieve the class-level docstring.
@@ -99,18 +98,31 @@ def extract_config_metadata(node: ast.ClassDef) -> Optional[Dict]:
             if field_type:
                 field_data['type'] = field_type
 
-            # Initialize the default value as None.
             default_value = None
 
             # Check if the field value is defined using a call to the 'field' function.
             if isinstance(item.value, ast.Call) and getattr(item.value.func, 'id', None) == 'field':
-                # Iterate over keyword arguments to extract 'default' value.
+                # Iterate over keyword arguments to extract 'default' or 'default_factory' value.
                 for kw in item.value.keywords:
                     if kw.arg == 'default':
                         try:
                             default_value = ast.literal_eval(kw.value)
                         except Exception as e:
                             logger.error(f"Failed to eval default for field {field_name}: {e}")
+                    elif kw.arg == 'default_factory':
+                        if isinstance(kw.value, ast.Name):
+                            # Handle common default factories.
+                            if kw.value.id == 'dict':
+                                default_value = {}
+                            elif kw.value.id == 'list':
+                                default_value = []
+                            else:
+                                logger.warning(f"Unknown default_factory {kw.value.id} for field {field_name}, skipping evaluation.")
+                        else:
+                            try:
+                                default_value = ast.literal_eval(kw.value)
+                            except Exception as e:
+                                logger.error(f"Failed to eval default_factory for field {field_name}: {e}")
                 # Iterate again to extract 'metadata' if available.
                 for kw in item.value.keywords:
                     if kw.arg == 'metadata' and isinstance(kw.value, ast.Dict):
@@ -131,7 +143,6 @@ def extract_config_metadata(node: ast.ClassDef) -> Optional[Dict]:
             if default_value is not None:
                 field_data['default'] = default_value
 
-            # Save the processed field data under its name.
             fields[field_name] = field_data
 
     # Return the gathered metadata if any fields were identified; otherwise, return None.

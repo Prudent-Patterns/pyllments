@@ -1,0 +1,8 @@
+---
+title: "Simple Flow API"
+description: "A simple flow API recipe"
+---
+
+```bash
+pyllments recipe run simple_flow_api
+```

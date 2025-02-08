@@ -27,7 +27,7 @@ dependencies = [
     "langchain-community",
     "langchain-chroma",
     "langchain-anthropic",
-    "sentence-transformers",
+    "sentence-transformers[onnx-gpu]",
     "openai",
     "jsonlines",
     "opencv-python",

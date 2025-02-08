@@ -131,13 +131,20 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
         no_gui: bool = typer.Option(False, help="Don't look for GUI components"),
         port: int = typer.Option(8000, help="Port to run server on"),
         env: Optional[str] = typer.Option(None, help="Path to .env file"),
+        host: str = typer.Option(
+            "127.0.0.1",
+            "--host",
+            "-H",
+            help=("Network interface to bind the server to. "
+                  "Defaults to 127.0.0.1 for local development.")
+        ),
         profile: bool = typer.Option(False, help="Enable profiling output"),
         config: List[str] = typer.Option(
             [],
             help="Additional configuration options as key=value pairs"
         )
     ):
-        # Combine key=value pairs into a config dictionary.
+        # Combine key=value pairs into a configuration dictionary.
         config_dict = {}
         for pair in config:
             try:
@@ -162,6 +169,7 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
                 no_gui=no_gui,
                 port=port,
                 env=env,
+                host=host,
                 config=config_dict
             )
         except Exception as e:

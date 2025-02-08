@@ -4,7 +4,6 @@ This recipe demonstrates how to create a basic chat interface with an LLM backen
 and expose it through an API endpoint.
 """
 from dataclasses import dataclass, field
-from typing import Optional
 
 from pyllments.elements import ChatInterfaceElement, LLMChatElement, APIElement
 from pyllments.payloads import MessagePayload

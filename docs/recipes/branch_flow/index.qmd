@@ -1,0 +1,34 @@
+---
+title: "Branching Chat Flow"
+format: 
+    html:
+        code-links:
+            - text: Recipe Code
+              icon: github
+              href: https://github.com/Prudent-Patterns/pyllments/blob/main/pyllments/recipes/branch_flow.py
+description: "Create a multi-tabbed chat interface that allows users to branch conversations and create new ones." 
+---
+
+```bash
+pyllments recipe run branch_flow
+```
+### Configuration
+
+| Argument         | Example | Description                                          | Default |
+| :--------------- | :--- | :------------------------------------------------:| :------ |
+| width            | 800    | Width of the chat interface.         | 800    |
+| height           | 942    | Height of the application.           | 942    |
+| custom_models    | *See Below*     | Add custom LLM models and/or base urls. | "{}"    |
+
+::: {layout-ncol=2}
+![Branch Flow GUI](branch_flow_gui.jpg){.lightbox}
+
+![Branch Flow Flow Diagram](branch_flow_flowchart.jpg){.lightbox}
+:::
+
+This recipe enables both entirely new chats and forked conversations from existing ones, managed by an integrated flow system.
+
+-   **New Chat**: Start fresh conversations.
+-   **Branching**: Fork from existing chats, optionally copying messages.
+-   **Tabbed Interface**: Manage multiple chats/branches simultaneously.
+-   **LLM Integration**: Seamlessly connects UI with LLM backend.
