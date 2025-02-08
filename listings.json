@@ -1,0 +1,11 @@
+[
+  {
+    "listing": "/recipes/index.html",
+    "items": [
+      "/recipes/branch_flow/index.html",
+      "/recipes/multi_chat_flow.html",
+      "/recipes/simple_flow.html",
+      "/recipes/simple_flow_api.html"
+    ]
+  }
+]

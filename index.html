@@ -70,10 +70,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-8ea72dc5fed832574809a9c94082fbbb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-f8dc6eab18fde03278982b0b35885446.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-772ea8b5d9f62e7203cf4134676a36be.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-06d5b62565b184dafb44ab445649472e.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -103,6 +103,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-diagram/mermaid.min.js"></script>
 <script src="site_libs/quarto-diagram/mermaid-init.js"></script>
 <link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+<script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Immediately trigger the glitch effect on menu text when the DOM is ready
+  PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
+
+  // Wait 300ms before checking for the sidebar toggle element to ensure it exists
+  setTimeout(function() {
+    var toggleElement = document.querySelector('.quarto-sidebar-toggle');
+    if (toggleElement) {
+      toggleElement.addEventListener('click', function() {
+        // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
+        setTimeout(function() {
+          PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
+        }, 500);
+      });
+    }
+  }, 300);
+});
+</script>
 
 
 <link rel="stylesheet" href="styles.css">
@@ -165,7 +185,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">📚 Introduction</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">🚀 Introduction</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -180,7 +200,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./index.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">📚 Introduction</span></a>
+ <span class="menu-text">🚀 Introduction</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -276,6 +296,41 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
       </ul>
   </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="./recipes/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">👨‍🍳 Recipes</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Multi Chat Flow</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/simple_flow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Simple Flow</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Simple Flow API</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Branching Chat Flow</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
     </ul>
     </div>
 </nav>
@@ -332,55 +387,107 @@ LLM + vDB Integrations
 
 </section>
 </div>
-<p>Pyllments consists of a set of <strong>Elements</strong> with a consistent interface that allows you to connect them in a near infinite amount of ways through their respective ports using simple flow-based programming.</p>
+<p>Pyllments consists of a set of <strong>Elements</strong> with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.</p>
 <section id="elements" class="level4">
 <h4 class="anchored" data-anchor-id="elements">Elements:</h4>
 <ul>
 <li>Easily integrate into your own projects</li>
-<li>Built to have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows</li>
+<li>Have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows</li>
 <li>Can individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)</li>
 </ul>
 </section>
-<section id="elements-are-building-blocks-with-a-consistent-interface-and-easily-composable-front-end-components." class="level3 page-columns page-full">
-<h3 class="anchored" data-anchor-id="elements-are-building-blocks-with-a-consistent-interface-and-easily-composable-front-end-components.">Elements are building blocks with a consistent interface and easily composable front-end components.</h3>
+<section id="elements-are-building-blocks-with-a-consistent-interface" class="level1 column-page">
+<h1>Elements are building blocks with a consistent interface</h1>
+</section>
 <div class="column-page">
-<video autoplay="" loop="" muted="" playsinline="" style="display: block; max-width: 100%; margin: 0 auto;" playbackrate="1" controls="" onmouseover="this.controls = true;" onmouseout="this.controls = false;">
-<source src="assets/introduction/wide_vid_test.mp4" type="video/mp4">
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video autoplay="" loop="" muted="" playsinline="" style="display: block; max-width: 100%; margin: 0 auto;" playbackrate="1">
+<source src="assets/introduction/pyllments_intro_pg_vid1.mp4" type="video/mp4">
 </video>
+<button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;">
+▷
+</button>
 </div>
-<section id="elements-work-together-to-create-composable-and-modular-flows" class="level3 page-columns page-full">
-<h3 class="anchored" data-anchor-id="elements-work-together-to-create-composable-and-modular-flows">Elements work together to create <em>composable</em> and <em>modular</em> flows</h3>
-<div class="page-columns page-full">
-<div class="quarto-figure quarto-figure-center page-columns page-full">
-<figure class="figure page-columns page-full">
-<p class="page-columns page-full"><img src="assets/introduction/wide_img.jpg" class="img-fluid figure-img column-page"></p>
-<figcaption>A full screen image</figcaption>
-</figure>
 </div>
-</div>
+<hr>
+<section id="elements-can-create-and-manage-easily-composable-front-end-components-called-views" class="level1 column-page">
+<h1>Elements can create and manage easily composable front-end components called Views</h1>
 </section>
-<section id="simple-api-generation" class="level3 page-columns page-full">
-<h3 class="anchored" data-anchor-id="simple-api-generation">Simple API generation</h3>
-<div class="page-columns page-full">
-<div class="quarto-figure quarto-figure-center page-columns page-full">
-<figure class="figure page-columns page-full">
-<p class="page-columns page-full"><img src="assets/introduction/wide_img.jpg" class="img-fluid figure-img column-page"></p>
-<figcaption>A full screen image</figcaption>
-</figure>
+<div class="video-container column-page" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video playsinline="" controls="" style="width: 100%; display: block;">
+<source src="assets/introduction/pyllments_intro_pg_vid2.mp4" type="video/mp4">
+Your browser does not support the video tag. </video> <!-- Custom play button overlay --> <button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;"> ▷ </button>
 </div>
-</div>
+<hr>
+<section id="using-their-ports-interface-elements-can-be-connected-in-endless-permutations." class="level1 column-page">
+<h1>Using their <code>Ports</code> interface, Elements can be connected in endless permutations.</h1>
 </section>
-<section id="integration-with-models-and-vector-stores" class="level3 page-columns page-full">
-<h3 class="anchored" data-anchor-id="integration-with-models-and-vector-stores">Integration with models and vector stores</h3>
-<div class="page-columns page-full">
-<div class="quarto-figure quarto-figure-center page-columns page-full">
-<figure class="figure page-columns page-full">
-<p class="page-columns page-full"><img src="assets/introduction/wide_img.jpg" class="img-fluid figure-img column-page"></p>
-<figcaption>A full screen image</figcaption>
-</figure>
+<div class="column-page">
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video playsinline="" controls="" style="width: 100%; display: block;">
+<source src="assets/introduction/pyllments_intro_pg_vid3.mp4" type="video/mp4">
+Your browser does not support the video tag. </video> <button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;"> ▷ </button>
 </div>
 </div>
+<hr>
+<section id="attach-api-endpoints-to-any-part-of-the-flow" class="level1 column-page">
+<h1>Attach API endpoints to any part of the flow</h1>
 </section>
+<div class="column-page">
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video playsinline="" controls="" style="width: 100%; display: block;">
+<source src="assets/introduction/pyllments_intro_pg_vid4.mp4" type="video/mp4">
+Your browser does not support the video tag. </video> <button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;"> ▷ </button>
+</div>
+</div>
 <section id="example" class="level1">
 <h1>Example</h1>
 <div class="sourceCode" id="annotated-cell-1"><pre class="sourceCode python code-annotation-code code-with-copy code-annotated"><code class="sourceCode python"><span id="annotated-cell-1-1"><a href="#annotated-cell-1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyllments.elements.chat_interface <span class="im">import</span> ChatInterfaceElement, LLMChatElement</span>
@@ -399,7 +506,6 @@ LLM + vDB Integrations
 <span data-code-cell="annotated-cell-1" data-code-lines="6" data-code-annotation="2">Connect the chat interface element’s output port to the LLM chat element’s input port</span>
 </dd>
 </dl>
-<p>something something</p>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -463,10 +569,50 @@ message_output --MessagePayload--&gt; messages_input
 <li><p>LLM Integration: Easily incorporate Large Language Models into your applications.</p></li>
 <li><p>Flexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.</p></li>
 </ul>
+<!-- Global script to attach play button functionality to all video containers -->
+<script>
+// This script finds every video container and adds a central play overlay behavior.
+document.querySelectorAll('.video-container').forEach(container => {
+// Select the video element within the current container.
+const video = container.querySelector('video');
+// Select the overlay play button.
+const playButton = container.querySelector('.custom-play-button');
+
+// When playback begins, hide the play button.
+video.addEventListener('play', () => {
+playButton.style.display = 'none';
+});
+
+// When playback is paused, show the play button.
+video.addEventListener('pause', () => {
+playButton.style.display = 'block';
+});
+
+// Clicking on the overlay play button resumes playback.
+playButton.addEventListener('click', () => {
+video.play();
+});
+
+// For videos without native controls (like our first video), 
+// add a click event to pause the video when clicked.
+if (!video.hasAttribute('controls')) {
+video.addEventListener('click', () => {
+if (!video.paused) {
+video.pause();
+}
+});
+}
+});
+</script>
 
 
 </section>
-</section></main></div>
+</main></div>
+
+
+
+
+
 
 
 

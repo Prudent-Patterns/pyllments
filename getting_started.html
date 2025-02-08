@@ -36,10 +36,10 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-8ea72dc5fed832574809a9c94082fbbb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-f8dc6eab18fde03278982b0b35885446.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-772ea8b5d9f62e7203cf4134676a36be.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-06d5b62565b184dafb44ab445649472e.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -66,6 +66,26 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
+<script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Immediately trigger the glitch effect on menu text when the DOM is ready
+  PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
+
+  // Wait 300ms before checking for the sidebar toggle element to ensure it exists
+  setTimeout(function() {
+    var toggleElement = document.querySelector('.quarto-sidebar-toggle');
+    if (toggleElement) {
+      toggleElement.addEventListener('click', function() {
+        // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
+        setTimeout(function() {
+          PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
+        }, 500);
+      });
+    }
+  }, 300);
+});
+</script>
 
 
 <link rel="stylesheet" href="styles.css">
@@ -143,7 +163,7 @@ ul.task-list li input[type="checkbox"] {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">📚 Introduction</span></a>
+ <span class="menu-text">🚀 Introduction</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -235,6 +255,41 @@ ul.task-list li input[type="checkbox"] {
   <div class="sidebar-item-container"> 
   <a href="./explanation/ports.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Ports</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="./recipes/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">👨‍🍳 Recipes</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Multi Chat Flow</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/simple_flow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Simple Flow</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Simple Flow API</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
       </ul>
