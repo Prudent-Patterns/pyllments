@@ -39,6 +39,13 @@ style="display: block; max-width: 100px; margin: 0 auto;">
 
 Pyllments consists of a set of **Elements** with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.
 
+Pyllments comes with a set of pre-built parameterized application you can run immediately from the command line like so:
+```bash
+pyllments recipe run branch_flow --height 900 --width 700
+```
+[See Recipes Here](recipes)
+
+
 #### Elements:
 * Easily integrate into your own projects
 * Have front end components associated with them, which allows you to build your own composable GUIs to interact with your flows
@@ -162,21 +169,6 @@ z-index: 2;">
 </button>
 </div>
 </div>
-
-
-# Example
-```python
-from pyllments.elements.chat_interface import ChatInterfaceElement, LLMChatElement
-
-chat_interface = ChatInterfaceElement() # <1>
-llm_chat = LLMChatElement() # <1>
-
-chat_interface.ports.output['message_output'] > llm_chat.ports.input['message_input'] # <2>
-```
-1. \(**👈 Press Me**\) Create a the chat interface and LLM chat elements 
-2. Connect the chat interface element's output port to the LLM chat element's input port
-
-
 
 ```{mermaid}
 flowchart LR

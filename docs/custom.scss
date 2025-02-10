@@ -136,9 +136,30 @@ ol.breadcrumb {
   background-color: $white;
 }
 
-p code:not(.sourceCode) {
-  color: $lesser-white;
+code:not(.sourceCode),
+p code:not(.sourceCode),
+li code:not(.sourceCode),
+td code:not(.sourceCode) {
+  color: $primary-accent-color;
   background-color: $code-background-color;
+}
+
+code.sourceCode .code-annotation-anchor {
+  color: $secondary-accent-color;
+  font-weight: bold;
+  font-size: .91em;
+  // border-color: $secondary-accent-color;
+}
+
+dl.code-annotation-container-grid {
+  dt {
+    color: $secondary-accent-color;
+    &[data-target-cell].code-annotation-active {
+      color: $primary-background-color;
+      border: solid #aaa 1px;
+      background-color: $secondary-accent-color;
+    }
+  }
 }
 
 table {
@@ -148,4 +169,9 @@ table {
   .header {
     border-bottom: 1px solid $secondary-accent-color;
   }
+}
+
+h1, h2 {
+  margin-top: .8rem;
+  margin-bottom: .8rem;
 }

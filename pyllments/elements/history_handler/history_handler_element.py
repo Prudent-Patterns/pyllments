@@ -23,8 +23,8 @@ class HistoryHandlerElement(Element):
     - current context column
     Ports:
     - input:
-        - message_input: MessagePayload - Human and AI messages handled - triggers output of the current context
-        - messages_input: list[MessagePayload] - Messages to add to context
+        - message_emit_input: MessagePayload - Human and AI messages handled - triggers output of the current context
+        - messages_input: MessagePayload | list[MessagePayload] - Messages to add to context
     - output:
         - messages_output: list[MessagePayload]
     """
@@ -34,12 +34,12 @@ class HistoryHandlerElement(Element):
         super().__init__(**params)
         self.model = HistoryHandlerModel(**params)
         
-        self._message_input_setup()
+        self._message_emit_input_setup()
         self._messages_output_setup()
 
         self._messages_input_setup()
 
-    def _message_input_setup(self):
+    def _message_emit_input_setup(self):
         def unpack(payload: MessagePayload):
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
@@ -55,7 +55,7 @@ class HistoryHandlerElement(Element):
             if self.model.context:
                 self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
 
-        self.ports.add_input(name='message_input', unpack_payload_callback=unpack)
+        self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
     def _messages_input_setup(self): # TODO: need better port naming
         def unpack(payload: Union[list[MessagePayload], MessagePayload]):

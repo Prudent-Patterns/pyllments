@@ -88,11 +88,11 @@ class ChatFlowManager:
 
             flow['name'] = tab_name
         
-        # Connect the elements
-        flow['chat_interface'].ports.output['message_output'] > flow['history_handler'].ports.input['message_input']
-        flow['history_handler'].ports.output['messages_output'] > flow['llm_chat'].ports.input['messages_input']
-        flow['llm_chat'].ports.output['message_output'] > flow['chat_interface'].ports.input['message_input']
-        flow['llm_chat'].ports.output['message_output'] > flow['history_handler'].ports.input['messages_input']
+        # Connect the elements using dot notation for ports
+        flow['chat_interface'].ports.message_output > flow['history_handler'].ports.message_emit_input
+        flow['history_handler'].ports.messages_output > flow['llm_chat'].ports.messages_emit_input
+        flow['llm_chat'].ports.message_output > flow['chat_interface'].ports.message_input
+        flow['llm_chat'].ports.message_output > flow['history_handler'].ports.messages_input
         # Create view with unique name
         interface_view = flow['chat_interface'].create_interface_view(
             input_height=input_box_height,

@@ -1,9 +1,0 @@
----
-title: "Getting Started Tutorial"
----
-
-# 1. Creating your first element
-# 2. Connecting elements
-# 3. Building your first flow
-# 4. Testing your flow
-# 5. Deploying your flow

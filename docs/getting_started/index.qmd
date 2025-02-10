@@ -1,0 +1,84 @@
+---
+title: "Getting Started Tutorial"
+lightbox: true
+---
+Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application. 
+
+Please make sure that you've [installed pyllments](/installation.qmd) if you want to follow along.
+
+If you don't care about building flows, you can hop on over to the [recipes section](/recipes) to run pre-built applications. d
+
+## 1. Creating your first `Element` 
+
+:::{.column-margin}
+![Element Diagram](getting_started_element.jpg)
+:::
+
+The fundamental building block of pyllments, is as you may have guessed, an `Element`. 
+
+
+An element is composed of a `Model` that handles the business logic, `Ports` that handle the communication between elements, and optionally, `Views` that handles the frontend representation of the element.
+
+```python
+from pyllments.elements import ChatInterfaceElement # <1> 
+
+chat_interface_el = ChatInterfaceElement() # <2>
+```
+1. Import the `ChatInterfaceElement` from the `pyllments.elements` subpackage. This is how most elements are efficiently imported.
+2. Create an instance of the `ChatInterfaceElement`
+
+## 2. Adding more elements
+Now that we're getting the hang of it, lets create a couple more.
+
+```python
+from pyllments.elements import LLMChatElement, HistoryHandlerElement
+
+llm_chat_el = LLMChatElement(model_name='gpt-4o') # <1>
+history_handler_el = HistoryHandlerElement( # <2>
+    history_token_limit=1000, 
+    tokenizer_model='gpt-4o' # <2>
+)
+
+```
+1. Create an instance of the `LLMChatElement` with the model name set to 'gpt-4o'. LLMChatElement uses the [LiteLLM naming system](https://models.litellm.ai) and is compatible with the chat models supported by LiteLLM. All you need is the corresponding API key in an .env file.
+2. Create an instance of the `HistoryHandlerElement` with the token limit set to 1000 tokens as measured by the gpt-4o tokenizer. This is the default tokenizer used and can be expected to be a good enough estimate for most use cases.
+
+## 3. Your first flow
+
+Lets take a moment to think about what we want to achieve. We are creating a chat interface which uses an LLM to respond to message while also taking into account the history of the conversation.
+
+Below, you can see that each individual element has its own unique set of input and output ports as well as a designated Payload type it either emits or receives. In this case, we're only using the `MessagePayload` and `List[MessagePayload]` types. For an output port to connect to an input port, its payload type must be compatible with the input port's payload type. 
+
+For the `HistoryHandlerElement` to connect to the `LLMChatElement`, the `messages_emit_input` port of the `LLMChatElement` must be able to accept a `List[MessagePayload]` type.
+
+![Flow Diagram](getting_started_flow.jpg){.column-page}
+
+To facilitate the proper communication between the elements:
+
+1. When we type a message into the `ChatInterfaceElement` and hit send, it emits a `MessagePayload` through the `message_output` port.
+2. That message is recieved by the `HistoryHandlerElement` through the `message_emit_input` port.
+3. The `_emit_input` suffix specifies that upon recieving a payload, `HistoryHandlerElement` will emit a payload. The list of `MessagePayload`s that is emitted from the `messages_output` port consists of the message history stored internally with the latest `MessagePayload` appended at the end of that list.
+4. When the `LLMChatElement` recieves a `List[MessagePayload]` through the `messages_emit_input` port, it sends the list of messages to the LLM we previously specified and returns a `MessagePayload` through the `message_output` port.
+5. The first input port that the `MessagePayload` is received by is the `messages_input` port of the `HistoryHandlerElement`, which unlike the `message_emit_input` port, does not emit any payload, it instead only appends the `MessagePayload` to the internal message history.
+6. The second input that the `MessagePayload` is received by is the `message_input` port of the `ChatInterfaceElement`, which causes the message to be streamed to the chatfeed we will soon see. 
+
+## 4. Connecting the elements
+
+Now that we have a flow in mind, connecting the elements is a breeze.
+
+```python
+chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
+
+history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
+
+llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
+
+llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
+```
+
+The ports are accessed using dot notation on the `ports` attribute of the element.
+In the case of `llm_chat_el.ports.message_output > chat_interface_el.ports.message_input`, we are connecting an output port of the `LLMChatElement` to an input port of the `ChatInterfaceElement` using the `>` operator, with the output port being on the left side of it. It is equivalent to `llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_input)`.
+
+
+## 5. Testing your flow
+## 6. Deploying your flow

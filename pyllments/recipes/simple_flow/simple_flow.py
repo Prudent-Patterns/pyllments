@@ -59,9 +59,9 @@ async def get_streamed_message(payload):
     return await payload.model.streamed_message()
 
 api_el = APIElement(
-    endpoint=config['api_endpoint'],  # Using the endpoint defined in the configuration.
+    endpoint=config['api_endpoint'],
     connected_input_map={
-        'message_input': llm_chat_el.ports.output['message_output']
+        'message_input': llm_chat_el.ports.message_output
     },
     response_dict={
         'message_input': {
@@ -73,9 +73,9 @@ api_el = APIElement(
 )
 
 # Connect elements
-chat_interface_el.ports.output['message_output'] > llm_chat_el.ports.input['messages_input']
-llm_chat_el.ports.output['message_output'] > chat_interface_el.ports.input['message_input']
-api_el.ports.output['api_output'] > chat_interface_el.ports.input['message_emit_input']
+chat_interface_el.ports.message_output > llm_chat_el.ports.messages_emit_input
+llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
+api_el.ports.api_output > chat_interface_el.ports.message_emit_input
 
 
 @flow

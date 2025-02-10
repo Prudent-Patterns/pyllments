@@ -335,11 +335,11 @@ class Ports(param.Parameterized):
     """Keeps track of InputPorts and OutputPorts and handles their creation"""
     input = param.Dict(default={}, doc="Dictionary to store input ports")
     output = param.Dict(default={}, doc="Dictionary to store output ports")
-    # containing_element = param.Parameter(precedence=-1)
 
-    def __init__(self, containing_element=None,**params):
+    def __init__(self, containing_element=None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
+
 
     def add_input(self, name: str, unpack_payload_callback, **kwargs):
         input_port = InputPort(
@@ -358,3 +358,26 @@ class Ports(param.Parameterized):
             **kwargs)
         self.output[name] = output_port
         return output_port
+
+    def __getattr__(self, name: str):
+        """Enable dot notation access to ports."""
+        # First check if it's in input ports
+        if name in self.input:
+            return self.input[name]
+        # Then check output ports
+        elif name in self.output:
+            return self.output[name]
+        # If not found in either, raise a descriptive error
+        available_ports = list(self.input.keys()) + list(self.output.keys())
+        raise AttributeError(
+            f"Port '{name}' not found. Available ports: {available_ports}"
+        )
+
+    def __setattr__(self, name: str, value):
+        """Handle attribute setting while preserving dot notation access for ports."""
+        if isinstance(value, InputPort):
+            self.input[name] = value
+        elif isinstance(value, OutputPort):
+            self.output[name] = value
+        else:
+            super().__setattr__(name, value)
