@@ -1,13 +1,13 @@
 [
   {
-    "objectID": "getting_started.html",
-    "href": "getting_started.html",
-    "title": "Getting Started Tutorial",
+    "objectID": "installation.html",
+    "href": "installation.html",
+    "title": "Installation Instructions",
     "section": "",
-    "text": "1. Creating your first element\n\n\n2. Connecting elements\n\n\n3. Building your first flow\n\n\n4. Testing your flow\n\n\n5. Deploying your flow",
+    "text": "You can install Pyllments using either of the following methods:\n\nUsing uv (Super duper fast)\n\n\nGet uv\nuv pip install pyllments\nqua## Using pip\npip install pyllments",
     "crumbs": [
       "Getting Started",
-      "🎓 Getting Started Tutorial"
+      "🔧 Installation"
     ]
   },
   {
@@ -15,7 +15,7 @@
     "href": "index.html",
     "title": "What is Pyllments?",
     "section": "",
-    "text": "Build Modular, LLM-Powered Applications with Ease.\n\n\n\n\n\n\n\n\n\n🧩\n\n\nModular Components\n\n\n⚡\n\n\nFlow-Based Programming\n\n\n🎨\n\n\nFront End Framework\n\n\n🔌\n\n\nLLM + vDB Integrations\n\n\n\n\n\n\n\n\n\n\nPyllments consists of a set of Elements with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.\n\nElements:\n\nEasily integrate into your own projects\nHave front end components associated with them, which allows you to build your own composable GUIs to interact with your flows\nCan individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)\n\n\n\nElements are building blocks with a consistent interface\n\n\n\n\n\n\n\n▷\n\n\n\n\n\nElements can create and manage easily composable front-end components called Views\n\n\n\n\nYour browser does not support the video tag.    ▷ \n\n\n\nUsing their Ports interface, Elements can be connected in endless permutations.\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\nAttach API endpoints to any part of the flow\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\nExample\nfrom pyllments.elements.chat_interface import ChatInterfaceElement, LLMChatElement\n\n1chat_interface = ChatInterfaceElement()\nllm_chat = LLMChatElement()\n\n2chat_interface.ports.output['message_output'] &gt; llm_chat.ports.input['message_input']\n\n1\n\n(👈 Press Me) Create a the chat interface and LLM chat elements\n\n2\n\nConnect the chat interface element’s output port to the LLM chat element’s input port\n\n\n\n\n\n\n\nflowchart LR\nsubgraph chat_interface_el [ChatInterfaceElement]\n  direction TB\n  subgraph chat_interface_el_views [Views]\n    direction LR\n    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View\n  end\n  subgraph chat_interface_el_Ports [Ports]\n      direction LR\n      subgraph chat_interface_el_input [Input]\n          direction TB\n          message_input:::InputPort ~~~ message_emit_input:::InputPort\n      end\n      subgraph chat_interface_el_output [Output]\n          direction TB\n          message_output:::OutputPort\n      end\n      chat_interface_el_input ~~~ chat_interface_el_output\n  end\n  chat_interface_el_views ~~~ chat_interface_el_Ports\nend\n\nsubgraph llm_chat_el [LLMChatElement]\n  direction TB\n  subgraph llm_Views [Views]\n    direction LR\n    model_selector_view:::View\n  end\n  subgraph llm_Ports [Ports]\n      direction LR\n      subgraph llm_chat_input [Input]\n          direction TB\n          messages_input:::InputPort\n      end\n      subgraph llm_chat_output [Output]\n          direction TB\n          llm_message_output[message_output]:::OutputPort\n      end\n      llm_chat_input ~~~ llm_chat_output\n  end\n  llm_Views ~~~ llm_Ports\nend\n\nmessage_output --MessagePayload--&gt; messages_input\n\n\n\n\n\n\nKey Features:\n\nModular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.\nReactive Design: Utilizes the Param library for reactive programming, ensuring seamless updates between models and views.\nVisualization Support: Leverages the Panel library for creating interactive web-based user interfaces.\nLLM Integration: Easily incorporate Large Language Models into your applications.\nFlexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.",
+    "text": "Build Modular, LLM-Powered Applications with Ease.\n\n\n\n\n\n\n\n\n\n🧩\n\n\nModular Components\n\n\n⚡\n\n\nFlow-Based Programming\n\n\n🎨\n\n\nFront End Framework\n\n\n🔌\n\n\nLLM + vDB Integrations\n\n\n\n\n\n\n\n\n\n\nPyllments consists of a set of Elements with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.\nPyllments comes with a set of pre-built parameterized application you can run immediately from the command line like so:\npyllments recipe run branch_flow --height 900 --width 700\nSee Recipes Here\n\nElements:\n\nEasily integrate into your own projects\nHave front end components associated with them, which allows you to build your own composable GUIs to interact with your flows\nCan individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)\n\n\n\nElements are building blocks with a consistent interface\n\n\n\n\n\n\n\n▷\n\n\n\n\n\nElements can create and manage easily composable front-end components called Views\n\n\n\n\nYour browser does not support the video tag.    ▷ \n\n\n\nUsing their Ports interface, Elements can be connected in endless permutations.\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\nAttach API endpoints to any part of the flow\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\n\n\n\nflowchart LR\nsubgraph chat_interface_el [ChatInterfaceElement]\n  direction TB\n  subgraph chat_interface_el_views [Views]\n    direction LR\n    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View\n  end\n  subgraph chat_interface_el_Ports [Ports]\n      direction LR\n      subgraph chat_interface_el_input [Input]\n          direction TB\n          message_input:::InputPort ~~~ message_emit_input:::InputPort\n      end\n      subgraph chat_interface_el_output [Output]\n          direction TB\n          message_output:::OutputPort\n      end\n      chat_interface_el_input ~~~ chat_interface_el_output\n  end\n  chat_interface_el_views ~~~ chat_interface_el_Ports\nend\n\nsubgraph llm_chat_el [LLMChatElement]\n  direction TB\n  subgraph llm_Views [Views]\n    direction LR\n    model_selector_view:::View\n  end\n  subgraph llm_Ports [Ports]\n      direction LR\n      subgraph llm_chat_input [Input]\n          direction TB\n          messages_input:::InputPort\n      end\n      subgraph llm_chat_output [Output]\n          direction TB\n          llm_message_output[message_output]:::OutputPort\n      end\n      llm_chat_input ~~~ llm_chat_output\n  end\n  llm_Views ~~~ llm_Ports\nend\n\nmessage_output --MessagePayload--&gt; messages_input\n\n\n\n\n\n\nKey Features:\n\nModular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.\nReactive Design: Utilizes the Param library for reactive programming, ensuring seamless updates between models and views.\nVisualization Support: Leverages the Panel library for creating interactive web-based user interfaces.\nLLM Integration: Easily incorporate Large Language Models into your applications.\nFlexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.",
     "crumbs": [
       "Getting Started",
       "🚀 Introduction"
@@ -83,14 +83,52 @@
     "text": "This be my introduction"
   },
   {
-    "objectID": "installation.html",
-    "href": "installation.html",
-    "title": "Installation Instructions",
+    "objectID": "getting_started/index.html",
+    "href": "getting_started/index.html",
+    "title": "Getting Started Tutorial",
     "section": "",
-    "text": "You can install Pyllments using either of the following methods:\n\nUsing pipUsing uv pip\n\n\npip install pyllments\n\n\nuv pip install pyllments",
-    "crumbs": [
-      "Getting Started",
-      "🔧 Installation"
-    ]
+    "text": "Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application.\nPlease make sure that you’ve installed pyllments if you want to follow along.\nIf you don’t care about building flows, you can hop on over to the recipes section to run pre-built applications. d"
+  },
+  {
+    "objectID": "getting_started/index.html#creating-your-first-element",
+    "href": "getting_started/index.html#creating-your-first-element",
+    "title": "Getting Started Tutorial",
+    "section": "1. Creating your first Element",
+    "text": "1. Creating your first Element\n\n\n\n\n\nElement Diagram\n\n\nThe fundamental building block of pyllments, is as you may have guessed, an Element.\nAn element is composed of a Model that handles the business logic, Ports that handle the communication between elements, and optionally, Views that handles the frontend representation of the element.\n1from pyllments.elements import ChatInterfaceElement\n\n2chat_interface_el = ChatInterfaceElement()\n\n1\n\nImport the ChatInterfaceElement from the pyllments.elements subpackage. This is how most elements are efficiently imported.\n\n2\n\nCreate an instance of the ChatInterfaceElement"
+  },
+  {
+    "objectID": "getting_started/index.html#adding-more-elements",
+    "href": "getting_started/index.html#adding-more-elements",
+    "title": "Getting Started Tutorial",
+    "section": "2. Adding more elements",
+    "text": "2. Adding more elements\nNow that we’re getting the hang of it, lets create a couple more.\nfrom pyllments.elements import LLMChatElement, HistoryHandlerElement\n\n1llm_chat_el = LLMChatElement(model_name='gpt-4o')\n2history_handler_el = HistoryHandlerElement(\n    history_token_limit=1000, \n    tokenizer_model='gpt-4o'\n)\n\n1\n\nCreate an instance of the LLMChatElement with the model name set to ‘gpt-4o’. LLMChatElement uses the LiteLLM naming system and is compatible with the chat models supported by LiteLLM. All you need is the corresponding API key in an .env file.\n\n2\n\nCreate an instance of the HistoryHandlerElement with the token limit set to 1000 tokens as measured by the gpt-4o tokenizer. This is the default tokenizer used and can be expected to be a good enough estimate for most use cases."
+  },
+  {
+    "objectID": "getting_started/index.html#your-first-flow",
+    "href": "getting_started/index.html#your-first-flow",
+    "title": "Getting Started Tutorial",
+    "section": "3. Your first flow",
+    "text": "3. Your first flow\nLets take a moment to think about what we want to achieve. We are creating a chat interface which uses an LLM to respond to message while also taking into account the history of the conversation.\nBelow, you can see that each individual element has its own unique set of input and output ports as well as a designated Payload type it either emits or receives. In this case, we’re only using the MessagePayload and List[MessagePayload] types. For an output port to connect to an input port, its payload type must be compatible with the input port’s payload type.\nFor the HistoryHandlerElement to connect to the LLMChatElement, the messages_emit_input port of the LLMChatElement must be able to accept a List[MessagePayload] type.\n\n\n\nFlow Diagram\n\n\nTo facilitate the proper communication between the elements:\n\nWhen we type a message into the ChatInterfaceElement and hit send, it emits a MessagePayload through the message_output port.\nThat message is recieved by the HistoryHandlerElement through the message_emit_input port.\nThe _emit_input suffix specifies that upon recieving a payload, HistoryHandlerElement will emit a payload. The list of MessagePayloads that is emitted from the messages_output port consists of the message history stored internally with the latest MessagePayload appended at the end of that list.\nWhen the LLMChatElement recieves a List[MessagePayload] through the messages_emit_input port, it sends the list of messages to the LLM we previously specified and returns a MessagePayload through the message_output port.\nThe first input port that the MessagePayload is received by is the messages_input port of the HistoryHandlerElement, which unlike the message_emit_input port, does not emit any payload, it instead only appends the MessagePayload to the internal message history.\nThe second input that the MessagePayload is received by is the message_input port of the ChatInterfaceElement, which causes the message to be streamed to the chatfeed we will soon see."
+  },
+  {
+    "objectID": "getting_started/index.html#connecting-the-elements",
+    "href": "getting_started/index.html#connecting-the-elements",
+    "title": "Getting Started Tutorial",
+    "section": "4. Connecting the elements",
+    "text": "4. Connecting the elements\nNow that we have a flow in mind, connecting the elements is a breeze.\nchat_interface_el.ports.message_output &gt; history_handler_el.ports.message_emit_input\n\nhistory_handler_el.ports.messages_output &gt; llm_chat_el.ports.messages_emit_input\n\nllm_chat_el.ports.message_output &gt; history_handler_el.ports.messages_input\n\nllm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_input\nThe ports are accessed using dot notation on the ports attribute of the element. In the case of llm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_input, we are connecting an output port of the LLMChatElement to an input port of the ChatInterfaceElement using the &gt; operator, with the output port being on the left side of it. It is equivalent to llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_input)."
+  },
+  {
+    "objectID": "getting_started/index.html#testing-your-flow",
+    "href": "getting_started/index.html#testing-your-flow",
+    "title": "Getting Started Tutorial",
+    "section": "5. Testing your flow",
+    "text": "5. Testing your flow"
+  },
+  {
+    "objectID": "getting_started/index.html#deploying-your-flow",
+    "href": "getting_started/index.html#deploying-your-flow",
+    "title": "Getting Started Tutorial",
+    "section": "6. Deploying your flow",
+    "text": "6. Deploying your flow"
   }
 ]

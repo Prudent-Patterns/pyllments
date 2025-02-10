@@ -20,26 +20,63 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<link href=".//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
-<script src="site_libs/quarto-html/quarto.js"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-f8dc6eab18fde03278982b0b35885446.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-06d5b62565b184dafb44ab445649472e.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="..//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-f8dc6eab18fde03278982b0b35885446.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-a952dec0db6056a36c49f99100190090.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<script src="../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -66,42 +103,22 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
-<script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  // Immediately trigger the glitch effect on menu text when the DOM is ready
-  PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-
-  // Wait 300ms before checking for the sidebar toggle element to ensure it exists
-  setTimeout(function() {
-    var toggleElement = document.querySelector('.quarto-sidebar-toggle');
-    if (toggleElement) {
-      toggleElement.addEventListener('click', function() {
-        // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
-        setTimeout(function() {
-          PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-        }, 500);
-      });
-    }
-  }, 300);
-});
-</script>
 
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../styles.css">
 </head>
 
-<body class="nav-sidebar floating nav-fixed">
+<body class="nav-sidebar floating nav-fixed slimcontent">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a href="./index.html" class="navbar-brand navbar-brand-logo">
-    <img src="./assets/logo/pyllments_logo_128.png" alt="" class="navbar-logo">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../assets/logo/pyllments_logo_128.png" alt="" class="navbar-logo">
     </a>
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../index.html">
     <span class="navbar-title">Pyllments Documentation</span>
     </a>
   </div>
@@ -112,23 +129,20 @@ document.addEventListener("DOMContentLoaded", function() {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./getting_started.html" aria-current="page"> 
+    <a class="nav-link active" href="../getting_started" aria-current="page"> 
 <span class="menu-text">Getting Started</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">How-To</span>
-    </span>
+    <a class="nav-link" href="../how_to"> 
+<span class="menu-text">How-To</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">Elements</span>
-    </span>
+    <a class="nav-link" href="../elements"> 
+<span class="menu-text">Elements</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">API Reference</span>
-    </span>
+    <a class="nav-link" href="../api_reference"> 
+<span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
@@ -148,7 +162,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./getting_started.html">🎓 Getting Started Tutorial</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Getting Started Tutorial</li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -162,19 +176,19 @@ document.addEventListener("DOMContentLoaded", function() {
     <ul class="list-unstyled mt-1">
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./index.html" class="sidebar-item-text sidebar-link">
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🚀 Introduction</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./installation.html" class="sidebar-item-text sidebar-link">
+  <a href="../installation.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🔧 Installation</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./getting_started.html" class="sidebar-item-text sidebar-link active">
+  <a href="../getting_started" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🎓 Getting Started Tutorial</span></a>
   </div>
 </li>
@@ -189,19 +203,19 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/chat_interface.html" class="sidebar-item-text sidebar-link">
+  <a href="../how_to/chat_interface.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Build a Chat Interface</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/conversation_history.html" class="sidebar-item-text sidebar-link">
+  <a href="../how_to/conversation_history.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Use Conversation History</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/retriever.html" class="sidebar-item-text sidebar-link">
+  <a href="../how_to/retriever.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Use a Retriever</span></a>
   </div>
 </li>
@@ -209,7 +223,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a href="./elements/index.html" class="sidebar-item-text sidebar-link">
+            <a href="../elements/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🧩 Elements</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -218,13 +232,13 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/ChatInterfaceElement.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/ChatInterfaceElement.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">ChatInterfaceElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/LLMChatElement.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/LLMChatElement.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">LLMChatElement</span></a>
   </div>
 </li>
@@ -241,19 +255,19 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/architecture.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/architecture.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Architecture</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/elements.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/elements.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Elements</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/ports.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/ports.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Ports</span></a>
   </div>
 </li>
@@ -261,7 +275,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a href="./recipes/index.html" class="sidebar-item-text sidebar-link">
+            <a href="../recipes/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">👨‍🍳 Recipes</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -270,25 +284,25 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Multi Chat Flow</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/simple_flow.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/simple_flow.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Simple Flow</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Simple Flow API</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
@@ -304,16 +318,17 @@ document.addEventListener("DOMContentLoaded", function() {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#creating-your-first-element" id="toc-creating-your-first-element" class="nav-link active" data-scroll-target="#creating-your-first-element">1. Creating your first element</a></li>
-  <li><a href="#connecting-elements" id="toc-connecting-elements" class="nav-link" data-scroll-target="#connecting-elements">2. Connecting elements</a></li>
-  <li><a href="#building-your-first-flow" id="toc-building-your-first-flow" class="nav-link" data-scroll-target="#building-your-first-flow">3. Building your first flow</a></li>
-  <li><a href="#testing-your-flow" id="toc-testing-your-flow" class="nav-link" data-scroll-target="#testing-your-flow">4. Testing your flow</a></li>
-  <li><a href="#deploying-your-flow" id="toc-deploying-your-flow" class="nav-link" data-scroll-target="#deploying-your-flow">5. Deploying your flow</a></li>
+  <li><a href="#creating-your-first-element" id="toc-creating-your-first-element" class="nav-link active" data-scroll-target="#creating-your-first-element">1. Creating your first <code>Element</code></a></li>
+  <li><a href="#adding-more-elements" id="toc-adding-more-elements" class="nav-link" data-scroll-target="#adding-more-elements">2. Adding more elements</a></li>
+  <li><a href="#your-first-flow" id="toc-your-first-flow" class="nav-link" data-scroll-target="#your-first-flow">3. Your first flow</a></li>
+  <li><a href="#connecting-the-elements" id="toc-connecting-the-elements" class="nav-link" data-scroll-target="#connecting-the-elements">4. Connecting the elements</a></li>
+  <li><a href="#testing-your-flow" id="toc-testing-your-flow" class="nav-link" data-scroll-target="#testing-your-flow">5. Testing your flow</a></li>
+  <li><a href="#deploying-your-flow" id="toc-deploying-your-flow" class="nav-link" data-scroll-target="#deploying-your-flow">6. Deploying your flow</a></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content">
+<main class="content page-columns page-full" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
@@ -334,20 +349,94 @@ document.addEventListener("DOMContentLoaded", function() {
 </header>
 
 
-<section id="creating-your-first-element" class="level1">
-<h1>1. Creating your first element</h1>
+<p>Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application.</p>
+<p>Please make sure that you’ve <a href="../installation.html">installed pyllments</a> if you want to follow along.</p>
+<p>If you don’t care about building flows, you can hop on over to the <a href="../recipes">recipes section</a> to run pre-built applications. d</p>
+<section id="creating-your-first-element" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="creating-your-first-element">1. Creating your first <code>Element</code></h2>
+
+<div class="no-row-height column-margin column-container"><div class="">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="getting_started_element.jpg" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Element Diagram"><img src="getting_started_element.jpg" class="img-fluid figure-img" alt="Element Diagram"></a></p>
+<figcaption>Element Diagram</figcaption>
+</figure>
+</div>
+</div></div><p>The fundamental building block of pyllments, is as you may have guessed, an <code>Element</code>.</p>
+<p>An element is composed of a <code>Model</code> that handles the business logic, <code>Ports</code> that handle the communication between elements, and optionally, <code>Views</code> that handles the frontend representation of the element.</p>
+<div class="sourceCode" id="annotated-cell-1"><pre class="sourceCode python code-annotation-code code-with-copy code-annotated"><code class="sourceCode python"><a class="code-annotation-anchor" data-target-cell="annotated-cell-1" data-target-annotation="1" onclick="event.preventDefault();">1</a><span id="annotated-cell-1-1" class="code-annotation-target"><a href="#annotated-cell-1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyllments.elements <span class="im">import</span> ChatInterfaceElement</span>
+<span id="annotated-cell-1-2"><a href="#annotated-cell-1-2" aria-hidden="true" tabindex="-1"></a></span>
+<a class="code-annotation-anchor" data-target-cell="annotated-cell-1" data-target-annotation="2" onclick="event.preventDefault();">2</a><span id="annotated-cell-1-3" class="code-annotation-target"><a href="#annotated-cell-1-3" aria-hidden="true" tabindex="-1"></a>chat_interface_el <span class="op">=</span> ChatInterfaceElement()</span><div class="code-annotation-gutter-bg"></div><div class="code-annotation-gutter"></div></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<dl class="code-annotation-container-grid">
+<dt data-target-cell="annotated-cell-1" data-target-annotation="1">1</dt>
+<dd>
+<span data-code-cell="annotated-cell-1" data-code-lines="1" data-code-annotation="1">Import the <code>ChatInterfaceElement</code> from the <code>pyllments.elements</code> subpackage. This is how most elements are efficiently imported.</span>
+</dd>
+<dt data-target-cell="annotated-cell-1" data-target-annotation="2">2</dt>
+<dd>
+<span data-code-cell="annotated-cell-1" data-code-lines="3" data-code-annotation="2">Create an instance of the <code>ChatInterfaceElement</code></span>
+</dd>
+</dl>
 </section>
-<section id="connecting-elements" class="level1">
-<h1>2. Connecting elements</h1>
+<section id="adding-more-elements" class="level2">
+<h2 class="anchored" data-anchor-id="adding-more-elements">2. Adding more elements</h2>
+<p>Now that we’re getting the hang of it, lets create a couple more.</p>
+<div class="sourceCode" id="annotated-cell-2"><pre class="sourceCode python code-annotation-code code-with-copy code-annotated"><code class="sourceCode python"><span id="annotated-cell-2-1"><a href="#annotated-cell-2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyllments.elements <span class="im">import</span> LLMChatElement, HistoryHandlerElement</span>
+<span id="annotated-cell-2-2"><a href="#annotated-cell-2-2" aria-hidden="true" tabindex="-1"></a></span>
+<a class="code-annotation-anchor" data-target-cell="annotated-cell-2" data-target-annotation="1" onclick="event.preventDefault();">1</a><span id="annotated-cell-2-3" class="code-annotation-target"><a href="#annotated-cell-2-3" aria-hidden="true" tabindex="-1"></a>llm_chat_el <span class="op">=</span> LLMChatElement(model_name<span class="op">=</span><span class="st">'gpt-4o'</span>)</span>
+<a class="code-annotation-anchor" data-target-cell="annotated-cell-2" data-target-annotation="2" onclick="event.preventDefault();">2</a><span id="annotated-cell-2-4" class="code-annotation-target"><a href="#annotated-cell-2-4" aria-hidden="true" tabindex="-1"></a>history_handler_el <span class="op">=</span> HistoryHandlerElement(</span>
+<span id="annotated-cell-2-5"><a href="#annotated-cell-2-5" aria-hidden="true" tabindex="-1"></a>    history_token_limit<span class="op">=</span><span class="dv">1000</span>, </span>
+<span id="annotated-cell-2-6"><a href="#annotated-cell-2-6" aria-hidden="true" tabindex="-1"></a>    tokenizer_model<span class="op">=</span><span class="st">'gpt-4o'</span></span>
+<span id="annotated-cell-2-7"><a href="#annotated-cell-2-7" aria-hidden="true" tabindex="-1"></a>)</span><div class="code-annotation-gutter-bg"></div><div class="code-annotation-gutter"></div></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<dl class="code-annotation-container-grid">
+<dt data-target-cell="annotated-cell-2" data-target-annotation="1">1</dt>
+<dd>
+<span data-code-cell="annotated-cell-2" data-code-lines="3" data-code-annotation="1">Create an instance of the <code>LLMChatElement</code> with the model name set to ‘gpt-4o’. LLMChatElement uses the <a href="https://models.litellm.ai">LiteLLM naming system</a> and is compatible with the chat models supported by LiteLLM. All you need is the corresponding API key in an .env file.</span>
+</dd>
+<dt data-target-cell="annotated-cell-2" data-target-annotation="2">2</dt>
+<dd>
+<span data-code-cell="annotated-cell-2" data-code-lines="4,6" data-code-annotation="2">Create an instance of the <code>HistoryHandlerElement</code> with the token limit set to 1000 tokens as measured by the gpt-4o tokenizer. This is the default tokenizer used and can be expected to be a good enough estimate for most use cases.</span>
+</dd>
+</dl>
 </section>
-<section id="building-your-first-flow" class="level1">
-<h1>3. Building your first flow</h1>
+<section id="your-first-flow" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="your-first-flow">3. Your first flow</h2>
+<p>Lets take a moment to think about what we want to achieve. We are creating a chat interface which uses an LLM to respond to message while also taking into account the history of the conversation.</p>
+<p>Below, you can see that each individual element has its own unique set of input and output ports as well as a designated Payload type it either emits or receives. In this case, we’re only using the <code>MessagePayload</code> and <code>List[MessagePayload]</code> types. For an output port to connect to an input port, its payload type must be compatible with the input port’s payload type.</p>
+<p>For the <code>HistoryHandlerElement</code> to connect to the <code>LLMChatElement</code>, the <code>messages_emit_input</code> port of the <code>LLMChatElement</code> must be able to accept a <code>List[MessagePayload]</code> type.</p>
+<div class="quarto-figure quarto-figure-center page-columns page-full">
+<figure class="figure page-columns page-full">
+<p class="page-columns page-full"><a href="getting_started_flow.jpg" class="lightbox page-columns page-full" data-gallery="quarto-lightbox-gallery-2" title="Flow Diagram"><img src="getting_started_flow.jpg" class="column-page img-fluid figure-img" alt="Flow Diagram"></a></p>
+<figcaption>Flow Diagram</figcaption>
+</figure>
+</div>
+<p>To facilitate the proper communication between the elements:</p>
+<ol type="1">
+<li>When we type a message into the <code>ChatInterfaceElement</code> and hit send, it emits a <code>MessagePayload</code> through the <code>message_output</code> port.</li>
+<li>That message is recieved by the <code>HistoryHandlerElement</code> through the <code>message_emit_input</code> port.</li>
+<li>The <code>_emit_input</code> suffix specifies that upon recieving a payload, <code>HistoryHandlerElement</code> will emit a payload. The list of <code>MessagePayload</code>s that is emitted from the <code>messages_output</code> port consists of the message history stored internally with the latest <code>MessagePayload</code> appended at the end of that list.</li>
+<li>When the <code>LLMChatElement</code> recieves a <code>List[MessagePayload]</code> through the <code>messages_emit_input</code> port, it sends the list of messages to the LLM we previously specified and returns a <code>MessagePayload</code> through the <code>message_output</code> port.</li>
+<li>The first input port that the <code>MessagePayload</code> is received by is the <code>messages_input</code> port of the <code>HistoryHandlerElement</code>, which unlike the <code>message_emit_input</code> port, does not emit any payload, it instead only appends the <code>MessagePayload</code> to the internal message history.</li>
+<li>The second input that the <code>MessagePayload</code> is received by is the <code>message_input</code> port of the <code>ChatInterfaceElement</code>, which causes the message to be streamed to the chatfeed we will soon see.</li>
+</ol>
 </section>
-<section id="testing-your-flow" class="level1">
-<h1>4. Testing your flow</h1>
+<section id="connecting-the-elements" class="level2">
+<h2 class="anchored" data-anchor-id="connecting-the-elements">4. Connecting the elements</h2>
+<p>Now that we have a flow in mind, connecting the elements is a breeze.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>chat_interface_el.ports.message_output <span class="op">&gt;</span> history_handler_el.ports.message_emit_input</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>history_handler_el.ports.messages_output <span class="op">&gt;</span> llm_chat_el.ports.messages_emit_input</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>llm_chat_el.ports.message_output <span class="op">&gt;</span> history_handler_el.ports.messages_input</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>llm_chat_el.ports.message_output <span class="op">&gt;</span> chat_interface_el.ports.message_input</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The ports are accessed using dot notation on the <code>ports</code> attribute of the element. In the case of <code>llm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_input</code>, we are connecting an output port of the <code>LLMChatElement</code> to an input port of the <code>ChatInterfaceElement</code> using the <code>&gt;</code> operator, with the output port being on the left side of it. It is equivalent to <code>llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_input)</code>.</p>
 </section>
-<section id="deploying-your-flow" class="level1">
-<h1>5. Deploying your flow</h1>
+<section id="testing-your-flow" class="level2">
+<h2 class="anchored" data-anchor-id="testing-your-flow">5. Testing your flow</h2>
+</section>
+<section id="deploying-your-flow" class="level2">
+<h2 class="anchored" data-anchor-id="deploying-your-flow">6. Deploying your flow</h2>
 
 
 </section>
@@ -771,6 +860,38 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
 
 
 

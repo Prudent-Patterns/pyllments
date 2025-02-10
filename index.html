@@ -73,7 +73,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-f8dc6eab18fde03278982b0b35885446.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-06d5b62565b184dafb44ab445649472e.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-a952dec0db6056a36c49f99100190090.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -103,26 +103,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-diagram/mermaid.min.js"></script>
 <script src="site_libs/quarto-diagram/mermaid-init.js"></script>
 <link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
-<script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  // Immediately trigger the glitch effect on menu text when the DOM is ready
-  PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-
-  // Wait 300ms before checking for the sidebar toggle element to ensure it exists
-  setTimeout(function() {
-    var toggleElement = document.querySelector('.quarto-sidebar-toggle');
-    if (toggleElement) {
-      toggleElement.addEventListener('click', function() {
-        // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
-        setTimeout(function() {
-          PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-        }, 500);
-      });
-    }
-  }, 300);
-});
-</script>
 
 
 <link rel="stylesheet" href="styles.css">
@@ -149,23 +129,20 @@ document.addEventListener("DOMContentLoaded", function() {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./getting_started.html" aria-current="page"> 
+    <a class="nav-link active" href="./getting_started" aria-current="page"> 
 <span class="menu-text">Getting Started</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">How-To</span>
-    </span>
+    <a class="nav-link" href="./how_to"> 
+<span class="menu-text">How-To</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">Elements</span>
-    </span>
+    <a class="nav-link" href="./elements"> 
+<span class="menu-text">Elements</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">API Reference</span>
-    </span>
+    <a class="nav-link" href="./api_reference"> 
+<span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
@@ -211,7 +188,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./getting_started.html" class="sidebar-item-text sidebar-link">
+  <a href="./getting_started" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🎓 Getting Started Tutorial</span></a>
   </div>
 </li>
@@ -388,6 +365,9 @@ LLM + vDB Integrations
 </section>
 </div>
 <p>Pyllments consists of a set of <strong>Elements</strong> with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.</p>
+<p>Pyllments comes with a set of pre-built parameterized application you can run immediately from the command line like so:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pyllments</span> recipe run branch_flow <span class="at">--height</span> 900 <span class="at">--width</span> 700</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><a href="recipes">See Recipes Here</a></p>
 <section id="elements" class="level4">
 <h4 class="anchored" data-anchor-id="elements">Elements:</h4>
 <ul>
@@ -488,24 +468,6 @@ cursor: pointer;
 z-index: 2;"> ▷ </button>
 </div>
 </div>
-<section id="example" class="level1">
-<h1>Example</h1>
-<div class="sourceCode" id="annotated-cell-1"><pre class="sourceCode python code-annotation-code code-with-copy code-annotated"><code class="sourceCode python"><span id="annotated-cell-1-1"><a href="#annotated-cell-1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyllments.elements.chat_interface <span class="im">import</span> ChatInterfaceElement, LLMChatElement</span>
-<span id="annotated-cell-1-2"><a href="#annotated-cell-1-2" aria-hidden="true" tabindex="-1"></a></span>
-<a class="code-annotation-anchor" data-target-cell="annotated-cell-1" data-target-annotation="1" onclick="event.preventDefault();">1</a><span id="annotated-cell-1-3" class="code-annotation-target"><a href="#annotated-cell-1-3" aria-hidden="true" tabindex="-1"></a>chat_interface <span class="op">=</span> ChatInterfaceElement()</span>
-<span id="annotated-cell-1-4"><a href="#annotated-cell-1-4" aria-hidden="true" tabindex="-1"></a>llm_chat <span class="op">=</span> LLMChatElement()</span>
-<span id="annotated-cell-1-5"><a href="#annotated-cell-1-5" aria-hidden="true" tabindex="-1"></a></span>
-<a class="code-annotation-anchor" data-target-cell="annotated-cell-1" data-target-annotation="2" onclick="event.preventDefault();">2</a><span id="annotated-cell-1-6" class="code-annotation-target"><a href="#annotated-cell-1-6" aria-hidden="true" tabindex="-1"></a>chat_interface.ports.output[<span class="st">'message_output'</span>] <span class="op">&gt;</span> llm_chat.ports.<span class="bu">input</span>[<span class="st">'message_input'</span>]</span><div class="code-annotation-gutter-bg"></div><div class="code-annotation-gutter"></div></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<dl class="code-annotation-container-grid">
-<dt data-target-cell="annotated-cell-1" data-target-annotation="1">1</dt>
-<dd>
-<span data-code-cell="annotated-cell-1" data-code-lines="3,4" data-code-annotation="1">(<strong>👈 Press Me</strong>) Create a the chat interface and LLM chat elements</span>
-</dd>
-<dt data-target-cell="annotated-cell-1" data-target-annotation="2">2</dt>
-<dd>
-<span data-code-cell="annotated-cell-1" data-code-lines="6" data-code-annotation="2">Connect the chat interface element’s output port to the LLM chat element’s input port</span>
-</dd>
-</dl>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -606,7 +568,6 @@ video.pause();
 </script>
 
 
-</section>
 </main></div>
 
 

@@ -75,7 +75,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-f8dc6eab18fde03278982b0b35885446.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-06d5b62565b184dafb44ab445649472e.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-a952dec0db6056a36c49f99100190090.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -131,26 +131,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     }
   })
   </script>
-<script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  // Immediately trigger the glitch effect on menu text when the DOM is ready
-  PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-
-  // Wait 300ms before checking for the sidebar toggle element to ensure it exists
-  setTimeout(function() {
-    var toggleElement = document.querySelector('.quarto-sidebar-toggle');
-    if (toggleElement) {
-      toggleElement.addEventListener('click', function() {
-        // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
-        setTimeout(function() {
-          PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-        }, 500);
-      });
-    }
-  }, 300);
-});
-</script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -206,23 +186,20 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="../getting_started.html" aria-current="page"> 
+    <a class="nav-link active" href="../getting_started" aria-current="page"> 
 <span class="menu-text">Getting Started</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">How-To</span>
-    </span>
+    <a class="nav-link" href="../how_to"> 
+<span class="menu-text">How-To</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">Elements</span>
-    </span>
+    <a class="nav-link" href="../elements"> 
+<span class="menu-text">Elements</span></a>
   </li>  
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">API Reference</span>
-    </span>
+    <a class="nav-link" href="../api_reference"> 
+<span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
@@ -268,7 +245,7 @@ window.Quarto = {
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../getting_started.html" class="sidebar-item-text sidebar-link">
+  <a href="../getting_started" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🎓 Getting Started Tutorial</span></a>
   </div>
 </li>
@@ -434,7 +411,7 @@ Description
 </tr>
 </thead>
 <tbody class="list">
-<tr data-index="0" data-listing-file-modified-sort="1739151729223" data-listing-reading-time-sort="2" data-listing-word-count-sort="226" data-listing-title-sort="Branching Chat Flow" data-listing-filename-sort="index.qmd">
+<tr data-index="0" data-listing-file-modified-sort="1739152021866" data-listing-reading-time-sort="2" data-listing-word-count-sort="226" data-listing-title-sort="Branching Chat Flow" data-listing-filename-sort="index.qmd">
 <td>
 <a href="../recipes/branch_flow/index.html" class="title listing-title">Branching Chat Flow</a>
 </td>
@@ -442,7 +419,7 @@ Description
 <span class="listing-description">Create a multi-tabbed chat interface that allows users to branch conversations and create new ones.</span>
 </td>
 </tr>
-<tr data-index="1" data-listing-file-modified-sort="1739151729223" data-listing-reading-time-sort="1" data-listing-word-count-sort="1" data-listing-title-sort="Multi Chat Flow" data-listing-filename-sort="multi_chat_flow.qmd">
+<tr data-index="1" data-listing-file-modified-sort="1739152021866" data-listing-reading-time-sort="1" data-listing-word-count-sort="1" data-listing-title-sort="Multi Chat Flow" data-listing-filename-sort="multi_chat_flow.qmd">
 <td>
 <a href="../recipes/multi_chat_flow.html" class="title listing-title">Multi Chat Flow</a>
 </td>
@@ -450,7 +427,7 @@ Description
 <span class="listing-description">A multi chat flow recipe</span>
 </td>
 </tr>
-<tr data-index="2" data-listing-file-modified-sort="1739151729223" data-listing-reading-time-sort="1" data-listing-word-count-sort="4" data-listing-title-sort="Simple Flow" data-listing-filename-sort="simple_flow.qmd">
+<tr data-index="2" data-listing-file-modified-sort="1739152021866" data-listing-reading-time-sort="1" data-listing-word-count-sort="4" data-listing-title-sort="Simple Flow" data-listing-filename-sort="simple_flow.qmd">
 <td>
 <a href="../recipes/simple_flow.html" class="title listing-title">Simple Flow</a>
 </td>
@@ -458,7 +435,7 @@ Description
 <span class="listing-description">A simple flow recipe</span>
 </td>
 </tr>
-<tr data-index="3" data-listing-file-modified-sort="1739151729223" data-listing-reading-time-sort="1" data-listing-word-count-sort="4" data-listing-title-sort="Simple Flow API" data-listing-filename-sort="simple_flow_api.qmd">
+<tr data-index="3" data-listing-file-modified-sort="1739152021866" data-listing-reading-time-sort="1" data-listing-word-count-sort="4" data-listing-title-sort="Simple Flow API" data-listing-filename-sort="simple_flow_api.qmd">
 <td>
 <a href="../recipes/simple_flow_api.html" class="title listing-title">Simple Flow API</a>
 </td>
