@@ -3,6 +3,7 @@
     scrollbar-width: thin;
     border-color: var(--primary-accent-color);
     background-color: var(--secondary-background-color);
+    color: var(--white);
 }
 
 :host .bk-input-group > label {

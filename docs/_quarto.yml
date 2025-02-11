@@ -50,27 +50,27 @@ format:
     toc: true
     highlight-style: github
     freeze: auto
-    # include-in-header:
-    #   - text: |
-    #       <script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
-    #       <script>
-    #       document.addEventListener("DOMContentLoaded", function() {
-    #         // Immediately trigger the glitch effect on menu text when the DOM is ready
-    #         PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-    #         // Wait 300ms before checking for the sidebar toggle element to ensure it exists
-    #         setTimeout(function() {
-    #           var toggleElement = document.querySelector('.quarto-sidebar-toggle');
-    #           if (toggleElement) {
-    #             toggleElement.addEventListener('click', function() {
-    #               // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
-    #               setTimeout(function() {
-    #                 PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
-    #               }, 500);
-    #             });
-    #           }
-    #         }, 300);
-    #       });
-    #       </script>
+    include-in-header:
+      - text: |
+          <script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
+          <script>
+          document.addEventListener("DOMContentLoaded", function() {
+            // Immediately trigger the glitch effect on menu text when the DOM is ready
+            PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
+            // Wait 300ms before checking for the sidebar toggle element to ensure it exists
+            setTimeout(function() {
+              var toggleElement = document.querySelector('.quarto-sidebar-toggle');
+              if (toggleElement) {
+                toggleElement.addEventListener('click', function() {
+                  // After the toggle is clicked, wait 500ms for any UI updates then trigger the glitch effect again
+                  setTimeout(function() {
+                    PowerGlitch.glitch('span.menu-text', { playMode: 'click' });
+                  }, 500);
+                });
+              }
+            }, 300);
+          });
+          </script>
   
 
 

@@ -2,16 +2,19 @@
 title: "Installation Instructions"
 ---
 
-You can install Pyllments using either of the following methods:
+Requires:
+```bash
+python >= 3.11
+```
 
 ::: {.panel-tabset}
 
 ## Using uv (Super duper fast)
-[Get uv](https://docs.astral.sh/uv/getting-started/installation/)
+[Get uv](https://docs.astral.sh/uv/getting-started/installation/#pypi)
 ```{.bash}
 uv pip install pyllments
 ```
-qua## Using pip
+## Using pip (Not super duper fast)
 ```{.bash}
 pip install pyllments
 ```

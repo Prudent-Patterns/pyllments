@@ -24,6 +24,7 @@ $breadcrumb-bg: $secondary-background-color;
 $breadcrumb-active-color: $lesser-white;
 $code-background-color: rgba(52, 58, 64, .65);
 $table-accent-bg: None;
+$callout-color-tip: $tertiary-accent-color;
 
 /*-- Mermaid styling --*/
 $mermaid-bg-color: $primary-background-color;
@@ -136,6 +137,10 @@ ol.breadcrumb {
   background-color: $white;
 }
 
+button.code-copy-button {
+  color: $secondary-accent-color;
+}
+
 code:not(.sourceCode),
 p code:not(.sourceCode),
 li code:not(.sourceCode),
@@ -174,4 +179,29 @@ table {
 h1, h2 {
   margin-top: .8rem;
   margin-bottom: .8rem;
+}
+
+::-webkit-scrollbar {
+  width: 8px; /* Set the width of the scrollbar */
+  height: 8px; /* Set the height of the scrollbar */
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: $primary-accent-color; /* Color of the scrollbar thumb */
+  border-radius: 4px; /* Rounded corners for the scrollbar thumb */
+}
+
+::-webkit-scrollbar-track {
+  background-color: $primary-background-color; /* Background color of the scrollbar track */
+}
+
+// Tabset
+.panel-tabset .nav-tabs {
+  .nav-link {
+    color: $secondary-accent-color; // Default color for nav links
+
+    &.active {
+      color: $primary-accent-color; // Color for the active nav link
+    }
+  }
 }
