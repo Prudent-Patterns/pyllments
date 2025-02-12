@@ -39,13 +39,16 @@ class APIElement(Element):
         """)
 
     response_dict = param.Dict(default={}, doc="""
-        A mapping of output port names to the key, value pairs of the generated API response.
-        Is created when all of the input ports have received a payload, after which, it is cleared.
+        A mapping of input port names to the key-value pairs of the generated API response.
+        This mapping is used after all of the specified input ports have received a payload,
+        at which point, their payloads are aggregated to build the API response and then the
+        stored payloads are cleared.
 
         response_dict = {
-        # attribute_name is retrieved from the payload at the respective port e.g. payload.model.attribute_name
-        # lambda function can be provided to retrieve the attribute_name from the payload
-            'port_a': {'alias': 'attribute_name'}
+            # 'alias' is the key in the API response corresponding to the payload attribute
+            # retrieved from the payload at the respective input port e.g. payload.model.attribute_name;
+            # a lambda or async function can also be provided to retrieve/format the attribute.
+            'port_a': {'alias': 'attribute_name'},
             'port_b': {'another_alias': 'another_attribute_name'}
         }
         """)
@@ -54,7 +57,7 @@ class APIElement(Element):
         A mapping of output port names to the callback function and the list of input ports to take into account
         before using the callback_fn to output a dictionary to the API.
         The arguments in the callback_fn are Payloads from the respective ports - their names are the port names.
-        def callback_fn(port_a_payload, port_b_payload):
+        def callback_fn(port_a, port_b):
             return {
                 'alias': attribute_name,
                 'another_alias': another_attribute_name

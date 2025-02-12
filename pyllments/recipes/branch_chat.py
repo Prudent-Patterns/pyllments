@@ -1,5 +1,5 @@
 """
-This recipe creates a branching chat interface with an LLM backend. The interface can be customized through various display parameters to match your application's needs.
+Creates a branching chat interface where you have the ability to create new chats or branch off of existing ones.
 """
 from dataclasses import dataclass, field
 import re

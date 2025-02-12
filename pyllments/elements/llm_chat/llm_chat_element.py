@@ -62,7 +62,7 @@ class LLMChatElement(Element):
         provider : str, default 'OpenAI'
             The default provider value.
         model : str or dict, default 'gpt-4o-mini'
-            The default model (can be a key or an entire config dict).
+            The default model (this update assumes it is a string to be pre-selected).
         orientation : {'vertical', 'horizontal'}, default 'horizontal'
             Layout orientation for the provider and model selectors.
         model_selector_width : int, optional
@@ -159,13 +159,24 @@ class LLMChatElement(Element):
                 'OpenRouter': litellm.openrouter_models
             }
             # Allow for custom models via the passed-in models argument.
-            if models is not None:
+            if models:
                 provider_map['Custom'] = models
 
-            # Create a provider selector widget.
+            # NEW: Determine the default provider based on the provided default model string.
+            default_provider = provider  # Fallback to the provided 'provider'
+            default_model_config = None
+            if isinstance(model, str):
+                for prov, models_list in provider_map.items():
+                    processed_models = process_models(models_list)
+                    if model in processed_models:
+                        default_provider = prov
+                        default_model_config = processed_models[model]
+                        break
+
+            # Create a provider selector widget using the determined default_provider.
             provider_selector = pn.widgets.Select(
                 name='Provider Selector',
-                value=provider,
+                value=default_provider,
                 options=list(provider_map.keys()),
                 stylesheets=selector_css,
                 width=provider_selector_width,
@@ -174,7 +185,7 @@ class LLMChatElement(Element):
             )
 
             # Initialize model options based on the selected provider.
-            initial_options = process_models(provider_map.get(provider, {}))
+            initial_options = process_models(provider_map.get(default_provider, {}))
             model_selector = pn.widgets.Select(
                 name='Model Selector',
                 options=initial_options,
@@ -184,28 +195,27 @@ class LLMChatElement(Element):
                 margin=0,
             )
 
-            # Function to set the default model selection—matching either by key or config.
+            # Function to set the default model selection—matching by default_model_config if available.
             def set_model_defaults():
-                selected_config = None
-                if isinstance(model, dict):
-                    # Try to find a configuration that matches the provided dict.
-                    for config in initial_options.values():
-                        if config == model:
-                            selected_config = config
-                            break
+                if default_model_config is not None:
+                    model_selector.value = default_model_config
+                    self.model.model_name = default_model_config["model"]
+                    self.model.base_url = default_model_config["base_url"]
                 else:
-                    selected_config = initial_options.get(model)
-                
-                if selected_config:
-                    model_selector.value = selected_config
-                    self.model.model_name = selected_config["model"]
-                    self.model.base_url = selected_config["base_url"]
-                else:
-                    # Fallback: if no match, use the current widget's value.
-                    current = model_selector.value
-                    if current:
-                        self.model.model_name = current["model"]
-                        self.model.base_url = current["base_url"]
+                    selected_config = None
+                    if isinstance(model, dict):
+                        # Try to find a configuration that matches the provided dict.
+                        for config in initial_options.values():
+                            if config == model:
+                                selected_config = config
+                                break
+                    else:
+                        selected_config = initial_options.get(model)
+                    
+                    if selected_config:
+                        model_selector.value = selected_config
+                        self.model.model_name = selected_config["model"]
+                        self.model.base_url = selected_config["base_url"]
 
             set_model_defaults()
 
@@ -213,11 +223,18 @@ class LLMChatElement(Element):
             def on_provider_change(event):
                 new_options = process_models(provider_map.get(event.new, {}))
                 model_selector.options = new_options
-                if new_options:
-                    first_option = next(iter(new_options.values()))
-                    model_selector.value = first_option
-                    self.model.model_name = first_option["model"]
-                    self.model.base_url = first_option["base_url"]
+                # Try to set the default model for this new provider.
+                default_cfg = None
+                for cfg in new_options.values():
+                    if cfg["model"] == model:
+                        default_cfg = cfg
+                        break
+                if default_cfg is None and new_options:
+                    default_cfg = next(iter(new_options.values()))
+                model_selector.value = default_cfg
+                if default_cfg:
+                    self.model.model_name = default_cfg["model"]
+                    self.model.base_url = default_cfg["base_url"]
 
             provider_selector.param.watch(on_provider_change, 'value')
 
@@ -247,12 +264,16 @@ class LLMChatElement(Element):
                 sizing_mode='stretch_width',
                 margin=0
             )
+            # NEW: Set the default model based on the passed 'model' argument.
+            default_config = options.get(model)
+            if default_config is not None:
+                model_selector.value = default_config
+                self.model.model_name = default_config["model"]
+                self.model.base_url = default_config["base_url"]
+
             def on_model_change(event):
                 self.model.model_name = event.new["model"]
                 self.model.base_url = event.new["base_url"]
+
             model_selector.param.watch(on_model_change, 'value')
-            initial_option = model_selector.value
-            if initial_option:
-                self.model.model_name = initial_option["model"]
-                self.model.base_url = initial_option["base_url"]
             return pn.Row(model_selector)    
