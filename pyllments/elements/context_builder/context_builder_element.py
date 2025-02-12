@@ -104,7 +104,7 @@ class ContextBuilder(Element):
             (hasattr(payload_type, '__origin__') and issubclass(payload_type.__origin__, list)):
                 flow_map['input'][key] = payload_type
             elif isinstance(payload_type, str):
-                self.preset_messages[key] = type(self)._create_message(msg_type, payload_type)
+                self.preset_messages[key] = MessagePayload(content=payload_type, role=msg_type)
         return flow_map
 
     def _connected_flow_map_setup(self, connected_input_map):
@@ -133,7 +133,7 @@ class ContextBuilder(Element):
                 elif isinstance(ports_or_string, str):
                     msg_string = ports_or_string
                     if key not in self.preset_messages:
-                        self.preset_messages[key] = type(self)._create_message(msg_type, msg_string)
+                        self.preset_messages[key] = MessagePayload(content=msg_string, role=msg_type)
                     if key not in self.input_map:
                         self.input_map[key] = (msg_type, msg_string)
                 else:
@@ -244,16 +244,3 @@ class ContextBuilder(Element):
                     messages_output.emit(msg_payload_list)
 
         return flow_fn
-
-    @staticmethod
-    @cache
-    def _create_message(msg_type, text):
-        match msg_type:
-            case 'human':
-                return MessagePayload(message=HumanMessage(content=text))
-            case 'ai':
-                return MessagePayload(message=AIMessage(content=text))
-            case 'system':
-                return MessagePayload(message=SystemMessage(content=text))
-            case _:
-                raise ValueError(f"Invalid message type: {msg_type}")

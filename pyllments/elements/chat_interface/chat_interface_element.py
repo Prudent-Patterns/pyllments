@@ -2,7 +2,6 @@ from typing import Optional
 
 import panel as pn
 import param
-from langchain_core.messages.human import HumanMessage
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
