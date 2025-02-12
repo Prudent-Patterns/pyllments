@@ -238,8 +238,8 @@ def serve(
         logger.error(f"Failed to get FastAPI app: {e}")
 
     try:
-        with resources.files('pyllments').joinpath(ASSETS_PATH) as f:
-            app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=f), name=ASSETS_PATH)
+        asset_path = resources.files('pyllments').joinpath(ASSETS_PATH)
+        app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=str(asset_path)), name=ASSETS_PATH)
     except Exception as e:
         logger.error(f"Failed to mount static files: {e}")
 
@@ -276,8 +276,8 @@ def serve(
 
             @add_application('/', app=app, title='Pyllments')
             def serve_gui():
-                with resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH) as f:
-                    main_tmpl_str = f.read_text()
+                template_path = resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH)
+                main_tmpl_str = template_path.read_text()
                 tmpl = pn.Template(main_tmpl_str)
                 tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
                 tmpl.add_panel('app_main', obj())

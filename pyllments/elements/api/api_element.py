@@ -49,7 +49,7 @@ class APIElement(Element):
             # retrieved from the payload at the respective input port e.g. payload.model.attribute_name;
             # a lambda or async function can also be provided to retrieve/format the attribute.
             'port_a': {'alias': 'attribute_name'},
-            'port_b': {'another_alias': 'another_attribute_name'}
+            'port_b': {'another_alias': lambda payload: payload.model.another_attribute_name}
         }
         """)
 

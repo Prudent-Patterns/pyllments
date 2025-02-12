@@ -38,21 +38,31 @@ class LLMChatModel(Model):
         ]
 
     def generate_response(self, messages: list[MessagePayload]) -> MessagePayload:
-        """Generate a response using LiteLLM, ensuring that the current base_url is passed if provided."""
+        """
+        Generate a response using LiteLLM, ensuring that the current base_url is passed if provided.
+        For atomic mode, wraps the call in a coroutine so that the response can be awaited elsewhere.
+        """
         litellm_messages = self._messages_to_litellm(messages)
 
         if self.output_mode == 'atomic':
-            response = litellm.acompletion(
-                model=self.model_name,
-                messages=litellm_messages,
-                **self.model_args
-            )
+            # Wrap the atomic call in an async function so that a coroutine is stored.
+            async def atomic_response():
+                # Await the atomic completion from LiteLLM.
+                response = await litellm.acompletion(
+                    model=self.model_name,
+                    messages=litellm_messages,
+                    **self.model_args
+                )
+                return response
+
+            # The MessagePayload now holds a coroutine even for atomic mode.
             return MessagePayload(
                 role='assistant',
-                message_coroutine=response,
+                message_coroutine=atomic_response(),
                 mode='atomic'
             )
         elif self.output_mode == 'stream':
+            # For stream mode, the completion is expected to be a streaming coroutine.
             response_stream = litellm.acompletion(
                 model=self.model_name,
                 messages=litellm_messages,

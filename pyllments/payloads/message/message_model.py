@@ -8,54 +8,70 @@ from pyllments.base.model_base import Model
 
 
 class MessageModel(Model):
+    """
+    Model representing a message. Handles both atomic and streaming scenarios.
+    In streaming mode, this model will trigger the message stream when a message is requested.
+    In atomic mode, it now takes into account the stored coroutine and awaits it (or executes it synchronously)
+    to populate the message content.
+    """
     role = param.Selector(
         default='user', 
         objects=['system', 'assistant', 'user', 'function', 'tool', 'developer'],
-        doc="Message role - matches OpenAI/LiteLLM format")
+        doc="Message role - matches OpenAI/LiteLLM format"
+    )
     
     content = param.String(default='', doc="Message content")
     
     mode = param.Selector(
         objects=['atomic', 'stream'],
-        default='atomic')
+        default='atomic',
+        doc="Determines whether the message is captured atomically or via streaming"
+    )
     
-    message_coroutine = param.Parameter(doc="""
-        Used with stream mode for assistant messages""")
+    message_coroutine = param.Parameter(
+        default=None,
+        doc="Used with stream mode for assistant messages or atomic mode when a coroutine needs to be awaited"
+    )
     
-    streamed = param.Boolean(default=False, doc="""
-        Used to identify if the message has been streamed""")
+    streamed = param.Boolean(default=False, doc="Indicates whether the message has been fully streamed")
         
-    embedding = param.Parameter(doc="""
-        Message embedding if generated""")
+    embedding = param.Parameter(doc="Message embedding if generated")
 
     def __init__(self, **params):
         super().__init__(**params)
+        # Used to ensure only one streaming task is started for stream messages.
+        self._stream_task = None
 
     async def stream(self):
+        """
+        Processes the streaming message. Asynchronously iterates over the message stream, 
+        updating the content (in chunks) and ultimately marks the message as streamed.
+        """
         if self.mode != 'stream':
             raise ValueError("Cannot stream: Mode is not set to 'stream'")
             
         self.content = ''
-        # Buffer to store the streamed content and help not overwhelm redraws in the UI
         buffer = ''
         
+        # Trigger the external coroutine that yields the message stream.
         message_stream = await self.message_coroutine
         async for chunk in message_stream:
             delta = chunk['choices'][0].get('delta', {}).get('content', '')
             if delta:
                 buffer += delta
-                # Only update content and trigger redraws every N characters or on certain conditions
+                # Flush the buffer if it's large enough or contains a newline.
                 if len(buffer) >= 10 or '\n' in buffer:  
                     self.content += buffer
                     buffer = ''
         
-        # Flush any remaining content in the buffer
+        # Append any last remaining content.
         if buffer:
             self.content += buffer
                 
         logger.info("Completed message stream")
         self.streamed = True
-        # Remove watchers that may have been using streamed
+
+        # Clean up any watchers on 'streamed' if they exist.
         if (streamed_watchers := self.param.watchers.get('streamed')) is not None:
             for watcher in streamed_watchers['value']:
                 self.param.unwatch(watcher)
@@ -79,28 +95,68 @@ class MessageModel(Model):
     #     self.tokenization_map[model] = token_length
     #     return token_length
 
-    async def streamed_message(self) -> str:
-        """Wait for streaming to complete and return the final message content.
-        
+    async def aget_message(self) -> str:
+        """
+        Asynchronously retrieves the complete message content.
+        If streaming is required and not yet complete or if this is an atomic response with a coroutine,
+        the corresponding process is initiated and awaited.
+
         Returns
         -------
         str
-            The complete message content after streaming
+            The complete message content.
         """
-        if self.mode != 'stream':
+        if self.mode == 'atomic':
+            if self.message_coroutine is not None:
+                # Await the stored atomic coroutine, update content, then clear the coroutine
+                self.content = await self.message_coroutine
+                self.message_coroutine = None
             return self.content
-            
-        if self.streamed:
+        elif self.mode == 'stream':
+            if not self.streamed:
+                # If the streaming task hasn't started, initiate it.
+                if self._stream_task is None:
+                    self._stream_task = asyncio.create_task(self.stream())
+                # Wait for the streaming to complete.
+                await self._stream_task
             return self.content
-            
-        done_future = asyncio.Future()
-        
-        def on_streamed_change(event):
-            if event.new and not done_future.done():
-                done_future.set_result(self.content)
-        
-        watcher = self.param.watch(on_streamed_change, 'streamed')
-        try:
-            return await done_future
-        finally:
-            self.param.unwatch(watcher)
+        else:
+            raise ValueError(f"Unsupported mode: {self.mode}")
+
+    def get_message(self) -> str:
+        """
+        Synchronously retrieves the complete message content.
+        For stream mode, if the message hasn't been fully streamed,
+        this method will block until the stream is complete.
+        For atomic mode, if there is a stored coroutine, it will be executed synchronously.
+
+        Returns
+        -------
+        str
+            The complete message content.
+
+        Raises
+        ------
+        RuntimeError
+            If called in an active asynchronous event loop.
+        """
+        if self.mode == 'atomic':
+            if self.message_coroutine is not None:
+                # Execute the stored atomic coroutine synchronously,
+                # update content, then clear the stored coroutine.
+                self.content = asyncio.run(self.message_coroutine)
+                self.message_coroutine = None
+            return self.content
+        elif self.mode == 'stream':
+            # If we're in an asynchronous context, advise using the async method.
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(self.aget_message())
+            else:
+                raise RuntimeError(
+                    "get_message() cannot be called synchronously while an event loop is running. "
+                    "Use 'await aget_message()' instead."
+                )
+        else:
+            raise ValueError(f"Unsupported mode: {self.mode}")
