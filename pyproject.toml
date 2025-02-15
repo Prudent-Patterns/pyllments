@@ -43,6 +43,8 @@ dependencies = [
     "lancedb",
     "typer",
     "litellm>=1.57.3",
+    "discord-py>=2.4.0",
+    "python-telegram-bot>=21.10",
 ]
 
 [dependency-groups]

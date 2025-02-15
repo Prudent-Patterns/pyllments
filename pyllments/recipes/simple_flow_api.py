@@ -8,7 +8,6 @@ from pyllments.elements import ChatInterfaceElement, LLMChatElement, HistoryHand
 from dataclasses import dataclass, field
 
 from pyllments.elements import ChatInterfaceElement, LLMChatElement, APIElement
-from pyllments import flow
 
 
 @dataclass

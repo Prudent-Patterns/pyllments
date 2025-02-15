@@ -1,3 +1,7 @@
+---
+description: Always use to have context of what the pyllments library is about
+globs: **
+---
 # Project Synopsis
 Pyllments is a Python library for building graphical and API-based LLM applications through chaining together Elements in a potentially cyclic graph.
 

@@ -108,8 +108,9 @@ class MessageModel(Model):
         """
         if self.mode == 'atomic':
             if self.message_coroutine is not None:
-                # Await the stored atomic coroutine, update content, then clear the coroutine
-                self.content = await self.message_coroutine
+                # Await the stored atomic coroutine and extract message content from ModelResponse
+                response = await self.message_coroutine
+                self.content = response['choices'][0]['message']['content']
                 self.message_coroutine = None
             return self.content
         elif self.mode == 'stream':
@@ -142,9 +143,10 @@ class MessageModel(Model):
         """
         if self.mode == 'atomic':
             if self.message_coroutine is not None:
-                # Execute the stored atomic coroutine synchronously,
-                # update content, then clear the stored coroutine.
-                self.content = asyncio.run(self.message_coroutine)
+                # Execute the stored atomic coroutine synchronously and extract message content
+               # TODO: Use the LoopRegistry to get the running loop.
+                response = asyncio.run(self.message_coroutine)
+                self.content = response['choices'][0]['message']['content']
                 self.message_coroutine = None
             return self.content
         elif self.mode == 'stream':

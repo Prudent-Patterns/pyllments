@@ -1,0 +1,13 @@
+---
+description: Any mention of ports
+globs: **/*_element.py, **/ports.py
+---
+[ports.py](mdc:pyllments/ports/ports.py)
+
+Ports are part of an element. They are created within Elements to facilitate communication between other elements.
+Input ports receive payloads, and tend to trigger some internal process within the Element's model. Sometimes this results in a payload being emitted from an output port(not always).
+
+## Port naming convention:
+Input ports:
+ - Input ports that do not trigger an output port to emit something *_input
+ - Input ports that do trigger an output port to emit something *_emit_input

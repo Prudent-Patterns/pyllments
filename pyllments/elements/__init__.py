@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .chunker import TextChunkerElement
     from .api import APIElement
     from .context_builder import ContextBuilder
+    from .discord import DiscordElement
     
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
@@ -24,7 +25,8 @@ ELEMENT_MAPPING = {
     "HistoryHandlerElement": ".history_handler",
     "TextChunkerElement": ".chunker",
     "APIElement": ".api",
-    "ContextBuilder": ".context_builder"
+    "ContextBuilder": ".context_builder",
+    "DiscordElement": ".discord"
 }
 
 def __getattr__(name):

@@ -15,8 +15,8 @@ from uvicorn import run as uvicorn_run
 
 from pyllments.logging import setup_logging, logger
 from pyllments.common.resource_loader import get_asset
-from .registry import AppRegistry
-
+from .app_registry import AppRegistry
+from .loop_registry import LoopRegistry
 ASSETS_PATH = 'assets'
 ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'
 FILE_ICONS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/file_icons/tabler-icons-outline.min.css'
@@ -177,7 +177,7 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
     spec.loader.exec_module(module)
     return module
 
-
+# TODO: Consider adding a profiler singleton class to handle profiling of the application.
 def flow(func):
     """
     A decorator that adds the contains_view attribute to the function and wraps it.
@@ -232,16 +232,6 @@ def serve(
         load_dotenv(env)
     else:
         load_dotenv()
-    try:
-        app = AppRegistry.get_app()
-    except Exception as e:
-        logger.error(f"Failed to get FastAPI app: {e}")
-
-    try:
-        asset_path = resources.files('pyllments').joinpath(ASSETS_PATH)
-        app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=str(asset_path)), name=ASSETS_PATH)
-    except Exception as e:
-        logger.error(f"Failed to mount static files: {e}")
 
     if find_gui:
         def view_check(obj):
@@ -267,12 +257,19 @@ def serve(
                         break
                 frame = frame.f_back
 
-        if func_list_len := len(func_list) >= 1:
+        if (func_list_len := len(func_list)) >= 1:
             if func_list_len > 1:
                 logger.warning(f'{func_list_len} @flow wrapped functions found in script, using first found')
             elif func_list_len == 1:
                 logger.info(f"Found @flow wrapped function in script")
             name, obj = func_list[0]
+
+            app = AppRegistry.get_app()
+            try:
+                asset_path = resources.files('pyllments').joinpath(ASSETS_PATH)
+                app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=str(asset_path)), name=ASSETS_PATH)
+            except Exception as e:
+                logger.error(f"Failed to mount static files: {e}")
 
             @add_application('/', app=app, title='Pyllments')
             def serve_gui():
@@ -282,5 +279,8 @@ def serve(
                 tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
                 tmpl.add_panel('app_main', obj())
                 return tmpl
-
-    uvicorn_run(app, host=host, port=port)
+    if AppRegistry._instance is not None:
+        uvicorn_run(app, host=host, port=port)
+    else:
+        loop = LoopRegistry.get_loop()
+        loop.run_forever()

@@ -11,7 +11,7 @@ from pydantic._internal._model_construction import ModelMetaclass
 
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
-from pyllments.serve.registry import AppRegistry
+from pyllments.serve.app_registry import AppRegistry
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import InputPort
 # from pyllments.ports import Ports

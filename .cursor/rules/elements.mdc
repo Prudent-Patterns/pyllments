@@ -1,9 +1,17 @@
 ---
-description:
-globs:
+description: Creation or refinement of pyllments Elements
+globs: **/elements/**
 ---
+[element_base.py](mdc:pyllments/base/element_base.py) [component_base.py](mdc:pyllments/base/component_base.py)
 
-# Your rule content
+An Element consists of a model, which handles the business logic and is generally set in the __init__ method as `self.model = *Model, ports, which handle the connectivity and the resultant reactivity of what occurs when an Element receives a Payload from another Element via a port. Elements are subclasses of the Element class. Some Elements have views associated with them which are created with the Panel library. Views are visual components that are interactive when serving the front end of pyllments and are decorated with the @Component.view to allow them to automatically load css and other functionality. 
 
-- You can @ files here
-- You can use markdown but dont have to
+Any business logic arguments are passed as **params into the model. That is where the the business logic resides. The argument must be in the param format right below the class definition. e.g. `message_list = param.List(...)
+
+A good example of an Element is [chat_interface_element.py](mdc:pyllments/elements/chat_interface/chat_interface_element.py). It has views specified as parameters(created with the Param library) for easy access. In the the init contains logic that sets up the ports and creates the reactivity necessary, connecting the model to the views.
+
+Ports are generally created in hidden methods(_some_method) which are called in the __init__ of the element.
+
+If you think of the structure, you can compare it the MVC pattern.
+
+Elements tend to be strung together like so - look at this example recipe which hooks elements up through their output and input ports and arranges the views when serving a front end: [chat.py](mdc:pyllments/recipes/chat/chat.py)

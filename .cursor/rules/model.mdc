@@ -1,0 +1,12 @@
+---
+description: When models are mentioned
+globs: **/elements/**
+---
+[model_base.py](mdc:pyllments/base/model_base.py)
+
+A good examples of a model is [chat_interface_model.py](mdc:pyllments/elements/chat_interface/chat_interface_model.py)
+When the developer creates an instance of an element, they tend to pass in arguments which are passed to the model. Models must inherit from the Model class.
+These are the visible parameters specified with the param library in the model. Sometimes, these parameters are primarily for the developer, other times, it just is useful to have them be parameters.
+
+The methods within the model are created to be used within the element to help enable the reactivity that arrises when the Element receives a payload into any of its ports.
+Generally speaking, the reactivity associated with receiving and emitting from ports will be handled by the Elements, so, the model should contain the methods we can easily call from the port specification in the Element. e.g. do_something()
