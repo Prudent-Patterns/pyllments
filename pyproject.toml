@@ -45,6 +45,8 @@ dependencies = [
     "litellm>=1.57.3",
     "discord-py>=2.4.0",
     "python-telegram-bot>=21.10",
+    "telethon>=1.38.1",
+    "sqlite-utils>=3.38",
 ]
 
 [dependency-groups]

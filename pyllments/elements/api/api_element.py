@@ -142,16 +142,61 @@ class APIElement(Element):
     def _flow_controller_setup(self):
         if not (self.input_map or self.connected_input_map):
             raise ValueError("At least one of input_map or connected_input_map must be provided.")
+        
         flow_controller_kwargs = {}
+        
+        # 1. Setup basic flow maps
         flow_map = self._flow_map_setup(self.input_map)
         flow_controller_kwargs['flow_map'] = flow_map
+        
         if self.connected_input_map:
             connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
             flow_controller_kwargs['connected_flow_map'] = connected_flow_map
-        self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
-        # _flow_fn_setup requires the FlowController to be setup beforehand
-        self.flow_controller.flow_fn = self._flow_fn_setup()
 
+        # 2. Handle build_map if present (FlowController will handle this internally)
+        if self.build_map:
+            build_map = {}
+            for trigger_port, (callback_fn, _) in self.build_map.items():
+                build_map[trigger_port] = callback_fn
+            flow_controller_kwargs['build_map'] = build_map
+
+        # 3. Create custom user_flow_fn if we have response_dict
+        if self.response_dict:
+            async def custom_flow_fn(**kwargs):
+                active_input_port = kwargs['active_input_port']
+                c = kwargs.get('c', {})
+                
+                input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
+                input_name_payload_dict[active_input_port.name] = active_input_port.payload
+                
+                # Check if we have all required payloads
+                if all(port_name in input_name_payload_dict for port_name in self.response_dict.keys()):
+                    return_dict = {}
+                    # Build return dictionary using the response_dict mapping
+                    for port_name, alias_attr_map in self.response_dict.items():
+                        payload = input_name_payload_dict[port_name]
+                        for alias, attr_name in alias_attr_map.items():
+                            if isinstance(attr_name, str):
+                                return_dict[alias] = getattr(payload.model, attr_name)
+                            else:  # Handle lambda or async function
+                                result = attr_name(payload)
+                                # If the result is a coroutine, await it.
+                                if asyncio.iscoroutine(result):
+                                    result = await result
+                                return_dict[alias] = result
+                    
+                    # Set response future if available
+                    if self.response_future and not self.response_future.done():
+                        self.response_future.set_result(return_dict)
+                    
+                    # Clear stored payloads after processing
+                    input_name_payload_dict.clear()
+                    return return_dict
+                return None
+            
+            flow_controller_kwargs['user_flow_fn'] = custom_flow_fn
+
+        self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
         self.ports = self.flow_controller.ports
 
     def _flow_map_setup(self, input_map):
@@ -167,88 +212,6 @@ class APIElement(Element):
         for key, ports in connected_input_map.items():
             connected_flow_map['input'][key] = ports
         return connected_flow_map
-
-    def _flow_fn_setup(self):
-        async def async_flow_fn(**kwargs):
-            active_input_port = kwargs['active_input_port']
-            c = kwargs['c']
-            
-            # Only process if there's an active API request
-            if not self.response_future:
-                return
-            
-            return_dict = {}
-            if self.build_fn:
-                return_dict = self.build_fn(**kwargs)
-            elif self.build_map:
-                input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
-                
-                # Store incoming payload
-                input_name_payload_dict[active_input_port.name] = active_input_port.payload
-                
-                if c.get('is_ready', True):
-                    if active_input_port.name in self.build_map:
-                        callback_fn, required_ports = self.build_map[active_input_port.name]
-                        c['callback_fn'] = callback_fn
-                        c['required_ports'] = required_ports
-                        c['is_ready'] = False
-                    else:
-                        return
-                else:
-                    callback_fn = c['callback_fn']
-                    required_ports = c['required_ports']
-
-                # Check if we have all required payloads
-                if all(key in input_name_payload_dict for key in required_ports):
-                    # Create kwargs dict for callback function using port names
-                    callback_kwargs = {
-                        port_name: input_name_payload_dict[port_name] 
-                        for port_name in required_ports
-                    }
-                    
-                    if asyncio.iscoroutinefunction(callback_fn):
-                        return_dict = await callback_fn(**callback_kwargs)
-                    else:
-                        return_dict = callback_fn(**callback_kwargs)
-                    
-                    # Clear processed payloads
-                    for key in required_ports:
-                        input_name_payload_dict.pop(key, None)
-                    c['is_ready'] = True
-            elif self.response_dict:
-                input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
-                # Store incoming payload
-                input_name_payload_dict[active_input_port.name] = active_input_port.payload                
-                # Check if we have all required payloads defined in response_dict
-                if all(port_name in input_name_payload_dict for port_name in self.response_dict.keys()):
-                    logger.info("[APIElement] All required payloads received, building response")
-                    # Build return dictionary using the response_dict mapping
-                    for port_name, alias_attr_map in self.response_dict.items():
-                        payload = input_name_payload_dict[port_name]
-                        for alias, attr_name in alias_attr_map.items():
-                            if isinstance(attr_name, str):
-                                return_dict[alias] = getattr(payload.model, attr_name)
-                            else:  # In case of lambda function or async function being provided
-                                if asyncio.iscoroutinefunction(attr_name):
-                                    return_dict[alias] = await attr_name(payload)
-                                else:
-                                    return_dict[alias] = attr_name(payload)
-                    # Clear stored payloads after processing
-                    input_name_payload_dict.clear()
-
-            # Set the response future if we have a return dictionary
-            if return_dict:
-                logger.info(f"[APIElement] Setting response future to {return_dict}")
-                if self.response_future and not self.response_future.done():
-                    self.response_future.set_result(return_dict)
-                else:
-                    logger.warning("[APIElement] Response future not available or already done")
-
-        def flow_fn(**kwargs):
-            # Return the task directly - FlowController will handle clearing after completion
-            return asyncio.create_task(async_flow_fn(**kwargs))
-
-        return flow_fn
 
     def _create_request_pydantic_model(self):
         """Dynamically create a Pydantic model based on the argument names of request_output_fn."""

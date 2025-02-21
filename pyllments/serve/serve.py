@@ -279,7 +279,8 @@ def serve(
                 tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
                 tmpl.add_panel('app_main', obj())
                 return tmpl
-    if AppRegistry._instance is not None:
+    if AppRegistry._app is not None:
+        app = AppRegistry.get_app()
         uvicorn_run(app, host=host, port=port)
     else:
         loop = LoopRegistry.get_loop()

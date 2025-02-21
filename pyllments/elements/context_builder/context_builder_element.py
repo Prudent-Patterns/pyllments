@@ -43,7 +43,7 @@ class ContextBuilder(Element):
         build_map = {
             'port_a': ['port_a', 'port_b', 'system_msg'],
             'port_b': ['port_b', 'system_msg']
-        }
+    }
         When a payload enters port_a first, we wait until a payload at port_b is received, then we build
         the messages in the order of the list and emit them, with system_msg being what you specified in
         the input_map. When a payload enters port_b first, the message payloads are instantly built, since

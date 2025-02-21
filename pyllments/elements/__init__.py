@@ -14,7 +14,8 @@ if TYPE_CHECKING:
     from .api import APIElement
     from .context_builder import ContextBuilder
     from .discord import DiscordElement
-    
+    from .telegram import TelegramElement
+
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
     "ChatInterfaceElement": ".chat_interface",
@@ -26,7 +27,8 @@ ELEMENT_MAPPING = {
     "TextChunkerElement": ".chunker",
     "APIElement": ".api",
     "ContextBuilder": ".context_builder",
-    "DiscordElement": ".discord"
+    "DiscordElement": ".discord",
+    "TelegramElement": ".telegram"
 }
 
 def __getattr__(name):

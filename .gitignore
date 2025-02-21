@@ -166,4 +166,4 @@ cython_debug/
 # Ignore all files and folders with a lance extension
 
 # Development
-dev/private/
+/dev/private/

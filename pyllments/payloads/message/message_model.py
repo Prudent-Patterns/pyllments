@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from loguru import logger
 import param
@@ -37,8 +38,12 @@ class MessageModel(Model):
         
     embedding = param.Parameter(doc="Message embedding if generated")
 
+    timestamp = param.Number(default=None, doc="Unix timestamp when the message was created")
+
     def __init__(self, **params):
         super().__init__(**params)
+        self.timestamp = time.time() if not self.timestamp else self.timestamp
+
         # Used to ensure only one streaming task is started for stream messages.
         self._stream_task = None
 
