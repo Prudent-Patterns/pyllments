@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 from pyllments.payloads import ChunkPayload, MessagePayload
 
 
@@ -8,7 +10,7 @@ def chunk2message(payload):
     Retrieves the text from the chunk's model and assigns a role of 'human'.
     This ensures that the message is formatted according to our framework's standards.
     """
-    return MessagePayload(content=payload.model.text, role='human')
+    return MessagePayload(content=payload.model.text, role='user')
 
 def chunk_list2message(payload):
     """
@@ -21,7 +23,7 @@ def chunk_list2message(payload):
         f"Chunk {n}:\n{chunk.model.text}"
         for n, chunk in enumerate(payload)
     ]
-    return MessagePayload(content='\n'.join(content_list), role='human')
+    return MessagePayload(content='\n'.join(content_list), role='user')
 
 def message2message(payload):
     """
@@ -47,18 +49,33 @@ payload_message_mapping = {
     list[MessagePayload]: message_list2message,
 }
 
-def to_message_payload(payload, payload_message_mapping=payload_message_mapping, expected_type=None):
+def to_message_payload(payload, payload_message_mapping=payload_message_mapping, expected_type=None, role: Optional[str] = None):
     """
     Converts an input payload to a MessagePayload using a mapping of conversion functions.
 
     This function determines the payload's type (or uses an expected type if provided)
     and then applies the corresponding conversion function. If no mapping is found,
     a ValueError is raised.
+
+    Additionally, if a role is provided, it will override the role in the resulting MessagePayload(s).
+
+    Parameters:
+      payload: The input payload to be converted.
+      payload_message_mapping (dict): Mapping between payload types and conversion functions.
+      expected_type: Optional type to use for determining the conversion function. If not provided, the payload's type is used.
+      role (str, optional): If provided, override the role in the resulting MessagePayload(s) regardless of the default.
     """
-    payload_type = expected_type or type(payload)
+    payload_type = (expected_type or type(payload)) if expected_type is not Any else type(payload)
     try:
         conversion_function = payload_message_mapping[payload_type]
-        return conversion_function(payload)
+        return_val = conversion_function(payload)
+        if role is not None:
+            if isinstance(return_val, list):
+                for msg in return_val:
+                    msg.model.role = role
+            else:
+                return_val.model.role = role
+        return return_val
     except KeyError:
         raise ValueError(f"No message payload mapping found for {payload_type}")
     

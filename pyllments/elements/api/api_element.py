@@ -53,7 +53,7 @@ class APIElement(Element):
         }
         """)
 
-    build_map = param.Dict(default={}, doc="""
+    trigger_map = param.Dict(default={}, doc="""
         A mapping of output port names to the callback function and the list of input ports to take into account
         before using the callback_fn to output a dictionary to the API.
         The arguments in the callback_fn are Payloads from the respective ports - their names are the port names.
@@ -62,7 +62,7 @@ class APIElement(Element):
                 'alias': attribute_name,
                 'another_alias': another_attribute_name
             }
-        build_map = {
+        trigger_map = {
             'port_a': (callback_fn, ['port_a', 'port_b'])
         }
         """)
@@ -153,12 +153,12 @@ class APIElement(Element):
             connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
             flow_controller_kwargs['connected_flow_map'] = connected_flow_map
 
-        # 2. Handle build_map if present (FlowController will handle this internally)
-        if self.build_map:
-            build_map = {}
-            for trigger_port, (callback_fn, _) in self.build_map.items():
-                build_map[trigger_port] = callback_fn
-            flow_controller_kwargs['build_map'] = build_map
+        # 2. Handle trigger_map if present (FlowController will handle this internally)
+        if self.trigger_map:
+            trigger_map = {}
+            for trigger_port, (callback_fn, _) in self.trigger_map.items():
+                trigger_map[trigger_port] = callback_fn
+            flow_controller_kwargs['trigger_map'] = trigger_map
 
         # 3. Create custom user_flow_fn if we have response_dict
         if self.response_dict:

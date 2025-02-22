@@ -46,6 +46,12 @@ class Config:
             "help": "The default model to use when loading the interface."
         }
     )
+    system_prompt: str = field(
+        default=None,
+        metadata={
+            "help": "The system prompt to use when loading the interface."
+        }
+    )
     
     
 chat_interface_el = ChatInterfaceElement()
@@ -54,9 +60,21 @@ history_handler_el = HistoryHandlerElement(
     history_token_limit=config.history_token_limit, 
     tokenizer_model='gpt-4o'
 )
+# If a system prompt is provided, we use a ContextBuilder to inject the system prompt.
+if config.system_prompt:
+    from pyllments.elements import ContextBuilder
+    context_builder = ContextBuilder(
+        connected_input_map={
+            'system_prompt': ('developer', config.system_prompt),
+            'history_messages_input': (None, history_handler_el.ports.messages_output)
+        }
+    )
+    context_builder.ports.messages_output > llm_chat_el.ports.messages_emit_input
+else:
+    history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
 
 chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
-history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
+# history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
 llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 

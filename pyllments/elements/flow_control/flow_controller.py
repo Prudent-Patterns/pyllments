@@ -192,7 +192,7 @@ class FlowController(Element):
     containing_element = param.ClassSelector(default=None, class_=Element, doc="""
         Element that contains/uses this flow controller -- useful for self-documenting""")
 
-    build_map = param.Dict(default={}, doc="""
+    trigger_map = param.Dict(default={}, doc="""
         A mapping of trigger port names to callback functions.
         When a payload arrives at a trigger port, the FlowController will:
         1. Store the payload
@@ -411,9 +411,9 @@ class FlowController(Element):
             for other_input_port in other_input_ports:
                 self.connect_output(alias, other_input_port)
 
-    def _build_map_flow_fn(self, **kwargs):
-        """Internal handler for build_map based flow"""
-        if not self.build_map:
+    def _trigger_map_flow_fn(self, **kwargs):
+        """Internal handler for trigger_map based flow"""
+        if not self.trigger_map:
             return None
         
         active_input_port = kwargs['active_input_port']
@@ -423,8 +423,8 @@ class FlowController(Element):
         input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
         input_name_payload_dict[active_input_port.name] = active_input_port.payload
         
-        if active_input_port.name in self.build_map:
-            callback = self.build_map[active_input_port.name]
+        if active_input_port.name in self.trigger_map:
+            callback = self.trigger_map[active_input_port.name]
             # Get required ports from callback signature
             required_ports = [
                 param.name for param in signature(callback).parameters.values()
@@ -432,7 +432,7 @@ class FlowController(Element):
             
             # Check if we have all required payloads
             if all(port in input_name_payload_dict for port in required_ports):
-                # Execute callback with collected payloads
+                # Only create callback_kwargs if we have all required payloads
                 callback_kwargs = {
                     port: input_name_payload_dict[port]
                     for port in required_ports
@@ -451,9 +451,8 @@ class FlowController(Element):
                         except Exception as e:
                             logger.error(f"Error in async callback: {e}")
                             raise
+                    return asyncio.create_task(async_callback())
                 
-                return asyncio.create_task(async_callback())
-            else:
                 # Synchronous callback
                 try:
                     result = callback(**callback_kwargs)
@@ -471,16 +470,18 @@ class FlowController(Element):
         Sets up the main flow function based on configuration.
 
         This function assigns a callable to self.flow_fn so that when a payload is received,
-        the flow controller can process it. If no user_flow_fn or build_map is provided,
+        the flow controller can process it. If no user_flow_fn or trigger_map is provided,
         the fallback returns None but still remains callable.
+        The user_flow_fn is meant to be used to implement custom flow logic if trigger_map
+        doesn't suffice 
         """
         def flow_fn(**kwargs):
             if self.user_flow_fn:  # Maximum specificity first.
                 if asyncio.iscoroutinefunction(self.user_flow_fn):
                     return asyncio.create_task(self.user_flow_fn(**kwargs))
                 return self.user_flow_fn(**kwargs)
-            elif self.build_map:
-                result = self._build_map_flow_fn(**kwargs)
+            elif self.trigger_map:
+                result = self._trigger_map_flow_fn(**kwargs)
                 if result is not None:
                     return result
             # Fallback: do nothing and return None.

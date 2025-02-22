@@ -4,8 +4,9 @@ import param
 
 from pyllments.base.element_base import Element
 from loguru import logger
-# TODO: rename InteractElement
-class TestElement(Element):
+
+
+class PipeElement(Element):
     """
     Element used to test the inputs and outputs of other elements.
     When set up as an input element, it will store the received payloads in a list.
@@ -26,7 +27,7 @@ class TestElement(Element):
                 logger.info(f"Unpacking in TestElement: {self.receive_callback(payload)}")
     
         self.ports.add_input(
-            name='test_input',
+            name='pipe_input',
             unpack_payload_callback=unpack
         )
 
@@ -35,7 +36,7 @@ class TestElement(Element):
             return payload
         # Setup output port
         self.ports.add_output(
-            name='test_output',
+            name='pipe_output',
             pack_payload_callback=pack
         )
 
@@ -44,4 +45,4 @@ class TestElement(Element):
         self.received_payloads = []
 
     def send_payload(self, payload: Any):
-        self.ports.output['test_output'].stage_emit(payload=payload)
+        self.ports.output['pipe_output'].stage_emit(payload=payload)

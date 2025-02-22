@@ -1,0 +1,131 @@
+---
+title: "ContextBuilder"
+---
+
+## Overview
+
+The `ContextBuilder` helps you build an ordered list of messages from incoming payloads and preset messages. For example, a resulting message sequence might look like:
+
+
+```
+SOME_SYSTEM_MESSAGE,
+port_a_payload,
+port_b_payload,
+END_OF_CONTEXT_SYSTEM_MESSAGE
+```
+
+
+## Instantiation
+
+When initializing a `ContextBuilder`, you can provide either an `input_map` or a `connected_input_map` (or both), as well as optional settings like `trigger_map`, `build_fn`, and `outgoing_input_port`.
+
+---
+
+### 1. `input_map`
+
+This is a dictionary used to create input ports. Each key maps to a tuple where:
+
+- The first element is the role that will be assigned to the payload (if None, then no role is assigned, or if the payload is already a `MessagePayload`, it is passed through as-is).
+- The second element specifies the type of payload expected (e.g., `ChunkPayload`, `list[ChunkPayload]`, `MessagePayload`, or `list[MessagePayload]`).  
+  If a string is provided instead of a type, it is converted into a `MessagePayload` with the given role.
+
+**Example:**
+
+```python
+input_map = {
+    'port_a': ('user', MessagePayload),
+    'port_b': ('assistant', list[MessagePayload]),
+    'system_msg': ('system', "This text will be a sys message")
+}
+```
+
+*Comment:* This creates ports for user, assistant, and a constant system message with their respective payload types.
+
+---
+
+### 2. `connected_input_map`
+
+This mapping works similarly to `input_map`, but it automatically connects the created ports to existing ones. The payload type is inferred from the first connected port, and you can specify multiple ports.
+
+**Example:**
+
+```python
+connected_input_map = {
+    'port_a': ('user', [el1.ports.output['some_output']]),
+    'port_b': ('assistant', [el2.ports.output['some_output']]),
+    'system_msg': ('system', "This text will be a sys message")
+}
+```
+
+*Comment:* Here, `port_a` and `port_b` are connected to the outputs of other elements, while `system_msg` remains a constant message.
+
+---
+
+### 3. `trigger_map`
+
+The `trigger_map` establishes the rules for when the `ContextBuilder` should accumulate payloads and emit the list of `MessagePayload`s. Each key in the mapping corresponds to a triggering port and points to an ordered list of ports or constant messages that should be accumulated upon receiving a payload.
+
+**Example:**
+
+```python
+trigger_map = {
+    'port_a': ['port_a', 'port_b', 'system_msg'],
+    'port_b': ['port_b', 'system_msg']
+}
+```
+
+*Comment:* In this example, if `port_a` receives a payload, the builder waits for `port_b`'s payload before emitting the system message. A payload arriving at `port_b` independently triggers an immediate emission with its required messages.
+
+---
+
+### 4. `build_fn`
+
+For more complex control over the accumulation process, you can define a custom build function. This function is called every time any port receives a payload and receives:
+
+- All defined ports.
+- Constant message keys.
+- An `active_input_port` parameter indicating the port that just received a payload.
+- A persistent dictionary `c` for storing state between calls.
+
+Your function should return a list of ports that are processed into `MessagePayload`s and emitted.
+
+**Example:**
+
+```python
+def build_fn(port_a, port_b, system_msg, active_input_port, c):
+    if active_input_port == port_a:
+        return [port_a, port_b, system_msg]
+    else:
+        return [port_b, system_msg]
+```
+
+*Comment:* This sample build function adjusts the emission order based on the latest active port.
+
+---
+
+### 5. `outgoing_input_port`
+
+This parameter identifies the port to which the `ContextBuilder`'s output will be sent. You can assign it either during instantiation or manually afterwards.
+
+**Example (during instantiation):**
+
+```python
+cb = ContextBuilder(..., outgoing_input_port=el1.ports.output['some_output'])
+```
+
+**Alternatively, manually connecting after initialization:**
+
+```python
+cb = ContextBuilder(...)
+cb.ports.messages_output > some_element.ports.some_input_port
+```
+
+*Comment:* This ensures that the accumulated messages are correctly routed to the intended downstream component.
+
+---
+
+## Summary
+
+The `ContextBuilder` is a powerful tool for managing and sequencing message payloads. By configuring the input maps, trigger rules, and optionally a custom build function, you can effectively control how messages are accumulated and emitted within your system.
+
+Happy building!

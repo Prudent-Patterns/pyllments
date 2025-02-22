@@ -1,1 +1,1 @@
-from .test_element import TestElement
+from ...elements.pipe.pipe_element import TestElement
