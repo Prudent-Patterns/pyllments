@@ -1,1 +1,2 @@
-from ...elements.pipe.pipe_element import TestElement
+# Placeholder for element tests
+# This file intentionally left empty to make the directory a package

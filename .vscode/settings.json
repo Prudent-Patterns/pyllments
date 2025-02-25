@@ -13,6 +13,10 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}"
     ],
+    "python.analysis.exclude": [
+        "/${workspaceFolder}/dev/**",
+        "/${workspaceFolder}/docs/**",
+    ],
     "python.autoComplete.extraPaths": [
         "${workspaceFolder}"
     ],

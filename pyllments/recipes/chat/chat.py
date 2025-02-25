@@ -57,15 +57,15 @@ class Config:
 chat_interface_el = ChatInterfaceElement()
 llm_chat_el = LLMChatElement()
 history_handler_el = HistoryHandlerElement(
-    history_token_limit=config.history_token_limit, 
+    history_token_limit=config.history_token_limit,  # type: ignore
     tokenizer_model='gpt-4o'
 )
 # If a system prompt is provided, we use a ContextBuilder to inject the system prompt.
-if config.system_prompt:
+if config.system_prompt: # type: ignore
     from pyllments.elements import ContextBuilder
     context_builder = ContextBuilder(
         connected_input_map={
-            'system_prompt': ('developer', config.system_prompt),
+            'system_prompt': ('developer', config.system_prompt), # type: ignore
             'history_messages_input': (None, history_handler_el.ports.messages_output)
         }
     )
@@ -78,8 +78,8 @@ chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_i
 llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 
-interface_view = chat_interface_el.create_interface_view(width=config.width, height=config.height)
-model_selector_view = llm_chat_el.create_model_selector_view(models=config.custom_models, model=config.default_model)
+interface_view = chat_interface_el.create_interface_view(width=config.width, height=config.height) # type: ignore
+model_selector_view = llm_chat_el.create_model_selector_view(models=config.custom_models, model=config.default_model) # type: ignore
 
 @flow
 def my_flow():

@@ -153,22 +153,21 @@ class APIElement(Element):
             connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
             flow_controller_kwargs['connected_flow_map'] = connected_flow_map
 
-        # 2. Handle trigger_map if present (FlowController will handle this internally)
-        if self.trigger_map:
-            trigger_map = {}
-            for trigger_port, (callback_fn, _) in self.trigger_map.items():
-                trigger_map[trigger_port] = callback_fn
-            flow_controller_kwargs['trigger_map'] = trigger_map
-
-        # 3. Create custom user_flow_fn if we have response_dict
-        if self.response_dict:
-            async def custom_flow_fn(**kwargs):
-                active_input_port = kwargs['active_input_port']
-                c = kwargs.get('c', {})
-                
-                input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
-                input_name_payload_dict[active_input_port.name] = active_input_port.payload
-                
+        # 2. Create a custom flow_fn to handle our trigger_map and response_dict logic
+        async def api_flow_fn(**kwargs):
+            active_input_port = kwargs['active_input_port']
+            c = kwargs.get('c', {})
+            port_name = active_input_port.name
+            
+            # Store the incoming payload
+            input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
+            input_name_payload_dict[port_name] = active_input_port.payload
+            
+            # Store all kwargs for potential troubleshooting
+            self.stored_kwargs = kwargs
+            
+            # Handle response_dict logic if defined
+            if self.response_dict:
                 # Check if we have all required payloads
                 if all(port_name in input_name_payload_dict for port_name in self.response_dict.keys()):
                     return_dict = {}
@@ -192,10 +191,65 @@ class APIElement(Element):
                     # Clear stored payloads after processing
                     input_name_payload_dict.clear()
                     return return_dict
-                return None
             
-            flow_controller_kwargs['user_flow_fn'] = custom_flow_fn
-
+            # Handle trigger_map logic if defined
+            if self.trigger_map and port_name in self.trigger_map:
+                callback_fn, required_ports = self.trigger_map[port_name]
+                
+                # Check if we have all required payloads
+                if all(port in input_name_payload_dict for port in required_ports):
+                    # Prepare callback kwargs with payloads
+                    callback_kwargs = {
+                        port: input_name_payload_dict[port]
+                        for port in required_ports
+                    }
+                    
+                    # Handle async callbacks
+                    if asyncio.iscoroutinefunction(callback_fn):
+                        try:
+                            result = await callback_fn(**callback_kwargs)
+                            # Set response future if available
+                            if self.response_future and not self.response_future.done():
+                                self.response_future.set_result(result)
+                            # Clean up after processing
+                            for port in required_ports:
+                                input_name_payload_dict.pop(port, None)
+                            return result
+                        except Exception as e:
+                            logger.error(f"Error in async callback: {e}")
+                            raise
+                    else:
+                        try:
+                            result = callback_fn(**callback_kwargs)
+                            # Set response future if available
+                            if self.response_future and not self.response_future.done():
+                                self.response_future.set_result(result)
+                            # Clean up after processing
+                            for port in required_ports:
+                                input_name_payload_dict.pop(port, None)
+                            return result
+                        except Exception as e:
+                            logger.error(f"Error in sync callback: {e}")
+                            raise
+                            
+            # If we have build_fn, use it
+            if self.build_fn:
+                # Add active_input_port and context to kwargs
+                result = self.build_fn(
+                    active_input_port=active_input_port,
+                    c=c,
+                    **input_name_payload_dict
+                )
+                
+                if result is not None:
+                    # Set response future if available
+                    if self.response_future and not self.response_future.done():
+                        self.response_future.set_result(result)
+                    return result
+            
+            return None
+        
+        flow_controller_kwargs['flow_fn'] = api_flow_fn
         self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
         self.ports = self.flow_controller.ports
 
@@ -223,7 +277,7 @@ class APIElement(Element):
     def _route_setup(self):
         output_port_payload_type = signature(self.request_output_fn).return_annotation
         # Set up the output port for the Element
-        def pack_payload_callback(request_dict: dict) -> output_port_payload_type:
+        def pack_payload_callback(request_dict: dict) -> output_port_payload_type: # type: ignore
             return self.request_output_fn(**request_dict)
         self.ports.add_output('api_output', pack_payload_callback=pack_payload_callback)
         

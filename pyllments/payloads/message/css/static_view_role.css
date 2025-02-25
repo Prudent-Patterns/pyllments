@@ -1,6 +1,6 @@
 :host {
     position: absolute; /* Make the element absolute */
-    top: 4px; /* Position the element at the top */
+    top: 7px; /* Position the element at the top */
     right: 6px; /* Position the element on the left */
     margin: 0; /* Remove margins */
     border: 1px solid var(--light-outline-color);

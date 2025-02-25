@@ -106,9 +106,9 @@ class FlowPortMap(UserDict):
 class FlowController(Element):
     """
     Used to control complex flow logic between Elements.
-    Takes a user-provided callback which is meant to run every time a new
+    Takes a flow function which is meant to run every time a new
     input payload is received -- as well as maps for input and output payload types
-    or ports to be used in the callback signature.
+    or ports to be used in the function signature.
     Either flow_map or connected_flow_map should be provided to set up the ports.
     Can also create multi-ports which take a variable amount of connections, and
     create a new port and connection for each.
@@ -143,14 +143,10 @@ class FlowController(Element):
     ports to the FlowController's ports parameter in the __init__ method.
     """
 
-    user_flow_fn = param.Callable(doc="""
-        User-provided callback to run every time a new input payload is received.
-        This has highest priority and will be called before build_map logic.
-        """)
-    
-    flow_fn = param.Callable(doc="""
-        The main flow function that combines user_flow_fn and build_map logic.
-        This is set up internally by _setup_flow_fn.
+    flow_fn = param.Callable(default=None, doc="""
+        Function to run every time a new input payload is received.
+        The function should accept an active_input_port parameter, a context parameter 'c',
+        and any other flow ports as specified in the flow_map.
         """)
     
     flow_map = param.Dict(default={}, doc="""
@@ -192,29 +188,11 @@ class FlowController(Element):
     containing_element = param.ClassSelector(default=None, class_=Element, doc="""
         Element that contains/uses this flow controller -- useful for self-documenting""")
 
-    trigger_map = param.Dict(default={}, doc="""
-        A mapping of trigger port names to callback functions.
-        When a payload arrives at a trigger port, the FlowController will:
-        1. Store the payload
-        2. Check if all required ports (from callback's arguments) have payloads
-        3. Execute the callback with the collected payloads
-        4. Clean up the used payloads
-        
-        Example:
-        {
-            'trigger_port': lambda port_a, port_b: process_payloads(port_a, port_b)
-        }
-        
-        The callback function's argument names must match port names in the flow_map.
-        These arguments automatically define which ports are required.
-        """)
-
     def __init__(self, **params):
         super().__init__(**params)
         if self.containing_element:
             self.ports = Ports(containing_element=self.containing_element)
         self._setup_ports()
-        self._setup_flow_fn()
 
     def _setup_ports(self):
         for io_type in ['input', 'output']:
@@ -314,7 +292,7 @@ class FlowController(Element):
             port_alias = f"{alias}_{port_alias_num + 1}"
 
         port_type = self.flow_map['input'][alias]
-        def unpack(payload: port_type):
+        def unpack(payload: port_type): # type: ignore
             self._invoke_flow(port_alias, payload)
 
         input_port = self.ports.add_input(port_alias, unpack_payload_callback=unpack)
@@ -351,6 +329,7 @@ class FlowController(Element):
                 raise KeyError(f"No flow port found with alias '{input_port_name}'.")
 
         flow_port.payload = payload
+
         result = self.flow_fn(
             active_input_port=flow_port,
             c=self.context,
@@ -385,7 +364,7 @@ class FlowController(Element):
             port_alias_num = int(port_alias.rsplit('_')[-1])
             port_alias = f"{alias}_{port_alias_num + 1}"
         port_type = self.flow_map['output'][alias]
-        def pack(payload: port_type) -> port_type:
+        def pack(payload: port_type) -> port_type: # type: ignore
             return payload
 
         output_port = self.ports.add_output(port_alias, pack_payload_callback=pack)
@@ -411,81 +390,3 @@ class FlowController(Element):
             for other_input_port in other_input_ports:
                 self.connect_output(alias, other_input_port)
 
-    def _trigger_map_flow_fn(self, **kwargs):
-        """Internal handler for trigger_map based flow"""
-        if not self.trigger_map:
-            return None
-        
-        active_input_port = kwargs['active_input_port']
-        c = kwargs.get('c', {})
-        
-        # Store incoming payload
-        input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
-        input_name_payload_dict[active_input_port.name] = active_input_port.payload
-        
-        if active_input_port.name in self.trigger_map:
-            callback = self.trigger_map[active_input_port.name]
-            # Get required ports from callback signature
-            required_ports = [
-                param.name for param in signature(callback).parameters.values()
-            ]
-            
-            # Check if we have all required payloads
-            if all(port in input_name_payload_dict for port in required_ports):
-                # Only create callback_kwargs if we have all required payloads
-                callback_kwargs = {
-                    port: input_name_payload_dict[port]
-                    for port in required_ports
-                }
-                
-                # Handle async callbacks
-                if asyncio.iscoroutinefunction(callback):
-                    # Return a task that will handle cleanup after completion
-                    async def async_callback():
-                        try:
-                            result = await callback(**callback_kwargs)
-                            # Cleanup after async completion
-                            for port in required_ports:
-                                input_name_payload_dict.pop(port, None)
-                            return result
-                        except Exception as e:
-                            logger.error(f"Error in async callback: {e}")
-                            raise
-                    return asyncio.create_task(async_callback())
-                
-                # Synchronous callback
-                try:
-                    result = callback(**callback_kwargs)
-                    # Cleanup immediately for sync callbacks
-                    for port in required_ports:
-                        input_name_payload_dict.pop(port, None)
-                    return result
-                except Exception as e:
-                    logger.error(f"Error in sync callback: {e}")
-                    raise
-        return None
-
-    def _setup_flow_fn(self):
-        """
-        Sets up the main flow function based on configuration.
-
-        This function assigns a callable to self.flow_fn so that when a payload is received,
-        the flow controller can process it. If no user_flow_fn or trigger_map is provided,
-        the fallback returns None but still remains callable.
-        The user_flow_fn is meant to be used to implement custom flow logic if trigger_map
-        doesn't suffice 
-        """
-        def flow_fn(**kwargs):
-            if self.user_flow_fn:  # Maximum specificity first.
-                if asyncio.iscoroutinefunction(self.user_flow_fn):
-                    return asyncio.create_task(self.user_flow_fn(**kwargs))
-                return self.user_flow_fn(**kwargs)
-            elif self.trigger_map:
-                result = self._trigger_map_flow_fn(**kwargs)
-                if result is not None:
-                    return result
-            # Fallback: do nothing and return None.
-            return None
-
-        self.flow_fn = flow_fn
-        return flow_fn
