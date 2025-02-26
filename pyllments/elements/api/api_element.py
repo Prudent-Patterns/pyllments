@@ -6,7 +6,7 @@ from typing import Any
 import param
 from fastapi import FastAPI, HTTPException
 from loguru import logger
-from pydantic import BaseModel, create_model
+from pydantic import create_model
 from pydantic._internal._model_construction import ModelMetaclass
 
 from pyllments.base.element_base import Element
@@ -14,8 +14,6 @@ from pyllments.base.payload_base import Payload
 from pyllments.serve.app_registry import AppRegistry
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import InputPort
-# from pyllments.ports import Ports
-# from .api_model import APIModel
 
 
 class APIElement(Element):
