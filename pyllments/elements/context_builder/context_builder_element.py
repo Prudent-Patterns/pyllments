@@ -9,7 +9,6 @@ from .to_message import to_message_payload, payload_message_mapping
 
 
 class ContextBuilder(Element):
-    # Parameter definitions for input configuration
     input_map = param.Dict(default={}, doc="""
         A dictionary mapping the port name, a constant name, or a template name to their corresponding
         instances. 
@@ -90,7 +89,7 @@ class ContextBuilder(Element):
         # Create lookup tables for all port information
         self.port_types = {}      # port_name -> 'regular', 'template', 'constant'
         self.port_roles = {}      # port_name -> role
-        self.port_persist = {}    # port_name -> bool
+        self.port_persist = []    # List of port names that should persist
         self.required_ports = []  # list of required regular port names
         self.constants = {}       # constant_name -> MessagePayload
         self.templates = {}       # template_name -> template_data
@@ -138,7 +137,7 @@ class ContextBuilder(Element):
             if active_input_port.payload is not None:
                 c['input_name_payload_dict'][port_name] = active_input_port.payload
             
-            should_persist = self.port_persist.get(port_name, False)
+            should_persist = port_name in self.port_persist
             used_ports = set()
             processing_successful = False
             result_message_keys = []
@@ -156,7 +155,7 @@ class ContextBuilder(Element):
             # Clean up non-persisted ports
             if processing_successful:
                 for p_name in list(c['input_name_payload_dict'].keys()):
-                    if (not self.port_persist.get(p_name, False) and 
+                    if (p_name not in self.port_persist and 
                         p_name != port_name and
                         p_name not in used_ports and
                         p_name not in result_message_keys):
@@ -334,7 +333,7 @@ class ContextBuilder(Element):
                         self.input_map[key] = {
                             'role': self.port_roles.get(key, 'user'), 
                             'payload_type': payload_type, 
-                            'persist': self.port_persist.get(key, False)
+                            'persist': key in self.port_persist
                         }
         
         return connected_flow_map
@@ -439,7 +438,8 @@ class ContextBuilder(Element):
         if entry_type == 'constant':
             role = config.get('role', 'user')
             self.port_roles[key] = role
-            self.port_persist[key] = True  # Constants always persist
+            if key not in self.port_persist:
+                self.port_persist.append(key)  # Constants always persist
             self.constants[key] = MessagePayload(
                 content=config.get('message', ''),
                 role=role
@@ -447,14 +447,16 @@ class ContextBuilder(Element):
         elif entry_type == 'template':
             role = config.get('role', 'system')
             self.port_roles[key] = role
-            self.port_persist[key] = True  # Templates always persist
+            if key not in self.port_persist:
+                self.port_persist.append(key)  # Templates always persist
             self.templates[key] = {
                 'role': role,
                 'template': config.get('template', '')
             }
         else:  # Regular port
             self.port_roles[key] = config.get('role', 'user')
-            self.port_persist[key] = config.get('persist', False)
+            if config.get('persist', False) and key not in self.port_persist:
+                self.port_persist.append(key)
             
             # Add to required ports if it's a regular port (not output)
             if key != 'messages_output' and key not in self.required_ports:
