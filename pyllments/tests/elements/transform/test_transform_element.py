@@ -103,9 +103,9 @@ class TestTransformElement(unittest.TestCase):
         if len(self.received_payloads) > 0:
             self.assertEqual(self.received_payloads[0].model.content, "Transformed: Test input")
 
-    def test_connected_map_approach(self):
-        """Test using connected_input_map."""
-        logger.info("\n--- Running test_connected_map_approach ---")
+    def test_connected_ports_in_input_map(self):
+        """Test using ports directly in the input_map (replacing connected_input_map)."""
+        logger.info("\n--- Running test_connected_ports_in_input_map ---")
         
         # Create input pipe element
         input_pipe = PipeElement(name="input_pipe")
@@ -118,10 +118,10 @@ class TestTransformElement(unittest.TestCase):
             logger.info(f"simple_transform returning: {result.model.content}")
             return result
         
-        # Create transform element with connected_input_map
+        # Create transform element with ports in input_map (replacing connected_input_map)
         transform = TransformElement(
-            name="connected_map_test",
-            connected_input_map={
+            name="connected_ports_test",
+            input_map={
                 'port_input': {
                     'payload_type': MessagePayload,
                     'ports': [input_pipe.ports.output['pipe_output']]
@@ -130,7 +130,7 @@ class TestTransformElement(unittest.TestCase):
             emit_fn=simple_transform,
             output_payload_type=MessagePayload
         )
-        logger.info(f"Created transform element with connected_input_map: {transform}")
+        logger.info(f"Created transform element with ports in input_map: {transform}")
         
         # Connect output to pipe using > operator
         logger.info("Connecting transform output to output pipe")
@@ -138,7 +138,7 @@ class TestTransformElement(unittest.TestCase):
         
         # Send a payload to trigger transformation
         logger.info("Sending payload to input_pipe")
-        test_payload = MessagePayload(content="Connected map test", role="user")
+        test_payload = MessagePayload(content="Connected ports test", role="user")
         input_pipe.send_payload(test_payload)
         logger.info(f"Sent payload: {test_payload}")
         
@@ -146,7 +146,7 @@ class TestTransformElement(unittest.TestCase):
         logger.info(f"Received payloads: {self.received_payloads}")
         self.assertEqual(len(self.received_payloads), 1, "Should receive transformed payload")
         if len(self.received_payloads) > 0:
-            self.assertEqual(self.received_payloads[0].model.content, "Transformed: Connected map test")
+            self.assertEqual(self.received_payloads[0].model.content, "Transformed: Connected ports test")
 
     def test_direct_use_of_flow_controller(self):
         """Test using the flow controller's outgoing_input_port parameter."""

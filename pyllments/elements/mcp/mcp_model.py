@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import AsyncExitStack
 from copy import deepcopy
+import signal
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -42,6 +43,8 @@ class MCPModel(Model):
     context_stack = param.Parameter(default=None, doc="""
         The context stack to use for the MCP servers.
         """)
+    
+    tools = param.Dict(default={}, doc="""""")
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -94,6 +97,16 @@ class MCPModel(Model):
 
     async def keep_alive(self):
         try:
-            await asyncio.Future()  # Keeps stack alive
+            shutdown_event = asyncio.Event()
+            loop = self.async_loop
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(
+                    sig,
+                    lambda: asyncio.create_task(shutdown_event.set())
+                )
+            await shutdown_event.wait()
         except asyncio.CancelledError:
-            await self.stack.aclose()
+            pass
+        finally:
+            await self.context_stack.aclose()
+

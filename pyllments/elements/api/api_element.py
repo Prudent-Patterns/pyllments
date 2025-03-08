@@ -28,14 +28,6 @@ class APIElement(Element):
         }
         """)
     
-    connected_input_map = param.Dict(default={}, doc="""
-        A mapping of input ports names to the input ports to be connected to the flow controller.
-        connected_input_map = {
-            'port_a': [el1.ports.output['some_output']],
-            'port_b': [el2.ports.output['some_output']]
-        }
-        """)
-
     response_dict = param.Dict(default={}, doc="""
         A mapping of input port names to the key-value pairs of the generated API response.
         This mapping is used after all of the specified input ports have received a payload,
@@ -138,18 +130,14 @@ class APIElement(Element):
             self.ports.output['api_output'] > self.outgoing_input_port
 
     def _flow_controller_setup(self):
-        if not (self.input_map or self.connected_input_map):
-            raise ValueError("At least one of input_map or connected_input_map must be provided.")
-        
+        if not self.input_map:
+            raise ValueError("input_map must be provided.")
+
         flow_controller_kwargs = {}
-        
-        # 1. Setup basic flow maps
+
+        # 1. Setup basic flow map using only input_map
         flow_map = self._flow_map_setup(self.input_map)
         flow_controller_kwargs['flow_map'] = flow_map
-        
-        if self.connected_input_map:
-            connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
-            flow_controller_kwargs['connected_flow_map'] = connected_flow_map
 
         # 2. Create a custom flow_fn to handle our trigger_map and response_dict logic
         async def api_flow_fn(**kwargs):
@@ -253,17 +241,11 @@ class APIElement(Element):
 
     def _flow_map_setup(self, input_map):
         flow_map = {'input': {}}
-        for key, (msg_type, payload_type) in input_map.items():
+        for key, payload_type in input_map.items():
             if (isinstance(payload_type, type) and issubclass(payload_type, Payload)) or \
-            (hasattr(payload_type, '__origin__') and issubclass(payload_type.__origin__, list)):
+               (hasattr(payload_type, '__origin__') and issubclass(payload_type.__origin__, list)):
                 flow_map['input'][key] = payload_type
         return flow_map
-
-    def _connected_flow_map_setup(self, connected_input_map):
-        connected_flow_map = {'input': {}}
-        for key, ports in connected_input_map.items():
-            connected_flow_map['input'][key] = ports
-        return connected_flow_map
 
     def _create_request_pydantic_model(self):
         """Dynamically create a Pydantic model based on the argument names of request_output_fn."""

@@ -1,0 +1,6 @@
+{% for mcp, tools in tool_response.items() %}
+{{ mcp }}:
+{% for tool, response_value in tools.items() %}
+    - {{ tool }}: {{ response_value }}
+{% endfor %}
+{% endfor %}

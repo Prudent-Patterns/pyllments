@@ -31,6 +31,47 @@ class Port(param.Parameterized):
             return NotImplemented
         return self.id == other.id
     
+    @staticmethod
+    def is_payload_compatible(output_type: type, input_type: type) -> bool:
+        """
+        Checks if the output payload type is compatible with the input payload type.
+        
+        This method handles special cases like Any, Union, and list types.
+        """
+        from typing import Any, Union, get_origin, get_args
+
+        # If either type is Any, they're compatible
+        if output_type is Any or input_type is Any:
+            return True
+
+        # If types are identical, they're compatible
+        if output_type == input_type:
+            return True
+
+        origin_output = get_origin(output_type)
+        origin_input = get_origin(input_type)
+
+        # Handle Union types
+        if origin_output is Union:
+            return any(Port.is_payload_compatible(t, input_type) for t in get_args(output_type))
+        if origin_input is Union:
+            return any(Port.is_payload_compatible(output_type, t) for t in get_args(input_type))
+
+        # Handle List types
+        if origin_output is list and origin_input is list:
+            return Port.is_payload_compatible(get_args(output_type)[0], get_args(input_type)[0])
+        if origin_output is list:
+            return Port.is_payload_compatible(get_args(output_type)[0], input_type)
+        if origin_input is list:
+            return Port.is_payload_compatible(output_type, get_args(input_type)[0])
+
+        # For non-generic types, use subclass check
+        try:
+            return issubclass(output_type, input_type)
+        except TypeError:
+            # If types cannot be used in issubclass, consider them incompatible
+            return False
+
 
 class InputPort(Port):
     output_ports = param.List(item_type=Port)
@@ -132,6 +173,9 @@ class OutputPort(Port):
     type_check_successful = param.Boolean(default=False, doc="""
         Is set to True once a single type-check has been completed successfully""")
     
+    on_connect_callback = param.Callable(default=None, doc="""
+        A callback that is called when the port is connected to an input port""")
+    
 
     def __init__(self, **params: param.Parameter):
         super().__init__(**params)
@@ -161,74 +205,34 @@ class OutputPort(Port):
             self.type_checking = False
 
     def connect(self, input_ports: Union[InputPort, tuple[InputPort], list[InputPort]]):
-        """Connects self and the other InputPort(s)"""
-        
+        """Connects self to the provided InputPort(s) after validating payload compatibility."""
         is_iterable = isinstance(input_ports, (tuple, list))
-        def _port_check(input_port: InputPort):
-            """
-            Checks if the individual port is an InputPort
-            and if output_type is compatible with input_type.
-            """
-            if not isinstance(input_port, InputPort):
-                raise ValueError(f"Can only connect OutputPorts to InputPorts. "
-                            f"Attempted to connect '{self.name}' ({type(self).__name__}) "
-                            f"to '{input_port.name}' ({type(input_port).__name__})")
-            
-            def _is_compatible(output_type, input_type):                
-                # If either type is Any, they're compatible
-                if output_type is Any or input_type is Any:
-                    return True
-                
-                # If types are identical, they're compatible
-                if output_type == input_type:
-                    return True
-                
-                # Handle Union types
-                if get_origin(output_type) is Union:
-                    return any(_is_compatible(t, input_type) for t in get_args(output_type))
-                if get_origin(input_type) is Union:
-                    return any(_is_compatible(output_type, t) for t in get_args(input_type))
-                
-                # Handle List types
-                if get_origin(output_type) is list and get_origin(input_type) is list:
-                    return _is_compatible(get_args(output_type)[0], get_args(input_type)[0])
-                
-                # Handle case where one is a List and the other is not
-                if get_origin(output_type) is list:
-                    return _is_compatible(get_args(output_type)[0], input_type)
-                if get_origin(input_type) is list:
-                    return _is_compatible(output_type, get_args(input_type)[0])
-                
-                # Check for subclass relationship for non-generic types
-                try:
-                    result = issubclass(output_type, input_type)
-                    return result
-                except TypeError as e:
-                    print(f"TypeError in subclass check. output_type: {output_type}, input_type: {input_type}",
-                          f"\n\n{e}")
-                    return False
-            
-            # Actually call _is_compatible with the payload types
-            compatibility_result = _is_compatible(self.payload_type, input_port.payload_type)
-        
-            return compatibility_result
         
         # Connect each InputPort in the iterable
         for port in (input_ports if is_iterable else (input_ports,)):
-            # Check payload compatibility
-            if not _port_check(port):
-                raise ValueError(f"""InputPort and OutputPort payload types are not compatible:
-                    OutputPort '{self.name}' in element '{self.containing_element.__class__.__name__}' 
-                    with payload type {self.payload_type}
-                    InputPort '{port.name}' in element '{port.containing_element.__class__.__name__}' 
-                    with payload type {port.payload_type}""")
+            if not isinstance(port, InputPort):
+                raise ValueError(f"Can only connect OutputPorts to InputPorts. "
+                                 f"Attempted to connect '{self.name}' "
+                                 f"to '{port.name}' ({type(port).__name__})")
             
+            # Use the centralized compatibility helper
+            if not Port.is_payload_compatible(self.payload_type, port.payload_type):
+                raise ValueError(
+                    f"InputPort and OutputPort payload types are not compatible:\n"
+                    f"OutputPort '{self.name}' in element '{self.containing_element.__class__.__name__}' "
+                    f"with payload type {self.payload_type}\n"
+                    f"InputPort '{port.name}' in element '{port.containing_element.__class__.__name__}' "
+                    f"with payload type {port.payload_type}"
+                )
+                
             self.input_ports.append(port)
             self.connected_elements.append(port.containing_element)
             port.connected_elements.append(self.containing_element)
             port.output_ports.append(self)
             port.output_ports_validation_map[self] = False
             log_connect(self, port)
+            if self.on_connect_callback:
+                self.on_connect_callback()
         if not is_iterable:
             return input_ports
 
@@ -317,6 +321,7 @@ class OutputPort(Port):
     def __gt__(self, other):
         """Implements self.connect(other) through el1.some_output > el2.some_input"""
         self.connect(other)
+        return other
 
     def _emit_ready_check(self):
         return all(item['value'] is not None for item in self.required_items.values())
@@ -350,11 +355,12 @@ class Ports(param.Parameterized):
         self.input[name] = input_port
         return input_port
     
-    def add_output(self, name: str, pack_payload_callback, **kwargs):
+    def add_output(self, name: str, pack_payload_callback, on_connect_callback=None, **kwargs):
         output_port = OutputPort(
             name=name,
             pack_payload_callback=pack_payload_callback,
             containing_element=self.containing_element,
+            on_connect_callback=on_connect_callback,
             **kwargs)
         self.output[name] = output_port
         return output_port

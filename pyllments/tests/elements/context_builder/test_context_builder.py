@@ -60,7 +60,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a minimal context builder
         print("Creating ContextBuilder with emit_order")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']],
@@ -106,7 +106,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a context builder with a constant and template
         print("Creating ContextBuilder with constant and template")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']]
@@ -153,7 +153,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a context builder with explicit emit_order
         print("Creating ContextBuilder with explicit emit_order")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']],
@@ -205,7 +205,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a context builder with trigger_map
         print("Creating ContextBuilder with trigger_map")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']],
@@ -279,7 +279,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a context builder with build_fn
         print("Creating ContextBuilder with build_fn")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']],
@@ -337,7 +337,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a context builder with one persistent port
         print("Creating ContextBuilder with persistent user port")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']],
@@ -406,7 +406,7 @@ class TestContextBuilder(unittest.TestCase):
         # Create a context builder with templates
         print("Creating ContextBuilder with templates")
         context_builder = ContextBuilder(
-            connected_input_map={
+            input_map={
                 'user_msg': {
                     'role': 'user', 
                     'ports': [user_input.ports.output['pipe_output']],
@@ -462,6 +462,92 @@ class TestContextBuilder(unittest.TestCase):
         self.assert_message_content(2, "system", content_substring="User: What is Python?")
         self.assert_message_content(2, "system", content_substring="Assistant: Python is a programming language.")
         print("✓ Conversation template rendered correctly with both variables")
+
+    def test_template_waits_for_all(self):
+        """Test that a template does not emit until all its dependent ports have payloads."""
+        print("\n===== RUNNING TEST: Template Waits For All =====")
+        # Create input pipe elements
+        user_input = PipeElement(name="user_input")
+        extra_input = PipeElement(name="extra_input")
+        
+        # Create a context builder with a template that depends on two ports: user_msg and extra_msg
+        context_builder = ContextBuilder(
+            input_map={
+                'user_msg': {
+                    'role': 'user', 
+                    'ports': [user_input.ports.output['pipe_output']],
+                    'persist': True
+                },
+                'extra_msg': {
+                    'role': 'assistant', 
+                    'ports': [extra_input.ports.output['pipe_output']],
+                    'persist': True
+                },
+                'dependent_template': {
+                    'role': 'system',
+                    'template': "Combined: {{ user_msg }} and {{ extra_msg }}"
+                }
+            },
+            emit_order=['user_msg', 'dependent_template'],
+            outgoing_input_port=self.output_pipe.ports.input['pipe_input']
+        )
+        
+        # Send only the user message, leaving extra_msg missing
+        print("Sending only user message")
+        user_input.send_payload(MessagePayload(content="Hello from user", role="user"))
+        
+        # Since extra_msg is missing, the dependent_template should cause overall emit to abort
+        self.assertEqual(len(self.received_messages), 0, "No messages should be emitted as template dependencies are incomplete")
+        print("✓ No messages emitted when one template dependency is missing")
+        
+        # Now send the extra_msg
+        print("Sending extra message")
+        extra_input.send_payload(MessagePayload(content="Hello from extra", role="assistant"))
+        
+        # Now, with both messages, emission should happen
+        # Expecting 2 messages: user_msg and dependent_template
+        self.assertEqual(len(self.received_messages), 2, "Should receive 2 messages after all dependencies are met")
+        print(f"✓ Received {len(self.received_messages)} messages after all template dependencies are met")
+        
+        # Verify that the dependent template includes both messages
+        # The combined template should render something like "Combined: Hello from user and Hello from extra"
+        self.assertIn("Hello from user", self.received_messages[1].model.content, "Template should include user message")
+        self.assertIn("Hello from extra", self.received_messages[1].model.content, "Template should include extra message")
+
+    def test_callback(self):
+        """Test that the port callback is invoked and transforms the payload."""
+        print("\n===== RUNNING TEST: Callback Functionality =====")
+        # Create an input pipe element
+        user_input = PipeElement(name="user_input")
+        
+        # Define a callback function that appends ' - callback' to the message content
+        def transform_callback(payload):
+            # Create a new MessagePayload with transformed content
+            return MessagePayload(content=payload.model.content + " - callback", role=payload.model.role)
+        
+        # Create a ContextBuilder with a connected_input_map using the callback
+        context_builder = ContextBuilder(
+            input_map={
+                'user_msg': {
+                    'role': 'user',
+                    'ports': [user_input.ports.output['pipe_output']],
+                    'callback': transform_callback
+                }
+            },
+            emit_order=['user_msg'],
+            outgoing_input_port=self.output_pipe.ports.input['pipe_input']
+        )
+        
+        # Send a test message through the user_input pipe
+        test_payload = MessagePayload(content="Test message", role="user")
+        user_input.send_payload(test_payload)
+        
+        # Verify that one message is received and its content is transformed
+        self.assertEqual(len(self.received_messages), 1, "Should receive 1 message")
+        transformed_message = self.received_messages[0]
+        self.assertEqual(transformed_message.model.content, "Test message - callback", "Message content should be transformed by the callback")
+        self.assertEqual(transformed_message.model.role, "user", "Message role should remain unchanged")
+        print("✓ Callback test passed: Payload correctly transformed")
 
 if __name__ == "__main__":
     unittest.main() 

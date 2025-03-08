@@ -1,4 +1,5 @@
 import param
+from jinja2 import meta
 import jinja2
 
 from pyllments.elements.flow_control.flow_controller import FlowController
@@ -12,35 +13,23 @@ class ContextBuilder(Element):
     input_map = param.Dict(default={}, doc="""
         A dictionary mapping the port name, a constant name, or a template name to their corresponding
         instances. 
-        - Ports: Input ports with 'role' and 'payload_type' keys. Optional 'persist' flag (defaults to False).
+        - Ports: Input ports with 'role' and 'payload_type' keys.
+            Optional 'persist' flag (defaults to False).
+            Optional 'callback' function to transform the payload when it is received by the port.
+                e.g. 'callback': lambda payload: do_something(payload.model.content)
         - Constants: Keys ending with '_constant' with 'role' and 'message' keys.
-        - Templates: Keys ending with '_template' with 'role' and 'template' keys.
+        - Templates: Keys ending with '_template' with 'role' and 'template' keys. emit_order and trigger_map
+          wait for the specified ports in the template as dependencies.(similar to included ports in the lists)
         
         Example:
         input_map = {
-            'port_a': {'role': 'user', 'payload_type': MessagePayload, 'persist': True},
+            'port_a': {'role': 'user', 'persist': True, 'ports': [el1.ports.output['some_output']]},
             'port_b': {'role': 'assistant', 'payload_type': list[MessagePayload]}, 
             'user_constant': {'role': 'user', 'message': "This text will be a user message"}, 
             'system_template': {'role': 'system', 'template': "{{ port_a }}  --  {{ port_b }}"}
         }
         """)
         
-    connected_input_map = param.Dict(default={}, doc="""
-        A dictionary mapping the port name, a constant name, or a template name to their corresponding
-        instances. Similar to input_map but for connecting to existing ports.
-        - Ports: Input ports with 'role' and 'ports' keys (list of output ports to connect to).
-        - Constants: Keys ending with '_constant' with 'role' and 'message' keys.
-        - Templates: Keys ending with '_template' with 'role' and 'template' keys.
-        
-        Example:
-        connected_input_map = {
-            'port_a': {'role': 'user', 'ports': [el1.ports.some_output]},
-            'port_b': {'role': 'assistant', 'persist': True, 'ports': [el2.ports.some_output]},
-            'system_constant': {'role': 'system', 'message': "This text will be a sys message"},
-            'system_template': {'role': 'system', 'template': "{{ port_a }}  --  {{ port_b }}"}
-        }
-        """)
-
     emit_order = param.List(default=[], doc="""
         A list of msg/port names in the order of the messages to be emitted.
         Use when neither the trigger_map nor build_fn are provided.
@@ -85,8 +74,8 @@ class ContextBuilder(Element):
 
     def __init__(self, **params):
         super().__init__(**params)
-        
-        # Create lookup tables for all port information
+        # Create lookup tables
+        self.callbacks = {}  # mapping of port names to callback functions
         self.port_types = {}      # port_name -> 'regular', 'template', 'constant'
         self.port_roles = {}      # port_name -> role
         self.port_persist = []    # List of port names that should persist
@@ -105,19 +94,14 @@ class ContextBuilder(Element):
             self.ports.messages_output > self.outgoing_input_port
 
     def _flow_controller_setup(self):
-        """Set up the flow controller with the configured inputs and outputs."""
-        if not (self.input_map or self.connected_input_map):
-            raise ValueError("At least one of input_map or connected_input_map must be provided.")
-        
+        """Set up the flow controller with the configured inputs."""
+        if not self.input_map:
+            raise ValueError("input_map must be provided.")
+
         flow_controller_kwargs = {}
-        
-        # Setup basic flow maps
+        # Setup basic flow map using input_map only
         flow_map = self._flow_map_setup(self.input_map)
         flow_controller_kwargs['flow_map'] = flow_map
-        
-        if self.connected_input_map:
-            connected_flow_map = self._connected_flow_map_setup(self.connected_input_map)
-            flow_controller_kwargs['connected_flow_map'] = connected_flow_map
 
         flow_controller_kwargs['flow_fn'] = self._create_context_flow_fn()
         self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
@@ -135,7 +119,10 @@ class ContextBuilder(Element):
                 c['input_name_payload_dict'] = {}
             
             if active_input_port.payload is not None:
-                c['input_name_payload_dict'][port_name] = active_input_port.payload
+                payload = active_input_port.payload
+                if port_name in self.callbacks:  # Check for a callback for this port
+                    payload = self.callbacks[port_name](payload)
+                c['input_name_payload_dict'][port_name] = payload
             
             should_persist = port_name in self.port_persist
             used_ports = set()
@@ -209,7 +196,7 @@ class ContextBuilder(Element):
         
         # Strategy 4: Default behavior - use all available ports in order of definition
         if all(port in input_name_payload_dict for port in self.required_ports) and self.required_ports:
-            ordered_keys = list(self.connected_input_map.keys() if self.connected_input_map else self.input_map.keys())
+            ordered_keys = list(self.input_map.keys())
             result = self._process_with_order(ordered_keys, input_name_payload_dict, messages_output)
             if result:
                 return result
@@ -218,7 +205,6 @@ class ContextBuilder(Element):
 
     def _process_with_order(self, order, input_name_payload_dict, messages_output):
         """Process messages using the given order.
-        
         Returns a dict with 'keys' and 'used_ports' if successful, None otherwise.
         """
         msg_payload_list = []
@@ -229,14 +215,16 @@ class ContextBuilder(Element):
             # Track regular ports for cleanup
             if self.port_types.get(key) == 'regular':
                 used_ports.add(key)
-                
+            
             # Get and add the message to the payload list
             message = self._get_message(key, input_name_payload_dict)
-            if message:
-                if isinstance(message, list):
-                    msg_payload_list.extend(message)
-                else:
-                    msg_payload_list.append(message)
+            if message is None:
+                # Abort if any required message (e.g., template) is not available
+                return None
+            if isinstance(message, list):
+                msg_payload_list.extend(message)
+            else:
+                msg_payload_list.append(message)
         
         # Only emit if we have messages to send
         if msg_payload_list:
@@ -292,74 +280,54 @@ class ContextBuilder(Element):
             )
 
     def _flow_map_setup(self, input_map):
-        """Set up the flow map based on the input_map configuration."""
-        flow_map = {'input': {}, 'output': {'messages_output': list[MessagePayload]}}
-        
-        # Add all regular ports from the input_map
+        """Set up the unified flow map based on the input_map configuration."""
+        flow_map = {
+            'input': {},
+            'output': {'messages_output': {"payload_type": list[MessagePayload]}}
+        }
+
+        # Add all regular port configurations from the input_map
         for key, config in input_map.items():
             if key != 'output' and not key.endswith('_constant') and not key.endswith('_template'):
-                payload_type = config.get('payload_type')
-                if payload_type:
-                    flow_map['input'][key] = payload_type
-        
+                flow_map['input'][key] = config
         return flow_map
 
-    def _connected_flow_map_setup(self, connected_input_map):
-        """Set up the connected flow map based on the connected_input_map configuration."""
-        connected_flow_map = {'input': {}, 'output': {}}
-        
-        for key, value in connected_input_map.items():
-            if key == 'output':
-                # Handle output connections
-                for out_key, ports in value.items():
-                    if isinstance(ports, (list, tuple)):
-                        connected_flow_map['output'][out_key] = ports
-                    elif isinstance(ports, InputPort):
-                        connected_flow_map['output'][out_key] = [ports]
-                    else:
-                        raise ValueError(f"Invalid value for output key '{out_key}': {ports}")
-            elif self.port_types.get(key) == 'constant' or self.port_types.get(key) == 'template':
-                # Constants and templates are already handled in _initialize_lookups
-                pass
-            else:
-                # Handle port connections
-                ports = value.get('ports', [])
-                ports_list = ports if isinstance(ports, (list, tuple)) else [ports]
-                
-                if ports_list:
-                    connected_flow_map['input'][key] = ports_list
-                    if key not in self.input_map:
-                        payload_type = ports_list[0].payload_type
-                        self.input_map[key] = {
-                            'role': self.port_roles.get(key, 'user'), 
-                            'payload_type': payload_type, 
-                            'persist': key in self.port_persist
-                        }
-        
-        return connected_flow_map
-        
     def _process_template(self, template_data, input_name_payload_dict):
-        """Process a Jinja2 template with payload content from the specified ports."""
+        """Process a Jinja2 template with payload content from the specified ports.
+        This version waits for all referenced ports to have a payload before processing.
+        """
         role = template_data.get('role', 'system')
         template_str = template_data.get('template', '')
         
-        # Use a special Jinja2 environment that returns an empty string for undefined variables
-        env = jinja2.Environment(undefined=jinja2.Undefined)
-        template_obj = env.from_string(template_str)
+        # Create an environment to parse the template and extract variables
+        parsing_env = jinja2.Environment()
+        parsed_content = parsing_env.parse(template_str)
+        # Find all variables referenced in the template
+        referenced_ports = meta.find_undeclared_variables(parsed_content)
         
-        # Create a context with port values
+        # Check that all referenced ports have a payload; if not, wait (i.e., return None)
+        for port in referenced_ports:
+            if port not in input_name_payload_dict or input_name_payload_dict[port] is None:
+                return None
+        
+        # Use an environment that errors on undefined variables instead of returning an empty string
+        render_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+        template_obj = render_env.from_string(template_str)
+        
+        # Build the template context with converted payloads from regular ports
         template_context = {}
         for port_name, payload in input_name_payload_dict.items():
             if payload is not None and self.port_types.get(port_name) == 'regular':
                 converted = self._convert_payload_to_message(
-                    port_name, 
-                    payload, 
+                    port_name,
+                    payload,
                     self.port_roles.get(port_name)
                 )
-                
                 if isinstance(converted, list):
-                    # For lists, join the content of all messages
-                    template_context[port_name] = '\n'.join([msg.model.content for msg in converted if hasattr(msg, 'model')])
+                    # Join multiple messages into one string
+                    template_context[port_name] = '\n'.join([
+                        msg.model.content for msg in converted if hasattr(msg, 'model')
+                    ])
                 elif converted and hasattr(converted, 'model'):
                     template_context[port_name] = converted.model.content
         
@@ -367,7 +335,7 @@ class ContextBuilder(Element):
             rendered_content = template_obj.render(**template_context)
             return MessagePayload(content=rendered_content, role=role)
         except Exception as e:
-            # Handle template rendering errors
+            # Handle template rendering errors gracefully
             error_msg = f"Error rendering template: {str(e)}"
             return MessagePayload(content=error_msg, role=role)
 
@@ -405,22 +373,15 @@ class ContextBuilder(Element):
         return msg_payload_list
 
     def _initialize_lookups(self):
-        """Initialize all lookup tables from input maps."""
-        # Process both input maps
-        for input_map_name in ['input_map', 'connected_input_map']:
-            input_map = getattr(self, input_map_name, {})
-            if not input_map:
+        """Initialize all lookup tables from input_map."""
+        input_map = getattr(self, 'input_map', {})
+        if not input_map:
+            return
+
+        for key, config in input_map.items():
+            if not isinstance(config, dict) or key == 'output':
                 continue
-                
-            for key, config in input_map.items():
-                if not isinstance(config, dict) or key == 'output':
-                    continue
-                    
-                # Skip if already processed (from input_map)
-                if key in self.port_types and input_map_name == 'connected_input_map':
-                    continue
-                
-                self._register_entry(key, config, input_map_name)
+            self._register_entry(key, config, 'input_map')
     
     def _register_entry(self, key, config, source_map):
         """Register an entry in the lookup tables based on its type."""
@@ -461,3 +422,7 @@ class ContextBuilder(Element):
             # Add to required ports if it's a regular port (not output)
             if key != 'messages_output' and key not in self.required_ports:
                 self.required_ports.append(key)
+            
+            # Register callback if provided
+            if 'callback' in config:
+                self.callbacks[key] = config['callback']
