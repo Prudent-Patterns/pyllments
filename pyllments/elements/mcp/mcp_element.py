@@ -18,8 +18,13 @@ class MCPElement(Element):
         def pack(tool_list: ToolListPayload) -> ToolListPayload:
             return tool_list
 
-        self.ports.add_output(
+        tool_list_output = self.ports.add_output(
             name='tool_list_output',
             pack_payload_callback=pack,
             on_connect_callback=lambda port: port.stage_emit(tool_list=self.model.tool_list))
+        # Emits the tool_list when it changes - for updates
+        self.model.param.watch(
+            lambda event: tool_list_output.stage_emit(tool_list=event.new),
+            'tool_list'
+            )
             

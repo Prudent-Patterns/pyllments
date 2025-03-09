@@ -20,7 +20,8 @@ class ContextBuilder(Element):
         - Constants: Keys ending with '_constant' with 'role' and 'message' keys.
         - Templates: Keys ending with '_template' with 'role' and 'template' keys. emit_order and trigger_map
           wait for the specified ports in the template as dependencies.(similar to included ports in the lists)
-        
+          The payloads are converted to MessagePayloads(using the payload_message_mapping), from
+          which the content is extracted before creating the final MessagePayload.
         Example:
         input_map = {
             'port_a': {'role': 'user', 'persist': True, 'ports': [el1.ports.output['some_output']]},

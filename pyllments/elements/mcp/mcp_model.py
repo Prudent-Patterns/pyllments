@@ -44,7 +44,7 @@ class MCPModel(Model):
         The context stack to use for the MCP servers.
         """)
     
-    tools = param.Dict(default={}, doc="""""")
+    tool_list = param.Dict(default={}, doc="""""")
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -110,3 +110,6 @@ class MCPModel(Model):
         finally:
             await self.context_stack.aclose()
 
+    def create_tool_list(self):
+        """Create a tool list from the MCPs."""
+        
