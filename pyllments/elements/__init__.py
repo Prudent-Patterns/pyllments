@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .telegram import TelegramElement
     from .pipe import PipeElement
     from .transform import TransformElement
+    from .mcp import MCPElement
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
     "ChatInterfaceElement": ".chat_interface",
@@ -31,7 +32,8 @@ ELEMENT_MAPPING = {
     "DiscordElement": ".discord",
     "TelegramElement": ".telegram",
     "PipeElement": ".pipe",
-    "TransformElement": ".transform"
+    "TransformElement": ".transform",
+    "MCPElement": ".mcp"
 }
 
 def __getattr__(name):

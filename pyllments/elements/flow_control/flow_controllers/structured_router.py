@@ -11,7 +11,7 @@ class StructuredRouterTransformer(Element):
                 'schema': {'response': str}
             },
             'tools': {
-                'schema_input_ports': [mcp_el.ports.tool_list_output],
+                'schema': [mcp_el.ports.tool_list_output],
                 'transform': lambda structured_input: ToolCallPayload(tools=structured_input),
                 'payload_type': ToolCallPayload,
                 'ports': [mcp_el.ports.tool_call_input]
