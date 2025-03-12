@@ -72,7 +72,9 @@ class MCPModel(Model):
         # Create a new event loop for MCP sessions
         self.mcp_loop = asyncio.new_event_loop()
         self.setup_complete = threading.Event()
-        self._shutdown_requested = False
+        
+        # Create an asyncio.Event instead of a boolean flag
+        self._shutdown_event = None  # Will be created in the asyncio thread
         
         # Start the MCP thread
         self.mcp_thread = threading.Thread(target=self.run_mcp_loop)
@@ -100,6 +102,9 @@ class MCPModel(Model):
         """Main coroutine that handles the entire lifecycle in a single task."""
         print("DEBUG: Starting main task")
         
+        # Create the shutdown event in the asyncio thread
+        self._shutdown_event = asyncio.Event()
+        
         # Create the AsyncExitStack in this task
         async with AsyncExitStack() as stack:
             self.context_stack = stack
@@ -110,16 +115,16 @@ class MCPModel(Model):
                 await self.mcp_setup(self.mcps)
                 self.setup_complete.set()
                 
-                # Run phase - keep running until shutdown is requested
-                print("DEBUG: Entering main loop")
-                while not self._shutdown_requested:
-                    await asyncio.sleep(0.1)
-                    
+                # Wait efficiently for shutdown signal
+                print("DEBUG: Waiting for shutdown signal")
+                await self._shutdown_event.wait()
+                print("DEBUG: Shutdown signal received")
+                
             except Exception as e:
                 print(f"DEBUG: Exception in main task: {e}")
             finally:
                 print("DEBUG: Main task completing")
-                # No need to explicitly close the AsyncExitStack - it's handled by the async with
+                # AsyncExitStack cleanup handled by async with
         
         print("DEBUG: Main task finished")
         self.mcp_loop.stop()
@@ -182,13 +187,18 @@ class MCPModel(Model):
         """Signal the main task to exit."""
         print("DEBUG: Entering shutdown")
         
-        if getattr(self, '_shutdown_requested', False):
+        # Check if already shutting down
+        if getattr(self, '_shutdown_in_progress', False):
             print("DEBUG: Already shutting down")
             return
+        self._shutdown_in_progress = True
         
-        self._shutdown_requested = True
+        # Signal the asyncio event from the main thread
+        if hasattr(self, '_shutdown_event') and self._shutdown_event is not None:
+            print("DEBUG: Setting shutdown event")
+            self.mcp_loop.call_soon_threadsafe(self._shutdown_event.set)
         
-        # Wait for the thread to exit (with timeout)
+        # Wait for the thread to exit
         if hasattr(self, 'mcp_thread') and self.mcp_thread.is_alive():
             print("DEBUG: Waiting for mcp_thread to finish")
             self.mcp_thread.join(timeout=5)
