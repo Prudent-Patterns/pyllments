@@ -57,6 +57,7 @@ dev = [
     "ipykernel",
     "ipython",
     "ipywidgets",
+    "pytest"
 ]
 
 [project.scripts]

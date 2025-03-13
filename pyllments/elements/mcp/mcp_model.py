@@ -6,6 +6,7 @@ from contextlib import AsyncExitStack
 from copy import deepcopy
 import signal
 
+from loguru import logger
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 import param
@@ -15,7 +16,11 @@ from pyllments.serve import LoopRegistry
 
 
 class MCPModel(Model):
-    """A model that handles tool calling with the Model Context Protocol."""
+    """
+    A model that handles tool calling with the Model Context Protocol.
+    WARNING: May need to manually run the shutdown() method to gracefully
+    exit the servers.
+    """
     mcps = param.Dict(default={}, doc="""
         A dictionary mapping server names to their corresponding MCP server specs.
         e.g.
@@ -77,7 +82,7 @@ class MCPModel(Model):
         self._shutdown_event = None  # Will be created in the asyncio thread
         
         # Start the MCP thread
-        self.mcp_thread = threading.Thread(target=self.run_mcp_loop)
+        self.mcp_thread = threading.Thread(target=self.run_mcp_loop, daemon=True)
         self.mcp_thread.start()
         
         # Wait for MCP setup to complete before setting up tools
@@ -90,17 +95,17 @@ class MCPModel(Model):
 
     def run_mcp_loop(self):
         """Run the MCP event loop in a dedicated thread."""
-        print("DEBUG: Entering run_mcp_loop")
+        logger.debug("Entering run_mcp_loop")
         asyncio.set_event_loop(self.mcp_loop)
         
         # Use a single top-level coroutine for the entire lifecycle
         # This ensures all async operations happen in the same task
         self.mcp_loop.run_until_complete(self._main_task())
-        print("DEBUG: Exiting run_mcp_loop")
+        logger.debug("Exiting run_mcp_loop")
 
     async def _main_task(self):
         """Main coroutine that handles the entire lifecycle in a single task."""
-        print("DEBUG: Starting main task")
+        logger.info("Starting main task")
         
         # Create the shutdown event in the asyncio thread
         self._shutdown_event = asyncio.Event()
@@ -111,22 +116,22 @@ class MCPModel(Model):
             
             try:
                 # Setup phase
-                print("DEBUG: Running mcp_setup")
+                logger.debug("Running mcp_setup")
                 await self.mcp_setup(self.mcps)
                 self.setup_complete.set()
                 
                 # Wait efficiently for shutdown signal
-                print("DEBUG: Waiting for shutdown signal")
+                logger.debug("Waiting for shutdown signal")
                 await self._shutdown_event.wait()
-                print("DEBUG: Shutdown signal received")
+                logger.info("Shutdown signal received")
                 
             except Exception as e:
-                print(f"DEBUG: Exception in main task: {e}")
+                logger.debug(f"Exception in main task: {e}")
             finally:
-                print("DEBUG: Main task completing")
+                logger.info("Main task completing")
                 # AsyncExitStack cleanup handled by async with
         
-        print("DEBUG: Main task finished")
+        logger.info("Main task finished")
         self.mcp_loop.stop()
 
     async def mcp_setup(self, mcps):
@@ -185,30 +190,30 @@ class MCPModel(Model):
 
     def shutdown(self):
         """Signal the main task to exit."""
-        print("DEBUG: Entering shutdown")
+        logger.info("Entering shutdown")
         
         # Check if already shutting down
         if getattr(self, '_shutdown_in_progress', False):
-            print("DEBUG: Already shutting down")
+            logger.debug("Already shutting down")
             return
         self._shutdown_in_progress = True
         
         # Signal the asyncio event from the main thread
         if hasattr(self, '_shutdown_event') and self._shutdown_event is not None:
-            print("DEBUG: Setting shutdown event")
+            logger.info("Setting shutdown event")
             self.mcp_loop.call_soon_threadsafe(self._shutdown_event.set)
         
         # Wait for the thread to exit
         if hasattr(self, 'mcp_thread') and self.mcp_thread.is_alive():
-            print("DEBUG: Waiting for mcp_thread to finish")
+            logger.debug("Waiting for mcp_thread to finish")
             self.mcp_thread.join(timeout=5)
             
             if self.mcp_thread.is_alive():
-                print("DEBUG: Warning: MCP thread did not exit within timeout")
+                logger.debug("Warning: MCP thread did not exit within timeout")
             else:
-                print("DEBUG: MCP thread exited cleanly")
+                logger.info("MCP thread exited cleanly")
         
-        print("DEBUG: Exiting shutdown")
+        logger.info("Exiting shutdown")
 
     def run_in_mcp_loop(self, coro):
         """Run a coroutine in the MCP loop and return its result."""
