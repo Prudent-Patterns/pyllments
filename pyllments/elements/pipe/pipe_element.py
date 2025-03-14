@@ -12,9 +12,15 @@ class PipeElement(Element):
     When set up as an input element, it will store the received payloads in a list.
     When set up as an output element, it will emit the the specified payload with send_payload
     """
-    receive_callback = param.Callable(default=None, doc="""
+    receive_callback = param.Callable(default=lambda x: x, doc="""
         Callback function for inspecting received payloads. 
         Used with logger.info(), so it should return a printable object.""")
+    received_payloads = param.List(default=[], doc="""
+        List of received payloads.
+        """)
+    store_received_payloads = param.Boolean(default=True, doc="""
+        Whether to store received payloads.
+        """)
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -23,6 +29,8 @@ class PipeElement(Element):
     def _setup_ports(self):
         def unpack(payload: Any):
             """Store the received payload"""
+            if self.store_received_payloads:
+                self.received_payloads.append(payload)
             if self.receive_callback:
                 logger.info(f"Unpacking in TestElement: {self.receive_callback(payload)}")
     

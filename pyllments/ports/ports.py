@@ -232,7 +232,7 @@ class OutputPort(Port):
             port.output_ports_validation_map[self] = False
             log_connect(self, port)
             if self.on_connect_callback:
-                self.on_connect_callback()
+                self.on_connect_callback(self)
         if not is_iterable:
             return input_ports
 

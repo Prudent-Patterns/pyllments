@@ -2,7 +2,7 @@ from typing import Literal, Union
 
 import jinja2
 import param
-from pydantic import BaseModel, create_model, Field
+from pydantic import BaseModel, create_model, Field, RootModel
 
 from pyllments.base.model_base import Model
 
@@ -28,11 +28,13 @@ class ToolListModel(Model):
             - todo.add_task(task: string)
         'verbose':
             """)
-    schema = param.ClassSelector(default=None, class_=BaseModel)
+    _schema = param.ClassSelector(default=None, class_=BaseModel, doc="""
+        The schema of the tool list. Dynamically computed when schema attribute is accessed.
+        """)
 
     def __init__(self, **params):
         super().__init__(**params)
-        self.schema = self.schema_setup(self.tool_list)
+        # self._schema = self.create_tools_schema(self.tool_list)
 
     def get_template_str(self):
         if self.tool_format == 'default':
@@ -57,6 +59,16 @@ class ToolListModel(Model):
         )
         return tool_model
 
+    def create_tools_schema(self, tool_list):
+        tool_schema_list = [self.create_tool_model(tool) for tool in tool_list]
+        tool_array_anyoff_schema = RootModel[list[Union[*tool_schema_list]]]
+        return tool_array_anyoff_schema
+    
+    @property
+    def schema(self):
+        if not self._schema:
+            self._schema = self.create_tools_schema(self.tool_list)
+        return self._schema
 
 class CleanModel(BaseModel):
     @classmethod

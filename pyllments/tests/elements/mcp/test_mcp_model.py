@@ -24,3 +24,4 @@ def test_tool_list(mcp_model):
     tool_list = mcp_model.tool_list  # Assuming this exists
     print(f"DEBUG: Tool list: {tool_list}")
     print("DEBUG: Exiting test_tool_list")
+

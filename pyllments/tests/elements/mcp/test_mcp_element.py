@@ -1,15 +1,14 @@
 import pytest
 
-from pyllments.elements.mcp import MCPElement
+from pyllments.elements import MCPElement, PipeElement
 from pyllments.logging import setup_logging
 
 setup_logging()
 
 @pytest.fixture
-def mcp_element():
+def mcp_pipe():
     """Fixture to create an instance of MCPElement for testing."""
-    print("DEBUG: Entering fixture setup")
-    element = MCPElement(mcps={
+    mcp_el = MCPElement(mcps={
         'test_mcp': {
             'type': 'script',
             'script': 'test_mcp_server.py',
@@ -19,10 +18,13 @@ def mcp_element():
             'script': 'test_mcp_server2.py',
         }
     })
-    print("DEBUG: Exiting fixture setup")
-    return element
 
-def test_tool_list_emit(mcp_element):
-    """Test the tool list emission functionality."""
-    print("DEBUG: Entering test_tool_list_emit")
-    # Add assertions and test logic here
+    pipe_el = PipeElement(receive_callback=lambda payload: payload.model.tool_list)
+    return mcp_el, pipe_el
+
+def test_tool_list(mcp_pipe):
+    """Test the tool list output of the MCP element."""
+    mcp_el, pipe_el = mcp_pipe
+    mcp_el.ports.tool_list_output > pipe_el.ports.pipe_input
+    assert pipe_el.received_payloads[0]
+

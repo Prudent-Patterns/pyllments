@@ -11,12 +11,12 @@ class MCPElement(Element):
         self.model = MCPModel(**params)
 
         self._tool_list_output_setup()
-        self._tool_response_output_setup()
-        self._tool_call_input_setup()
+        # self._tool_response_output_setup()
+        # self._tool_call_input_setup()
     
     def _tool_list_output_setup(self):
-        def pack(tool_list: ToolListPayload) -> ToolListPayload:
-            return tool_list
+        def pack(tool_list: list) -> ToolListPayload:
+            return ToolListPayload(tool_list=tool_list)
 
         tool_list_output = self.ports.add_output(
             name='tool_list_output',
