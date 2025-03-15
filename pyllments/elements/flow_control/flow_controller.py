@@ -4,10 +4,8 @@ import asyncio
 
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
-from pyllments.common.param import PayloadSelector
 from pyllments.ports.ports import InputPort, OutputPort, Ports
-# TODO: Reach decision about whether to get rid of InputFlowPorts to avoid stale storage of paylaods - currently
-# they payloads are being set to the flowports and not being cleaned up.
+
 
 class FlowPort(param.Parameterized):
     """Special Port wrapper for port management in the flow controller"""
@@ -33,7 +31,6 @@ class InputFlowPort(FlowPort):
     def __init__(self, **params):
         super().__init__(**params)
       
-
 
 class FlowPortMap(UserDict):
     """
@@ -107,34 +104,11 @@ class FlowController(Element):
     input payload is received -- as well as maps for input and output payload types
     or ports to be used in the function signature.
     Either flow_map or connected_flow_map should be provided to set up the ports.
-    Can also create multi-ports which take a variable amount of connections, and
-    create a new port and connection for each.
 
     Connecting ports after instantiation:
-    1. Using the '>' operator (standard Element connection):
+    Using the '>' operator (standard Element connection):
        element1.ports.output['some_output'] > flow_controller.ports.input['input_alias']
        flow_controller.ports.output['output_alias'] > element2.ports.input['some_input']
-
-    2. Using connect_input and connect_output methods:
-       flow_controller.connect_input('input_alias', element1.ports.output['some_output'])
-       flow_controller.connect_output('output_alias', element2.ports.input['some_input'])
-
-    3. For multi-ports:
-       flow_controller.connect_input('multi_input_alias', element1.ports.output['output1'])
-       flow_controller.connect_input('multi_input_alias', element2.ports.output['output2'])
-
-    4. Connecting multiple ports at once:
-       flow_controller.connect_inputs({
-           'input_alias1': [element1.ports.output['output1'], element2.ports.output['output2']],
-           'input_alias2': [element3.ports.output['output3']]
-       })
-       flow_controller.connect_outputs({
-           'output_alias1': [element4.ports.input['input1'], element5.ports.input['input2']],
-           'output_alias2': [element6.ports.input['input3']]
-       })
-
-    Note: When using multi-ports, the alias in flow_map should start with 'multi_'.
-    For example: 'multi_input_alias': SomePayloadType
 
     When FlowController is used within an element, it is recommended to assign that element's
     ports to the FlowController's ports parameter in the __init__ method.
@@ -154,11 +128,8 @@ class FlowController(Element):
             'input': {
                 'chat_input': {
                     'payload_type': MessagePayload,
-                    'ports': [el1.ports.output['msg']]
-                },
-                'multi_input': {
-                    'payload_type': MessagePayload
-                    // 'ports' is optional if you wish to connect later.
+                    'ports': [el1.ports.output['msg']],
+                    'persist': True
                 }
             },
             'output': {
@@ -217,7 +188,7 @@ class FlowController(Element):
                 else:
                     payload_type = config["payload_type"]
 
-                # Set up the port based on I/O type and payload type, including multi-port logic.
+                # Set up the port based on I/O type and payload type
                 self._setup_port_from_type(io_type, alias, payload_type)
 
                 # If external ports are specified, connect them.
@@ -226,9 +197,9 @@ class FlowController(Element):
                     ports = ports if isinstance(ports, list) else [ports]
                     for port in ports:
                         if io_type == 'input':
-                            self.connect_input(alias, port)
+                            port > self.ports.input[alias]
                         else:
-                            self.connect_output(alias, port)
+                            self.ports.output[alias] > port
 
     def _setup_port_from_type(self, io_type, alias, payload_type):
         if payload_type is None:
@@ -240,10 +211,6 @@ class FlowController(Element):
             self._setup_output_port(alias, payload_type)
 
     def _setup_input_port(self, alias, payload_type):
-        if alias.startswith('multi_'):
-            self.flow_port_map[alias] = {}
-            return
-        
         def unpack(payload: payload_type):
             self._invoke_flow(alias, payload)
         
@@ -256,10 +223,6 @@ class FlowController(Element):
         )
 
     def _setup_output_port(self, alias, payload_type):
-        if alias.startswith('multi_'):
-            self.flow_port_map[alias] = {}
-            return
-
         def pack(payload: payload_type) -> payload_type:
             return payload
         
@@ -271,61 +234,11 @@ class FlowController(Element):
             payload_type=payload_type
         )
 
-    def connect_input(self, alias: str, other_output_port):
-        """
-        Connect an input port to an external output port
-        Also handles setting up multi-ports
-        """
-        # Setup for multi-ports triggered upon connection
-        if alias.startswith('multi_'):
-            # Multiports return the newly created port for custom mappings
-            return self._multi_input_setup(alias, other_output_port)
-        else:
-            other_output_port.connect(self.ports.input[alias])
-
-    def _multi_input_setup(self, alias, other_output_port):
-        # Port name uniqueness setting
-        port_alias = f"{alias}_0"
-        while port_alias in self.ports.input:
-            port_alias_num = int(port_alias.rsplit('_')[-1])
-            port_alias = f"{alias}_{port_alias_num + 1}"
-
-        port_type = self.flow_map['input'][alias]['payload_type']
-        def unpack(payload: port_type): # type: ignore
-            self._invoke_flow(port_alias, payload)
-
-        input_port = self.ports.add_input(port_alias, unpack_payload_callback=unpack)
-        other_output_port.connect(input_port)
-
-        input_flow_port = InputFlowPort(
-            name=port_alias,
-            input_port=input_port,
-            payload_type=port_type
-        )
-
-        self.flow_port_map[alias][port_alias] = input_flow_port
-        return input_flow_port
-
     def _invoke_flow(self, input_port_name: str, payload):
-        is_multi = input_port_name.startswith('multi_')
-        if is_multi:
-            # Make sure to extract alias from port name
-            num_suffix = input_port_name.rsplit('_')[-1]
-            suffix_idx = input_port_name.rfind(num_suffix)
-            alias = input_port_name[:suffix_idx]
-            try:
-                flow_multi_port = self.flow_port_map[alias]
-            except KeyError:
-                raise KeyError(f"No flow port found with alias '{alias}'.")
-            try:
-                flow_port = flow_multi_port[input_port_name]
-            except KeyError:
-                raise KeyError(f"No flow port found in {alias} with name '{input_port_name}'.")
-        else:
-            try:
-                flow_port = self.flow_port_map[input_port_name]
-            except KeyError:
-                raise KeyError(f"No flow port found with alias '{input_port_name}'.")
+        try:
+            flow_port = self.flow_port_map[input_port_name]
+        except KeyError:
+            raise KeyError(f"No flow port found with alias '{input_port_name}'.")
 
         flow_port.payload = payload
 
@@ -335,58 +248,15 @@ class FlowController(Element):
             **self.flow_port_map.list_view()
         )
         
-        # Up to implementation how to store payloads
+        if not self.flow_map['input'][input_port_name].get('persist', False):
         # If result is a coroutine/task, create a task that waits for it before clearing
-        if asyncio.iscoroutine(result) or isinstance(result, asyncio.Task):
-            async def clear_after_complete():
-                try:
-                    await result
-                finally:
-                    flow_port.payload = None
-            asyncio.create_task(clear_after_complete())
-        else:
-            # Synchronous case - clear immediately as before
-            flow_port.payload = None
-
-    def connect_output(self, alias: str, other_input_port):
-        """Connect an output port to an external input port"""
-        # Setup for multi-ports triggered upon connection
-        if alias.startswith('multi_'):
-            # Multiports return the newly created port for custom mappings
-            return self._multi_output_setup(alias, other_input_port)
-        else:
-            self.ports.output[alias].connect(other_input_port)
-
-    def _multi_output_setup(self, alias, other_input_port):
-        # Port name uniqueness setting
-        port_alias = f"{alias}_0"
-        while port_alias in self.ports.output:
-            port_alias_num = int(port_alias.rsplit('_')[-1])
-            port_alias = f"{alias}_{port_alias_num + 1}"
-        port_type = self.flow_map['output'][alias]['payload_type']
-        def pack(payload: port_type) -> port_type: # type: ignore
-            return payload
-
-        output_port = self.ports.add_output(port_alias, pack_payload_callback=pack)
-        self.ports.output[port_alias].connect(other_input_port)
-
-        output_flow_port = OutputFlowPort(
-            name=port_alias,
-            output_port=output_port,
-            payload_type=port_type
-        )
-        self.flow_port_map[alias][port_alias] = output_flow_port
-        return output_flow_port
-
-    def connect_inputs(self, input_alias_map: dict[str, list[OutputPort]]):
-        """Connect input ports to external output ports"""
-        for alias, other_output_ports in input_alias_map.items():
-            for other_output_port in other_output_ports:
-                self.connect_input(alias, other_output_port)
-
-    def connect_outputs(self, output_alias_map: dict[str, list[InputPort]]):
-        """Connect output ports to external input ports"""
-        for alias, other_input_ports in output_alias_map.items():
-            for other_input_port in other_input_ports:
-                self.connect_output(alias, other_input_port)
-
+            if asyncio.iscoroutine(result) or isinstance(result, asyncio.Task):
+                async def clear_after_complete():
+                    try:
+                        await result
+                    finally:
+                        flow_port.payload = None
+                asyncio.create_task(clear_after_complete())
+            else:
+                # Synchronous case - clear immediately as before
+                flow_port.payload = None

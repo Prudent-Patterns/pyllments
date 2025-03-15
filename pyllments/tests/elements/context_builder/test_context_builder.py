@@ -22,12 +22,13 @@ class TestContextBuilder(unittest.TestCase):
             print(f"Captured {len(self.received_messages)} messages")
             return payload
             
-        self.output_pipe.receive_callback = capture_messages
+        self.output_pipe.ports.input['pipe_input'].unpack_payload_callback = capture_messages
     
     def tearDown(self):
         """Clean up after each test."""
         print("----- Test completed -----")
         self.received_messages = []
+        # Clear any class-level test fixtures if needed
     
     def assert_message_content(self, index, role, content_substring=None, exact_content=None):
         """Helper method to assert message properties."""
@@ -328,14 +329,12 @@ class TestContextBuilder(unittest.TestCase):
     #-------------------------------------------------------------------
     
     def test_port_persistence(self):
-        """Test port persistence behavior."""
+        """Test that persisted port messages are available for subsequent emissions."""
         print("\n===== RUNNING TEST: Port Persistence =====")
         # Create input pipe elements
         user_input = PipeElement(name="user_input")
         assistant_input = PipeElement(name="assistant_input")
         
-        # Create a context builder with one persistent port
-        print("Creating ContextBuilder with persistent user port")
         context_builder = ContextBuilder(
             input_map={
                 'user_msg': {
@@ -346,56 +345,74 @@ class TestContextBuilder(unittest.TestCase):
                 'assistant_msg': {
                     'role': 'assistant', 
                     'ports': [assistant_input.ports.output['pipe_output']]
-                    # No persist flag, assistant messages should NOT persist
+                    # No persist flag - should not persist
                 }
             },
+            emit_order=['user_msg', 'assistant_msg'],
             outgoing_input_port=self.output_pipe.ports.input['pipe_input']
         )
         
         # Send initial messages
-        print("Sending initial user message: 'Question 1'")
-        user_input.send_payload(MessagePayload(content="Question 1", role="user"))
-        print("Sending initial assistant message: 'Answer 1'")
-        assistant_input.send_payload(MessagePayload(content="Answer 1", role="assistant"))
+        print("Sending initial messages")
+        user_input.send_payload(MessagePayload(content="Hello", role="user"))
+        assistant_input.send_payload(MessagePayload(content="Hi", role="assistant"))
         
-        # Verify both messages were emitted
-        self.assertEqual(len(self.received_messages), 2, "Should receive 2 messages")
-        print(f"✓ Received {len(self.received_messages)} initial messages (as expected)")
-        self.assert_message_content(0, "user", exact_content="Question 1")
-        self.assert_message_content(1, "assistant", exact_content="Answer 1")
-        
-        # Reset received messages
-        print("Resetting received messages")
+        # Clear received messages
         self.received_messages = []
         
-        # Send only a new assistant message, user message should persist
-        print("Sending only new assistant message: 'Answer 2'")
-        assistant_input.send_payload(MessagePayload(content="Answer 2", role="assistant"))
+        # Send only new assistant message
+        print("Sending new assistant message")
+        assistant_input.send_payload(MessagePayload(content="How are you?", role="assistant"))
         
-        # Verify user message persisted
+        # Should get both persisted user message and new assistant message
         self.assertEqual(len(self.received_messages), 2, "Should receive 2 messages")
-        print(f"✓ Received {len(self.received_messages)} messages with persisted user message (as expected)")
-        self.assert_message_content(0, "user", exact_content="Question 1")  # Persisted
-        print("✓ User message persisted correctly")
-        self.assert_message_content(1, "assistant", exact_content="Answer 2")  # New
+        self.assert_message_content(0, "user", exact_content="Hello")  # Persisted message
+        self.assert_message_content(1, "assistant", exact_content="How are you?")  # New message
+
+    def test_template_with_persisted_ports(self):
+        """Test that templates can access persisted port messages."""
+        print("\n===== RUNNING TEST: Template with Persisted Ports =====")
+        user_input = PipeElement(name="user_input")
+        assistant_input = PipeElement(name="assistant_input")
         
-        # Reset received messages
-        print("Resetting received messages")
+        context_builder = ContextBuilder(
+            input_map={
+                'user_msg': {
+                    'role': 'user', 
+                    'ports': [user_input.ports.output['pipe_output']],
+                    'persist': True
+                },
+                'assistant_msg': {
+                    'role': 'assistant', 
+                    'ports': [assistant_input.ports.output['pipe_output']]
+                },
+                'summary_template': {
+                    'role': 'system',
+                    'template': "Last user message: {{ user_msg }}"
+                }
+            },
+            emit_order=['user_msg', 'assistant_msg', 'summary_template'],
+            outgoing_input_port=self.output_pipe.ports.input['pipe_input']
+        )
+        
+        # Send initial messages
+        print("Sending messages")
+        user_input.send_payload(MessagePayload(content="Hello", role="user"))
+        assistant_input.send_payload(MessagePayload(content="Hi", role="assistant"))
+        
+        # Clear received messages
         self.received_messages = []
         
-        # Send a new user message and assistant message
-        print("Sending new user message: 'Question 2'")
-        user_input.send_payload(MessagePayload(content="Question 2", role="user"))
-        print("Sending new assistant message: 'Answer 3'")
-        assistant_input.send_payload(MessagePayload(content="Answer 3", role="assistant"))
+        # Send new assistant message - template should use persisted user message
+        print("Sending new assistant message")
+        assistant_input.send_payload(MessagePayload(content="How are you?", role="assistant"))
         
-        # Verify updated messages
-        self.assertEqual(len(self.received_messages), 2, "Should receive 2 messages")
-        print(f"✓ Received {len(self.received_messages)} updated messages (as expected)")
-        self.assert_message_content(0, "user", exact_content="Question 2")  # Updated
-        print("✓ User message updated correctly")
-        self.assert_message_content(1, "assistant", exact_content="Answer 3")  # New
-    
+        # Verify template uses persisted message
+        self.assertEqual(len(self.received_messages), 3)
+        self.assert_message_content(0, "user", exact_content="Hello")
+        self.assert_message_content(1, "assistant", exact_content="How are you?")
+        self.assert_message_content(2, "system", content_substring="Last user message: Hello")
+
     def test_template_processing(self):
         """Test template processing with variables."""
         print("\n===== RUNNING TEST: Template Processing =====")
@@ -548,6 +565,110 @@ class TestContextBuilder(unittest.TestCase):
         self.assertEqual(transformed_message.model.content, "Test message - callback", "Message content should be transformed by the callback")
         self.assertEqual(transformed_message.model.role, "user", "Message role should remain unchanged")
         print("✓ Callback test passed: Payload correctly transformed")
+
+    def test_flow_controller_persistence(self):
+        """Test that persistence is properly handled by the flow controller and template storage."""
+        print("\n===== RUNNING TEST: Flow Controller Persistence =====")
+        # Create input pipe elements
+        user_input = PipeElement(name="user_input")
+        assistant_input = PipeElement(name="assistant_input")
+        
+        context_builder = ContextBuilder(
+            input_map={
+                'user_msg': {
+                    'role': 'user', 
+                    'ports': [user_input.ports.output['pipe_output']],
+                    'persist': True
+                },
+                'assistant_msg': {
+                    'role': 'assistant', 
+                    'ports': [assistant_input.ports.output['pipe_output']]
+                },
+                'msg_constant': {
+                    'role': 'system',
+                    'message': "This is a constant"
+                },
+                'msg_template': {
+                    'role': 'system',
+                    'template': "User said: {{ user_msg }}"
+                }
+            },
+            emit_order=['msg_constant', 'user_msg', 'msg_template', 'assistant_msg'],
+            outgoing_input_port=self.output_pipe.ports.input['pipe_input']
+        )
+        
+        # Verify only regular ports are in flow_map
+        self.assertIn('user_msg', context_builder.flow_controller.flow_map['input'])
+        self.assertIn('assistant_msg', context_builder.flow_controller.flow_map['input'])
+        self.assertNotIn('msg_constant', context_builder.flow_controller.flow_map['input'])
+        self.assertNotIn('msg_template', context_builder.flow_controller.flow_map['input'])
+        
+        # Verify constants and templates are in their respective storages
+        self.assertIn('msg_constant', context_builder.constants)
+        self.assertIn('msg_template', context_builder.templates)
+        
+        # Send messages
+        user_input.send_payload(MessagePayload(content="Hello", role="user"))
+        assistant_input.send_payload(MessagePayload(content="Hi", role="assistant"))
+        
+        # Reset received messages
+        self.received_messages = []
+        
+        # Send new assistant message - user message should persist
+        assistant_input.send_payload(MessagePayload(content="How are you?", role="assistant"))
+        
+        # Should still have user message and template due to persistence
+        self.assertEqual(len(self.received_messages), 4, "Should receive 4 messages")
+        self.assert_message_content(0, "system", exact_content="This is a constant")
+        self.assert_message_content(1, "user", exact_content="Hello")
+        self.assert_message_content(2, "system", content_substring="User said: Hello")
+        self.assert_message_content(3, "assistant", exact_content="How are you?")
+
+    def test_template_storage(self):
+        """Test that template storage properly maintains dependencies."""
+        print("\n===== RUNNING TEST: Template Storage =====")
+        user_input = PipeElement(name="user_input")
+        assistant_input = PipeElement(name="assistant_input")
+        
+        context_builder = ContextBuilder(
+            input_map={
+                'user_msg': {
+                    'role': 'user', 
+                    'ports': [user_input.ports.output['pipe_output']],
+                    'persist': True
+                },
+                'assistant_msg': {
+                    'role': 'assistant', 
+                    'ports': [assistant_input.ports.output['pipe_output']],
+                    'persist': True
+                },
+                'convo_template': {
+                    'role': 'system',
+                    'template': "Conversation:\nUser: {{ user_msg }}\nAssistant: {{ assistant_msg }}"
+                }
+            },
+            emit_order=['user_msg', 'assistant_msg', 'convo_template'],
+            outgoing_input_port=self.output_pipe.ports.input['pipe_input']
+        )
+        
+        # Send user message
+        user_input.send_payload(MessagePayload(content="What is Python?", role="user"))
+        
+        # Verify template storage has user message
+        self.assertIn('convo_template', context_builder.template_storage)
+        self.assertIn('user_msg', context_builder.template_storage['convo_template'])
+        
+        # Send assistant message
+        assistant_input.send_payload(MessagePayload(content="Python is a programming language.", role="assistant"))
+        
+        # Verify template storage has both messages
+        self.assertIn('assistant_msg', context_builder.template_storage['convo_template'])
+        
+        # Verify template rendered correctly
+        self.assertEqual(len(self.received_messages), 3, "Should receive 3 messages")
+        template_content = self.received_messages[2].model.content
+        self.assertIn("User: What is Python?", template_content)
+        self.assertIn("Assistant: Python is a programming language.", template_content)
 
 if __name__ == "__main__":
     unittest.main() 

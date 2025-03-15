@@ -19,8 +19,12 @@ class TransformElement(Element):
         
         Example:
         input_map = {
-            'port_a': {'payload_type': MessagePayload},
-            'port_b': {'payload_type': MessagePayload, 'persist': True, 'ports': [el2.ports.output['some_output']]}
+            'port_a_input': {'payload_type': MessagePayload},
+            'port_b_input': {
+                'payload_type': MessagePayload,
+                'persist': True,
+                'ports': [el2.ports.output['some_output']]
+            }
         }"""
     )
         
