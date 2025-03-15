@@ -44,8 +44,10 @@ def request_output_fn(message: str, role: str) -> MessagePayload:
 
 api_el = APIElement(
     endpoint='api',
-    connected_input_map={
-        'message_input': llm_chat_el.ports.message_output
+    input_map={
+        'message_input': {
+            'ports': [llm_chat_el.ports.message_output]
+        }
     },
     response_dict={
         'message_input': {

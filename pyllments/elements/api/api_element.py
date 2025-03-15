@@ -133,118 +133,178 @@ class APIElement(Element):
         if not self.input_map:
             raise ValueError("input_map must be provided.")
 
-        flow_controller_kwargs = {}
-
-        # 1. Setup basic flow map using only input_map
+        # 1. Setup flow map with persist=True for all input ports
         flow_map = self._flow_map_setup(self.input_map)
-        flow_controller_kwargs['flow_map'] = flow_map
-
-        # 2. Create a custom flow_fn to handle our trigger_map and response_dict logic
-        async def api_flow_fn(**kwargs):
+        
+        # 2. Create a simplified flow_fn 
+        def api_flow_fn(**kwargs):
             active_input_port = kwargs['active_input_port']
             c = kwargs.get('c', {})
             port_name = active_input_port.name
             
-            # Store the incoming payload
-            input_name_payload_dict = c.setdefault('input_name_payload_dict', {})
-            input_name_payload_dict[port_name] = active_input_port.payload
+            # Handle response_dict logic
+            if self.response_dict and self._check_required_ports(self.response_dict.keys()):
+                self._process_response_dict()
+                return None
             
-            # Store all kwargs for potential troubleshooting
-            self.stored_kwargs = kwargs
-            
-            # Handle response_dict logic if defined
-            if self.response_dict:
-                # Check if we have all required payloads
-                if all(port_name in input_name_payload_dict for port_name in self.response_dict.keys()):
-                    return_dict = {}
-                    # Build return dictionary using the response_dict mapping
-                    for port_name, alias_attr_map in self.response_dict.items():
-                        payload = input_name_payload_dict[port_name]
-                        for alias, attr_name in alias_attr_map.items():
-                            if isinstance(attr_name, str):
-                                return_dict[alias] = getattr(payload.model, attr_name)
-                            else:  # Handle lambda or async function
-                                result = attr_name(payload)
-                                # If the result is a coroutine, await it.
-                                if asyncio.iscoroutine(result):
-                                    result = await result
-                                return_dict[alias] = result
-                    
-                    # Set response future if available
-                    if self.response_future and not self.response_future.done():
-                        self.response_future.set_result(return_dict)
-                    
-                    # Clear stored payloads after processing
-                    input_name_payload_dict.clear()
-                    return return_dict
-            
-            # Handle trigger_map logic if defined
+            # Handle trigger_map logic
             if self.trigger_map and port_name in self.trigger_map:
                 callback_fn, required_ports = self.trigger_map[port_name]
+                if self._check_required_ports(required_ports):
+                    return self._process_trigger_callback(callback_fn, required_ports)
                 
-                # Check if we have all required payloads
-                if all(port in input_name_payload_dict for port in required_ports):
-                    # Prepare callback kwargs with payloads
-                    callback_kwargs = {
-                        port: input_name_payload_dict[port]
-                        for port in required_ports
-                    }
-                    
-                    # Handle async callbacks
-                    if asyncio.iscoroutinefunction(callback_fn):
-                        try:
-                            result = await callback_fn(**callback_kwargs)
-                            # Set response future if available
-                            if self.response_future and not self.response_future.done():
-                                self.response_future.set_result(result)
-                            # Clean up after processing
-                            for port in required_ports:
-                                input_name_payload_dict.pop(port, None)
-                            return result
-                        except Exception as e:
-                            logger.error(f"Error in async callback: {e}")
-                            raise
-                    else:
-                        try:
-                            result = callback_fn(**callback_kwargs)
-                            # Set response future if available
-                            if self.response_future and not self.response_future.done():
-                                self.response_future.set_result(result)
-                            # Clean up after processing
-                            for port in required_ports:
-                                input_name_payload_dict.pop(port, None)
-                            return result
-                        except Exception as e:
-                            logger.error(f"Error in sync callback: {e}")
-                            raise
-                            
-            # If we have build_fn, use it
+            # Handle build_fn logic
             if self.build_fn:
-                # Add active_input_port and context to kwargs
-                result = self.build_fn(
-                    active_input_port=active_input_port,
-                    c=c,
-                    **input_name_payload_dict
+                return self._process_build_fn(
+                    active_input_port=active_input_port, 
+                    c=c, 
+                    port_kwargs={k: v for k, v in kwargs.items() if k not in ['active_input_port', 'c']}
                 )
-                
-                if result is not None:
-                    # Set response future if available
-                    if self.response_future and not self.response_future.done():
-                        self.response_future.set_result(result)
-                    return result
             
             return None
         
-        flow_controller_kwargs['flow_fn'] = api_flow_fn
-        self.flow_controller = FlowController(containing_element=self, **flow_controller_kwargs)
+        self.flow_controller = FlowController(
+            containing_element=self, 
+            flow_map=flow_map,
+            flow_fn=api_flow_fn
+        )
         self.ports = self.flow_controller.ports
 
+    def _check_required_ports(self, port_names):
+        """Check if all required ports have payloads available"""
+        return all(
+            port_name in self.flow_controller.flow_port_map and 
+            self.flow_controller.flow_port_map[port_name].payload is not None
+            for port_name in port_names
+        )
+
+    def _set_response(self, result):
+        """Set the response future if available and not done"""
+        if self.response_future and not self.response_future.done():
+            self.response_future.set_result(result)
+        return result
+
+    def _process_response_dict(self):
+        """Process response dictionary and create async task"""
+        async def process_response():
+            return_dict = {}
+            # Build return dictionary using the response_dict mapping
+            for port_name, alias_attr_map in self.response_dict.items():
+                payload = self.flow_controller.flow_port_map[port_name].payload
+                for alias, attr_name in alias_attr_map.items():
+                    if isinstance(attr_name, str):
+                        # Direct attribute access
+                        attr_value = getattr(payload.model, attr_name)
+                        return_dict[alias] = attr_value
+                    else:  # Function or lambda
+                        # Call the function/lambda with the payload
+                        result = attr_name(payload)
+                        
+                        # If it returned a coroutine, await it
+                        if asyncio.iscoroutine(result):
+                            try:
+                                result = await result
+                            except Exception as e:
+                                logger.error(f"Error awaiting coroutine for '{alias}': {e}")
+                                result = f"Error: {str(e)}"
+                            
+                        return_dict[alias] = result
+            
+            return self._set_response(return_dict)
+        
+        # Schedule the async task
+        asyncio.create_task(process_response())
+        return None
+
+    def _process_trigger_callback(self, callback_fn, required_ports):
+        """Process a trigger callback function"""
+        # Prepare callback kwargs with payloads
+        callback_kwargs = {
+            port: self.flow_controller.flow_port_map[port].payload
+            for port in required_ports
+        }
+        
+        # Handle async callbacks
+        if asyncio.iscoroutinefunction(callback_fn):
+            async def process_async_callback():
+                try:
+                    result = await callback_fn(**callback_kwargs)
+                    return self._set_response(result)
+                except Exception as e:
+                    logger.error(f"Error in async callback: {e}")
+                    raise
+            
+            # Schedule the async task
+            asyncio.create_task(process_async_callback())
+            return None
+        else:
+            try:
+                result = callback_fn(**callback_kwargs)
+                return self._set_response(result)
+            except Exception as e:
+                logger.error(f"Error in sync callback: {e}")
+                raise
+
+    def _process_build_fn(self, active_input_port, c, port_kwargs):
+        """Process the build function"""
+        # Check if build_fn is async
+        if asyncio.iscoroutinefunction(self.build_fn):
+            async def process_async_build():
+                result = await self.build_fn(
+                    active_input_port=active_input_port,
+                    c=c,
+                    **port_kwargs
+                )
+                
+                if result is not None:
+                    return self._set_response(result)
+                return None
+            
+            # Schedule the async task
+            asyncio.create_task(process_async_build())
+            return None
+        else:
+            # Synchronous build_fn
+            result = self.build_fn(
+                active_input_port=active_input_port,
+                c=c,
+                **port_kwargs
+            )
+            
+            if result is not None:
+                return self._set_response(result)
+            return None
+
     def _flow_map_setup(self, input_map):
+        """
+        Create a flow map from the input_map, ensuring persist=True for all input ports.
+        """
         flow_map = {'input': {}}
-        for key, payload_type in input_map.items():
-            if (isinstance(payload_type, type) and issubclass(payload_type, Payload)) or \
-               (hasattr(payload_type, '__origin__') and issubclass(payload_type.__origin__, list)):
-                flow_map['input'][key] = payload_type
+        
+        for key, config in input_map.items():
+            port_config = None
+            
+            # Case 1: Direct payload type
+            if (isinstance(config, type) and issubclass(config, Payload)) or \
+               (hasattr(config, '__origin__') and issubclass(config.__origin__, list)):
+                port_config = {
+                    'payload_type': config,
+                    'persist': True
+                }
+                
+            # Case 2: Dictionary configuration
+            elif isinstance(config, dict):
+                port_config = config.copy()
+                port_config['persist'] = True
+                
+                # Ensure we have a way to determine payload_type
+                if 'payload_type' not in port_config and ('ports' not in port_config or not port_config['ports']):
+                    logger.warning(f"Skipping input port '{key}': no payload_type or ports specified")
+                    continue
+            
+            if port_config:
+                flow_map['input'][key] = port_config
+                
         return flow_map
 
     def _create_request_pydantic_model(self):

@@ -74,7 +74,7 @@ class StructuredRouterTransformer(Element):
         build_fn_kwargs = {}
 
         def build_fn(**build_fn_kwargs):
-            
+            pass
         
 
         
