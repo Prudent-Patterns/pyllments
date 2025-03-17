@@ -9,7 +9,7 @@ from pyllments.base.element_base import Element
 from .to_message import to_message_payload, payload_message_mapping
 
 
-class ContextBuilder(Element):
+class ContextBuilderElement(Element):
     """
     The ContextBuilder aggregates messages from multiple input ports and emits them
     as a single list of messages, handling constants, templates, and port persistence.

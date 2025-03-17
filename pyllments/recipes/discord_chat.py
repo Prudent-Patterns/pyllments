@@ -29,8 +29,8 @@ history_handler_el = HistoryHandlerElement(context_token_limit=12000)
 
 # Add ContextBuilder if system prompt is provided
 if config.system_prompt:
-    from pyllments.elements import ContextBuilder
-    context_builder = ContextBuilder(
+    from pyllments.elements import ContextBuilderElement
+    context_builder = ContextBuilderElement(
         connected_input_map={
             'system_prompt': ('developer', config.system_prompt),
             'history_messages_input': (None, history_handler_el.ports.messages_output)

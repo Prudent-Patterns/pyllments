@@ -12,12 +12,14 @@ if TYPE_CHECKING:
     from .history_handler import HistoryHandlerElement
     from .chunker import TextChunkerElement
     from .api import APIElement
-    from .context_builder import ContextBuilder
+    from .context_builder import ContextBuilderElement
     from .discord import DiscordElement
     from .telegram import TelegramElement
     from .pipe import PipeElement
     from .transform import TransformElement
     from .mcp import MCPElement
+    from .structured_router_transformer import StructuredRouterTransformer
+    
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
     "ChatInterfaceElement": ".chat_interface",
@@ -33,7 +35,8 @@ ELEMENT_MAPPING = {
     "TelegramElement": ".telegram",
     "PipeElement": ".pipe",
     "TransformElement": ".transform",
-    "MCPElement": ".mcp"
+    "MCPElement": ".mcp",
+    "StructuredRouterTransformer": ".structured_router_transformer",
 }
 
 def __getattr__(name):

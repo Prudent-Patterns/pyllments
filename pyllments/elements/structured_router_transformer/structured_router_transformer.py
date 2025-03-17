@@ -1,7 +1,8 @@
 import json
+from typing import Union
 
 import param
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, RootModel
 
 from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.base.element_base import Element
@@ -39,6 +40,7 @@ class StructuredRouterTransformer(Element):
         super().__init__(**params)
 
         self.routing_setup()
+        self.setup_schema_message_output()
 
     def routing_setup(self):
         flow_controller_kwargs = {}
@@ -83,22 +85,56 @@ class StructuredRouterTransformer(Element):
         return flow_map
     
     def setup_schema_message_output(self):
-        base_schema = create_model('', )
-        def pack(pydantic_model: BaseModel):
-            pass
+        def pack(pydantic_model: BaseModel) -> SchemaPayload:
+            return SchemaPayload(schema=pydantic_model)
 
-    def add_schema(self, name, pydantic_schema):
-        pass
-
+        self.ports.add_output(
+            name='schema_message_output',
+            pack_payload_callback=pack,
+            on_connect_callback=lambda port: port.stage_emit(schema=self.pydantic_model)
+            )
+        # Emits the schema payload when the pydantic model changes
+        self.param.watch(
+            'pydantic_model',
+            lambda event: self.ports.schema_message_output.stage_emit(schema=event.new)
+            )
         
     @property
     def schemas(self):
-        for 
+        """
+        Used to get the schema and schema name to use for each of the routes.
+        Only return the schemas that have pydantic models
+        """
+        schemas = {}
+        for route in self.routing_map:
+            if pydantic_model := self.routing_map[route]['schema'].get('pydantic_model', None):
+                if self.routing_map[route]['schema'].get('name', None):
+                    schema_name_str = self.routing_map[route]['schema']['name']
+                else:
+                    schema_name_str = route
+                schemas['route'] = {
+                    'name': schema_name_str,
+                    'pydantic_model': pydantic_model
+                    }
+        return schemas
     
+    def set_pydantic_schema(self, pydantic_schema=None):
+        if pydantic_schema:
+            self.pydantic_model = pydantic_schema
+        else:
+            sub_pydantic_models = []
+            for schema in self.schemas.values():
+                sub_pydantic_models_kwargs = {
+                    'route': (str, schema['name']),
+                    schema['name']: (schema['pydantic_model'], ...)
+                    }
+                sub_pydantic_model = create_model('', sub_pydantic_models_kwargs)
+                sub_pydantic_models.append(sub_pydantic_model)
+            self.pydantic_model = RootModel[Union[*sub_pydantic_models]]
+
     def flow_fn_setup(self):
 
-        def build_fn(**kwargs):
-
+        def flow_fn(**kwargs):
             if (active := kwargs['active_input_port']).name == 'message_input':
                 route = active.name
                 message_content = active.model.content
@@ -113,13 +149,15 @@ class StructuredRouterTransformer(Element):
                     output_payload = MessagePayload(content=json_str)
                 kwargs[route].emit(output_payload)
             # Set the pydantic schema based on the provided schema input
-            if active.name.endswith('_schema_input'):
+            elif active.name.endswith('_schema_input'):
                 route = active.name.removesuffix('_schema_input')
                 if extract_callback := self.routing_map[route]['schema'].get('extract_callback', None):
                     pydantic_schema = extract_callback(active)
                 else: # Assume schema payload
                     pydantic_schema = active.model.schema
                 self.routing_map[route]['schema']['pydantic_model'] = pydantic_schema
+
+        return flow_fn
             
 
         

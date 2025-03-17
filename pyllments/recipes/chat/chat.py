@@ -62,8 +62,8 @@ history_handler_el = HistoryHandlerElement(
 )
 # If a system prompt is provided, we use a ContextBuilder to inject the system prompt.
 if config.system_prompt: # type: ignore
-    from pyllments.elements import ContextBuilder
-    context_builder = ContextBuilder(
+    from pyllments.elements import ContextBuilderElement
+    context_builder = ContextBuilderElement(
         connected_input_map={
             'system_prompt': ('developer', config.system_prompt), # type: ignore
             'history_messages_input': (None, history_handler_el.ports.messages_output)

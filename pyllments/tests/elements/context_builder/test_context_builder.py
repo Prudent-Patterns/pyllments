@@ -1,5 +1,5 @@
 import param
-from pyllments.elements import ContextBuilder, PipeElement
+from pyllments.elements import ContextBuilderElement, PipeElement
 from pyllments.payloads import MessagePayload
 import unittest
 
@@ -60,7 +60,7 @@ class TestContextBuilder(unittest.TestCase):
         
         # Create a minimal context builder
         print("Creating ContextBuilder with emit_order")
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -106,7 +106,7 @@ class TestContextBuilder(unittest.TestCase):
         
         # Create a context builder with a constant and template
         print("Creating ContextBuilder with constant and template")
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -153,7 +153,7 @@ class TestContextBuilder(unittest.TestCase):
         
         # Create a context builder with explicit emit_order
         print("Creating ContextBuilder with explicit emit_order")
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -205,7 +205,7 @@ class TestContextBuilder(unittest.TestCase):
         
         # Create a context builder with trigger_map
         print("Creating ContextBuilder with trigger_map")
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -279,7 +279,7 @@ class TestContextBuilder(unittest.TestCase):
         
         # Create a context builder with build_fn
         print("Creating ContextBuilder with build_fn")
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -335,7 +335,7 @@ class TestContextBuilder(unittest.TestCase):
         user_input = PipeElement(name="user_input")
         assistant_input = PipeElement(name="assistant_input")
         
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -375,7 +375,7 @@ class TestContextBuilder(unittest.TestCase):
         user_input = PipeElement(name="user_input")
         assistant_input = PipeElement(name="assistant_input")
         
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -422,7 +422,7 @@ class TestContextBuilder(unittest.TestCase):
         
         # Create a context builder with templates
         print("Creating ContextBuilder with templates")
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -488,7 +488,7 @@ class TestContextBuilder(unittest.TestCase):
         extra_input = PipeElement(name="extra_input")
         
         # Create a context builder with a template that depends on two ports: user_msg and extra_msg
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -543,7 +543,7 @@ class TestContextBuilder(unittest.TestCase):
             return MessagePayload(content=payload.model.content + " - callback", role=payload.model.role)
         
         # Create a ContextBuilder with a connected_input_map using the callback
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user',
@@ -573,7 +573,7 @@ class TestContextBuilder(unittest.TestCase):
         user_input = PipeElement(name="user_input")
         assistant_input = PipeElement(name="assistant_input")
         
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 
@@ -630,7 +630,7 @@ class TestContextBuilder(unittest.TestCase):
         user_input = PipeElement(name="user_input")
         assistant_input = PipeElement(name="assistant_input")
         
-        context_builder = ContextBuilder(
+        context_builder = ContextBuilderElement(
             input_map={
                 'user_msg': {
                     'role': 'user', 

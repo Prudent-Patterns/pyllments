@@ -51,7 +51,7 @@ from pyllments.elements.embedder import EmbedderElement
 from pyllments.elements.file_loader import FileLoaderElement
 from pyllments.elements.retriever import RetrieverElement
 from pyllments.elements.chat_interface import ChatInterfaceElement
-from pyllments.elements.context_builder import ContextBuilder
+from pyllments.elements.context_builder import ContextBuilderElement
 from pyllments.elements.flow_control.flow_controllers.switch.switch import Switch
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.history_handler import HistoryHandlerElement
@@ -106,7 +106,7 @@ def create_pyllments_app():
     history_handler_element = HistoryHandlerElement()
     test_element.ports.output['test_output'] > history_handler_element.ports.input['message_input']
 
-    context_builder = ContextBuilder(
+    context_builder = ContextBuilderElement(
         connected_input_map={
             'main_system_prompt': ('system', 'You are a chatbot made for RAG. You will be given a history of previous messages, retrieved chunks of text, and a user query.'),
             'system_history_prompt': ('system', 'Below is the history of the conversation.'),
