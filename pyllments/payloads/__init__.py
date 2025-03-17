@@ -9,6 +9,8 @@ if TYPE_CHECKING:
     from .tool_list import ToolListPayload
     from .tool_call import ToolCallPayload
     from .tool_response import ToolResponsePayload
+    from .schema import SchemaPayload
+    from .structured import StructuredPayload
 
 # Define mapping between class names and their module paths
 PAYLOAD_MAPPING = {
@@ -18,6 +20,8 @@ PAYLOAD_MAPPING = {
     "ToolListPayload": ".tool_list",
     "ToolCallPayload": ".tool_call",
     "ToolResponsePayload": ".tool_response",
+    "SchemaPayload": ".schema",
+    "StructuredPayload": ".structured",
 }
 
 def __getattr__(name):

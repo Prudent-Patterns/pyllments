@@ -1,30 +1,83 @@
-import param
+from openai import BaseModel
+from pydantic import Field, create_model, RootModel
+from typing import Union, Literal
 
 from pyllments.base.element_base import Element
-from pyllments.payloads import ToolListPayload, ToolCallPayload, ToolResponsePayload
+from pyllments.payloads import SchemaPayload, StructuredPayload
 from .mcp_model import MCPModel
 
 class MCPElement(Element):
     """An Element that handles tool calling with the Model Context Protocol."""
+    _tool_list_schema = param.ClassSelector(default=None, class_=BaseModel, doc="""
+        The schema of the tool list
+        """)
     def __init__(self, **params):
         super().__init__(**params)
         self.model = MCPModel(**params)
 
-        self._tool_list_output_setup()
+
+        self._tool_list_schema_output_setup()
+        self._tool_list_structured_output_setup()
         # self._tool_response_output_setup()
         # self._tool_call_input_setup()
     
-    def _tool_list_output_setup(self):
-        def pack(tool_list: list) -> ToolListPayload:
-            return ToolListPayload(tool_list=tool_list)
+    def _tool_list_schema_output_setup(self):
+        def pack(tool_list: list) -> SchemaPayload:
+            return SchemaPayload(schema=self.tool_list_schema)
 
         tool_list_output = self.ports.add_output(
             name='tool_list_output',
             pack_payload_callback=pack,
-            on_connect_callback=lambda port: port.stage_emit(tool_list=self.model.tool_list))
+            on_connect_callback=lambda port: port.stage_emit(schema=self.tool_list_schema))
         # Emits the tool_list when it changes - for updates
         self.model.param.watch(
             lambda event: tool_list_output.stage_emit(tool_list=event.new),
             'tool_list'
             )
-            
+
+    def _tool_list_structured_output_setup(self):
+        """For the purpose of passing tools to LLMs (see litellm tool call format)"""
+        pass
+
+    @property
+    def tool_list_schema(self) -> BaseModel:
+        if not self._tool_list_schema:
+            self._tool_list_schema = self.create_tools_schema(self.model.tool_list)
+        return self._tool_list_schema
+
+def create_tools_schema(tool_list):
+    tool_schema_list = [create_tool_model(tool) for tool in tool_list]
+    tool_array_anyoff_schema = RootModel[list[Union[*tool_schema_list]]]
+    return tool_array_anyoff_schema
+
+def create_tool_model(tool):
+    model_args = {}
+    model_args['name'] = (Literal[tool['name']], ...)
+    if properties := tool['parameters'].get('properties'):
+        model_args['parameters'] = (object, Field(json_schema_extra=properties))
+    model_args['__doc__'] = tool.description
+    model_args['__base__'] = CleanModel
+
+
+    tool_model = create_model(
+        tool.name,
+        **model_args
+    )
+    return tool_model
+
+class CleanModel(BaseModel):
+    @classmethod
+    def remove_titles_recursively(cls,obj):
+        if isinstance(obj, dict):
+            if "title" in obj:
+                del obj["title"]
+            for value in obj.values():
+                cls.remove_titles_recursively(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                cls.remove_titles_recursively(item)
+
+    model_config = {
+        "json_schema_extra": lambda schema, model: model.remove_titles_recursively(schema)
+    }
+
