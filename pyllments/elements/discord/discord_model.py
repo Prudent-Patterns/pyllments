@@ -7,7 +7,7 @@ from loguru import logger
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
-from pyllments.serve.loop_registry import LoopRegistry  # Import loop registry
+from pyllments.common.loop_registry import LoopRegistry
 
 
 class DiscordModel(Model):

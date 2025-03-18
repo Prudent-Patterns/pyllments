@@ -7,7 +7,7 @@ from telethon import TelegramClient, events
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
-from pyllments.serve.loop_registry import LoopRegistry
+from pyllments.common.loop_registry import LoopRegistry
 
 
 class TelegramModel(Model):

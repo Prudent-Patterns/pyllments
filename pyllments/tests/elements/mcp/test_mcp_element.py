@@ -19,7 +19,7 @@ def mcp_pipe():
         }
     })
 
-    pipe_el = PipeElement(receive_callback=lambda payload: payload.model.tool_list)
+    pipe_el = PipeElement(receive_callback=lambda payload: payload.model.schema.model_json_schema())
     return mcp_el, pipe_el
 
 def test_tool_list(mcp_pipe):

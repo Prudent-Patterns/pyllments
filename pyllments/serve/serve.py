@@ -15,8 +15,8 @@ from uvicorn import run as uvicorn_run
 
 from pyllments.logging import setup_logging, logger
 from pyllments.common.resource_loader import get_asset
-from .app_registry import AppRegistry
-from .loop_registry import LoopRegistry
+from pyllments.common.app_registry import AppRegistry
+from pyllments.common.loop_registry import LoopRegistry
 ASSETS_PATH = 'assets'
 ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'
 FILE_ICONS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/file_icons/tabler-icons-outline.min.css'
