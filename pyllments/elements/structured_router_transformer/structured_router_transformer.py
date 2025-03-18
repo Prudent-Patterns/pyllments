@@ -1,12 +1,12 @@
 import json
-from typing import Union
+from typing import Union, Literal
 
 import param
 from pydantic import BaseModel, create_model, RootModel
 
 from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.base.element_base import Element
-from pyllments.payloads import MessagePayload
+from pyllments.payloads import MessagePayload, SchemaPayload
 from pyllments.ports import OutputPort
 
 
@@ -34,13 +34,15 @@ class StructuredRouterTransformer(Element):
 
     incoming_output_port = param.ClassSelector(class_=OutputPort)
 
-    pydantic_model = param.ClassSelector(class_=BaseModel)
+    pydantic_model = param.ClassSelector(default=None, class_=(BaseModel, RootModel), is_instance=False)
 
     def __init__(self, **params):
         super().__init__(**params)
 
         self.routing_setup()
-        self.setup_schema_message_output()
+        self.ports = self.flow_controller.ports
+        self.set_pydantic_schema()
+        self.setup_schema_output()
 
     def routing_setup(self):
         flow_controller_kwargs = {}
@@ -54,9 +56,9 @@ class StructuredRouterTransformer(Element):
         for route, route_params in self.routing_map.items():
             try:
                 if 'ports' in route_params:
-                    flow_map['output'][route] = route_params['ports']
+                    flow_map['output'][route] = {'ports': route_params['ports'], 'payload_type': route_params['payload_type']}
                 else:
-                    flow_map['output'][route] = route_params['payload_type']
+                    flow_map['output'][route] = {'payload_type': route_params['payload_type']}
             except KeyError:
                 raise ValueError(f"No ports or payload_type provided for route {route}")
             try:
@@ -84,19 +86,19 @@ class StructuredRouterTransformer(Element):
             flow_map['input']['message_input'] = {'payload_type': MessagePayload}
         return flow_map
     
-    def setup_schema_message_output(self):
-        def pack(pydantic_model: BaseModel) -> SchemaPayload:
+    def setup_schema_output(self):
+        def pack(pydantic_model: type(RootModel)) -> SchemaPayload:
             return SchemaPayload(schema=pydantic_model)
 
         self.ports.add_output(
-            name='schema_message_output',
+            name='schema_output',
             pack_payload_callback=pack,
-            on_connect_callback=lambda port: port.stage_emit(schema=self.pydantic_model)
+            on_connect_callback=lambda port: port.stage_emit(pydantic_model=self.pydantic_model)
             )
         # Emits the schema payload when the pydantic model changes
         self.param.watch(
-            'pydantic_model',
-            lambda event: self.ports.schema_message_output.stage_emit(schema=event.new)
+            lambda event: self.ports.schema_output.stage_emit(pydantic_model=event.new),
+            'pydantic_model'
             )
         
     @property
@@ -112,7 +114,7 @@ class StructuredRouterTransformer(Element):
                     schema_name_str = self.routing_map[route]['schema']['name']
                 else:
                     schema_name_str = route
-                schemas['route'] = {
+                schemas[route] = {
                     'name': schema_name_str,
                     'pydantic_model': pydantic_model
                     }
@@ -124,11 +126,11 @@ class StructuredRouterTransformer(Element):
         else:
             sub_pydantic_models = []
             for schema in self.schemas.values():
-                sub_pydantic_models_kwargs = {
-                    'route': (str, schema['name']),
+                sub_pydantic_model_kwargs = {
+                    'route': (Literal[schema['name']], ...), # Literal always required
                     schema['name']: (schema['pydantic_model'], ...)
                     }
-                sub_pydantic_model = create_model('', sub_pydantic_models_kwargs)
+                sub_pydantic_model = create_model(f"{schema['name']}_route", **sub_pydantic_model_kwargs)
                 sub_pydantic_models.append(sub_pydantic_model)
             self.pydantic_model = RootModel[Union[*sub_pydantic_models]]
 
