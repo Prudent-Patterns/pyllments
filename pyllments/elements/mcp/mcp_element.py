@@ -5,7 +5,9 @@ from pydantic import Field, create_model, RootModel, BaseModel
 
 from pyllments.base.element_base import Element
 from pyllments.payloads import SchemaPayload, StructuredPayload
+from pyllments.common.pydantic_models import CleanModel
 from .mcp_model import MCPModel
+
 
 class MCPElement(Element):
     """An Element that handles tool calling with the Model Context Protocol."""
@@ -26,13 +28,13 @@ class MCPElement(Element):
         def pack(tool_list: type(BaseModel)) -> SchemaPayload:
             return SchemaPayload(schema=self.tool_list_schema)
 
-        tool_list_output = self.ports.add_output(
-            name='tool_list_output',
+        tool_list_schema_output = self.ports.add_output(
+            name='tool_list_schema_output',
             pack_payload_callback=pack,
             on_connect_callback=lambda port: port.stage_emit(tool_list=self.tool_list_schema))
         # Emits the tool_list when it changes - for updates
         self.model.param.watch(
-            lambda event: tool_list_output.stage_emit(tool_list=event.new),
+            lambda event: tool_list_schema_output.stage_emit(tool_list=event.new),
             'tool_list'
             )
 
@@ -48,7 +50,7 @@ class MCPElement(Element):
 
     def create_tools_schema(self, tool_list):
         tool_schema_list = [self.create_tool_model(tool) for tool in tool_list]
-        tool_array_anyoff_schema = create_model('', __base__=(RootModel[list[Union[*tool_schema_list]]], CleanModel))
+        tool_array_anyoff_schema = create_model('tool_array', __base__=(RootModel[list[Union[*tool_schema_list]]], CleanModel))
         return tool_array_anyoff_schema
 
     def create_tool_model(self, tool):
@@ -66,19 +68,4 @@ class MCPElement(Element):
         )
         return tool_model
 
-class CleanModel(BaseModel):
-    @classmethod
-    def remove_titles_recursively(cls,obj):
-        if isinstance(obj, dict):
-            if "title" in obj:
-                del obj["title"]
-            for value in obj.values():
-                cls.remove_titles_recursively(value)
-        elif isinstance(obj, list):
-            for item in obj:
-                cls.remove_titles_recursively(item)
-
-    model_config = {
-        "json_schema_extra": lambda schema, model: model.remove_titles_recursively(schema)
-    }
 

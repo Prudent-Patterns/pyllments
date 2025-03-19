@@ -12,7 +12,7 @@ from mcp.client.stdio import stdio_client
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.serve import LoopRegistry
+from pyllments.common.loop_registry import LoopRegistry
 
 
 class MCPModel(Model):

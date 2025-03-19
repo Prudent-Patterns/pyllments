@@ -32,7 +32,7 @@ class PipeElement(Element):
             if self.store_received_payloads:
                 self.received_payloads.append(payload)
             if self.receive_callback:
-                logger.info(f"Unpacking in TestElement: {self.receive_callback(payload)}")
+                logger.info(f"Unpacking in PipeElement: {self.receive_callback(payload)}")
     
         self.ports.add_input(
             name='pipe_input',

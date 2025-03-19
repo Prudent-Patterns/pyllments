@@ -7,7 +7,7 @@ class StructuredModel(Model):
     """
     Model representing structured data.
     """
-    data = param.Dict(default={}, doc="The structured data content")
+    data = param.Parameter(doc="The structured data content")
 
     def __init__(self, **params):
         super().__init__(**params)

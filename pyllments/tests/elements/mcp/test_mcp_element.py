@@ -25,6 +25,6 @@ def mcp_pipe():
 def test_tool_list(mcp_pipe):
     """Test the tool list output of the MCP element."""
     mcp_el, pipe_el = mcp_pipe
-    mcp_el.ports.tool_list_output > pipe_el.ports.pipe_input
+    mcp_el.ports.tool_list_schema_output > pipe_el.ports.pipe_input
     assert pipe_el.received_payloads[0]
 
