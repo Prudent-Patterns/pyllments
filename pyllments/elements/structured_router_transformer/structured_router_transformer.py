@@ -13,6 +13,23 @@ from pyllments.ports import OutputPort
 
 
 class StructuredRouterTransformer(Element):
+    """An Element that routes and transforms structured data based on a routing map.
+    
+    This element is designed to parse structured input from a MessagePayload (usually JSON),
+    validate it against a generated Pydantic schema, and route the data to different output ports
+    based on the 'route' field in the payload. It can also optionally transform the data
+    before emitting it through the corresponding output port.
+    
+    The element works by:
+    1. Creating a unified schema from sub-schemas defined in the routing_map
+    2. Parsing incoming JSON messages against this schema
+    3. Extracting the appropriate route and data
+    4. Transforming the data if needed
+    5. Emitting the data through the corresponding output port
+    
+    It can also receive schema updates through dedicated schema input ports.
+  
+    """
     routing_map = param.Dict(default={}, doc="""
         routing_map = {
             'reply': {
@@ -36,7 +53,10 @@ class StructuredRouterTransformer(Element):
 
     incoming_output_port = param.ClassSelector(class_=OutputPort)
 
-    pydantic_model = param.ClassSelector(default=None, class_=(BaseModel, RootModel), is_instance=False)
+    pydantic_model = param.ClassSelector(default=None,
+        class_=(BaseModel, RootModel), is_instance=False, doc="""
+        The schema generated from the route subschemas.
+        """)
 
     def __init__(self, **params):
         super().__init__(**params)

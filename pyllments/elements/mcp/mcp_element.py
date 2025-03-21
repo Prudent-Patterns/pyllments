@@ -8,21 +8,22 @@ from pyllments.payloads import SchemaPayload, StructuredPayload
 from pyllments.common.pydantic_models import CleanModel
 from .mcp_model import MCPModel
 
-
+# TODO: Consider the access rights and confirmation ability of the tool response payload
 class MCPElement(Element):
     """An Element that handles tool calling with the Model Context Protocol."""
+
     _tool_list_schema = param.ClassSelector(default=None, class_=BaseModel, is_instance=False, doc="""
-        The schema of the tool list
-        """)
+        The schema of the tool list""")
+    
     def __init__(self, **params):
         super().__init__(**params)
         self.model = MCPModel(**params)
 
-
         self._tool_list_schema_output_setup()
         self._tool_list_structured_output_setup()
+        self._tool_call_structured_input_setup()
+
         # self._tool_response_output_setup()
-        # self._tool_call_input_setup()
     
     def _tool_list_schema_output_setup(self):
         def pack(tool_list: type(BaseModel)) -> SchemaPayload:
@@ -37,10 +38,22 @@ class MCPElement(Element):
             lambda event: tool_list_schema_output.stage_emit(tool_list=event.new),
             'tool_list'
             )
+    
+    def _tool_call_structured_input_setup(self):
+        def unpack(payload: StructuredPayload):
+            
+            self.ports.tool_response_output.stage_emit()
 
-    def _tool_list_structured_output_setup(self):
+        self.ports.add_input(
+            name='tool_call_structured_input',
+            unpack_payload_callback=unpack)
+
+    def _tool_response_output_setup(self):
         """For the purpose of passing tools to LLMs (see litellm tool call format)"""
-        pass
+        def pack():
+            pass
+            
+        self.ports.add_output(name='tool_response_output', pack_payload_callback=pack)
 
     @property
     def tool_list_schema(self) -> BaseModel:
@@ -67,5 +80,7 @@ class MCPElement(Element):
             **model_args
         )
         return tool_model
+    
+
 
 

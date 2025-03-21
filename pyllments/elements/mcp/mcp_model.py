@@ -69,6 +69,18 @@ class MCPModel(Model):
                 'properties': {'property': {'type': 'string'}},
         },]
     """)
+
+    hybrid_name_mcp_tool_map = param.Dict(doc="""
+        A dictionary mapping hybrid tool names to their corresponding MCP name and tool name
+        e.g.
+        hybrid_name_mcp_tool_map = {
+            'test_mcp_calculate': {
+                'mcp_name': 'test_mcp',
+                'tool_name': 'calculate'
+            }
+        }
+        """)
+    
     def __init__(self, **params):
         super().__init__(**params)
         self.async_loop = LoopRegistry.get_loop()
@@ -229,7 +241,12 @@ class MCPModel(Model):
             tool_dict = tool.model_dump()
             tool_dict['parameters'] = tool_dict['inputSchema']
             del tool_dict['inputSchema']
+            vanilla_name = tool_dict['name']
             tool_dict['name'] = f"{mcp_name}_{tool_dict['name']}"
+            self.hybrid_name_mcp_tool_map[tool_dict['name']] = {
+                'mcp_name': mcp_name,
+                'tool_name': vanilla_name
+            }
             tool_list.append(tool_dict)
         return tool_list
     
@@ -240,3 +257,25 @@ class MCPModel(Model):
             mcp_tool_list = self.create_tool_list_from_mcp(mcp_name)
             tool_list.extend(mcp_tool_list)
         self.tool_list = tool_list
+
+    def create_calls(self, tool_calls: list[dict]):
+        call_list = []
+        for tool_call in tool_calls:
+            call_list.append(
+                self.create_call(
+                    name=tool_call['name'],
+                    parameters=tool_call.get('parameters', None)
+                )
+            )
+        return call_list
+
+    def create_call(self, name: str, parameters: dict | None):
+        mcp_tool = self.hybrid_name_mcp_tool_map[name]
+        mcp_name = mcp_tool['mcp_name']
+        tool_name = mcp_tool['tool_name']
+        session = self.mcps[mcp_name]['session']
+        def call():
+            return self.run_in_mcp_loop(session.call_tool(tool_name, arguments=parameters))
+        return call
+        
+        
