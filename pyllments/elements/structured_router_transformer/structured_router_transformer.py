@@ -38,7 +38,7 @@ class StructuredRouterTransformer(Element):
                              
             'tools': {
                 'schema': {
-                    'ports': [mcp_el.ports.tool_list_schema_output],
+                    'ports': [mcp_el.ports.tools_schema_output],
                     'extract_callback': lambda payload: payload.model.schema # uses payload.model.schema by default
                     'name': 'tools' # Used in the schema for this route. Default name is the key in the routing_map
                 },

@@ -1,5 +1,5 @@
 import param
-import jinja2
+# import jinja2
 from pyllments.base.model_base import Model
 
 
@@ -7,26 +7,35 @@ class ToolResponseModel(Model):
     """
     Model representing a tool response.
     """
+    content = param.String(default=None, doc="""
+        The string representation of the tool response.
+        """)
     tool_responses = param.Dict(default=None, doc="""
-        The tool response(s). Metadata from the MCP SDK
+        The tool response(s). Response from the MCP SDK
         {
             'weather_temp_mcp': {
-                'meta': None,
-                'content': [{
-                    'type': 'text',
+                'parameters': {'location': 'San Francisco'}, # parameters of the tool call
+                'response': {
+                    'meta': None,
+                    'content': [{
+                        'type': 'text',
                     'text': 'The temperature is 54F.',
                     'annotations': None
-                }],
-                'isError': False
+                    }],
+                    'isError': False
+                }
             },
             'todo_mcp': {
-                'meta': None,
-                'content': [{
-                    'type': 'text',
-                    'text': 'Buy Groceries.',
-                    'annotations': None
-                }],
-                'isError': False
+                'parameters': None,
+                'response': {
+                    'meta': None,
+                     'content': [{
+                        'type': 'text',
+                        'text': 'Buy Groceries.',
+                        'annotations': None
+                    }],
+                    'isError': False
+                }
             }
         }""")
     
@@ -45,7 +54,7 @@ class ToolResponseModel(Model):
     #             wind: 10mph NW wind
     #     """)
 
-    jinja_env = param.ClassSelector(default=None, class_=jinja2.Environment)
+    # jinja_env = param.ClassSelector(default=None, class_=jinja2.Environment)
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -53,8 +62,9 @@ class ToolResponseModel(Model):
         # self.template = self.get_template_str()
          
     def call_tools(self):
-        for tool_call in self.tool_calls:
-            self.tool_responses
+        for tool, tool_spec in self.tool_responses.items():
+            tool_spec['response'] = tool_spec['call']()
+        return self.tool_responses
     # def get_template_str(self):
 
     #     if self.response_specificity == 'default':

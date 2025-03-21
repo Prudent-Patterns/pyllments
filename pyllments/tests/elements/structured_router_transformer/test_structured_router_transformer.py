@@ -82,7 +82,7 @@ def test_structured_router_transformer_routes():
                 'payload_type': StructuredPayload
             },
             'tools': {
-                'schema': {'ports': [mcp_el.ports.tool_list_schema_output]},
+                'schema': {'ports': [mcp_el.ports.tools_schema_output]},
                 'payload_type': StructuredPayload
             }
         }

@@ -2,9 +2,10 @@ from typing import Union, Literal
 
 import param
 from pydantic import Field, create_model, RootModel, BaseModel
+from loguru import logger
 
 from pyllments.base.element_base import Element
-from pyllments.payloads import SchemaPayload, StructuredPayload
+from pyllments.payloads import SchemaPayload, StructuredPayload, ToolResponsePayload
 from pyllments.common.pydantic_models import CleanModel
 from .mcp_model import MCPModel
 
@@ -12,75 +13,88 @@ from .mcp_model import MCPModel
 class MCPElement(Element):
     """An Element that handles tool calling with the Model Context Protocol."""
 
-    _tool_list_schema = param.ClassSelector(default=None, class_=BaseModel, is_instance=False, doc="""
-        The schema of the tool list""")
+    _tools_schema = param.ClassSelector(default=None, class_=BaseModel, is_instance=False, doc="""
+        The schema of the tools""")
     
     def __init__(self, **params):
         super().__init__(**params)
         self.model = MCPModel(**params)
 
-        self._tool_list_schema_output_setup()
-        self._tool_list_structured_output_setup()
-        self._tool_call_structured_input_setup()
+        self._tools_schema_output_setup()
+        self._tool_request_structured_input_setup()
+        self._tool_response_output_setup()
 
         # self._tool_response_output_setup()
     
-    def _tool_list_schema_output_setup(self):
-        def pack(tool_list: type(BaseModel)) -> SchemaPayload:
-            return SchemaPayload(schema=self.tool_list_schema)
+    def _tools_schema_output_setup(self):
+        def pack(tools_schema: type(BaseModel)) -> SchemaPayload:
+            return SchemaPayload(schema=tools_schema)
 
-        tool_list_schema_output = self.ports.add_output(
-            name='tool_list_schema_output',
+        tools_schema_output = self.ports.add_output(
+            name='tools_schema_output',
             pack_payload_callback=pack,
-            on_connect_callback=lambda port: port.stage_emit(tool_list=self.tool_list_schema))
-        # Emits the tool_list when it changes - for updates
+            on_connect_callback=lambda port: port.stage_emit(tools_schema=self.tools_schema))
+        # Emits the tools when it changes - for updates
         self.model.param.watch(
-            lambda event: tool_list_schema_output.stage_emit(tool_list=event.new),
-            'tool_list'
+            lambda event: tools_schema_output.stage_emit(tools_schema=event.new),
+            'tools'
             )
     
-    def _tool_call_structured_input_setup(self):
+    def _tool_request_structured_input_setup(self):
         def unpack(payload: StructuredPayload):
-            
-            self.ports.tool_response_output.stage_emit()
+            tool_request_list = payload.model.data
+            self.ports.tool_response_output.stage_emit(tool_request_list=tool_request_list)
 
         self.ports.add_input(
-            name='tool_call_structured_input',
+            name='tool_request_structured_input',
             unpack_payload_callback=unpack)
 
     def _tool_response_output_setup(self):
         """For the purpose of passing tools to LLMs (see litellm tool call format)"""
-        def pack():
-            pass
+        def pack(tool_request_list: list) -> ToolResponsePayload:
+            tool_responses = {}
+            for tool_request in tool_request_list:
+                hybrid_name = tool_request['name']
+                parameters = tool_request.get('parameters', None)
+                
+                # Add error handling if the tool is not found in the dictionary
+                if hybrid_name not in self.model.tools:
+                    logger.error(f"Tool {hybrid_name} not found in tools")
+                    continue
+                    
+                description = self.model.tools[hybrid_name]['description']
+                tool_responses[hybrid_name] = {
+                    'description': description,
+                    'parameters': parameters,
+                    'call': self.model.create_call(hybrid_name, parameters)
+                }
+            return ToolResponsePayload(tool_responses=tool_responses)
             
         self.ports.add_output(name='tool_response_output', pack_payload_callback=pack)
 
     @property
-    def tool_list_schema(self) -> BaseModel:
-        if not self._tool_list_schema:
-            self._tool_list_schema = self.create_tools_schema(self.model.tool_list)
-        return self._tool_list_schema
+    def tools_schema(self) -> BaseModel:
+        if not self._tools_schema:
+            self._tools_schema = self.create_tools_schema(self.model.tools)
+        return self._tools_schema
 
-    def create_tools_schema(self, tool_list):
-        tool_schema_list = [self.create_tool_model(tool) for tool in tool_list]
+    def create_tools_schema(self, tools_dict):
+        tool_schema_list = []
+        for tool_name, tool_data in tools_dict.items():
+            tool_schema_list.append(self.create_tool_model(tool_name, tool_data))
         tool_array_anyoff_schema = create_model('tool_array', __base__=(RootModel[list[Union[*tool_schema_list]]], CleanModel))
         return tool_array_anyoff_schema
 
-    def create_tool_model(self, tool):
+    def create_tool_model(self, tool_name, tool_data):
         model_args = {}
-        model_args['name'] = (Literal[tool['name']], ...)
-        if properties := tool['parameters'].get('properties'):
+        model_args['name'] = (Literal[tool_name], ...)
+        if properties := tool_data['parameters'].get('properties'):
             model_args['parameters'] = (object, Field(json_schema_extra=properties))
-        model_args['__doc__'] = tool['description']
+        model_args['__doc__'] = tool_data['description']
         model_args['__base__'] = CleanModel
 
-
         tool_model = create_model(
-            tool['name'],
+            tool_name,
             **model_args
         )
         return tool_model
-    
-
-
-

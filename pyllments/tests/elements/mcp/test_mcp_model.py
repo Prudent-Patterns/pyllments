@@ -18,10 +18,10 @@ def mcp_model():
     print("DEBUG: Exiting fixture setup")
     return model
 
-def test_tool_list(mcp_model):
-    """Test the tool list functionality."""
-    print("DEBUG: Entering test_tool_list")
-    tool_list = mcp_model.tool_list  # Assuming this exists
-    print(f"DEBUG: Tool list: {tool_list}")
-    print("DEBUG: Exiting test_tool_list")
+def test_tools(mcp_model):
+    """Test the tools functionality."""
+    print("DEBUG: Entering test_tools")
+    tools = mcp_model.tools  # Now using the new property name
+    print(f"DEBUG: Tools: {tools}")
+    print("DEBUG: Exiting test_tools")
 

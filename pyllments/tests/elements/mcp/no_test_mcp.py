@@ -18,10 +18,10 @@ def main():
     })
     print("DEBUG: Exiting main")
 
-    print("DEBUG: Entering tool list demonstration")
-    tool_list = mcp_model.tool_list  # Assuming this exists
-    print(f"DEBUG: Tool list: {tool_list}")
-    print("DEBUG: Exiting tool list demonstration")
+    print("DEBUG: Entering tools demonstration")
+    tools = mcp_model.tools  # Using the new property name
+    print(f"DEBUG: Tools: {tools}")
+    print("DEBUG: Exiting tools demonstration")
 
 if __name__ == '__main__':
     main()

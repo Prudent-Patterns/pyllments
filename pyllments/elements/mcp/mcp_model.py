@@ -32,7 +32,7 @@ class MCPModel(Model):
                 'args': ['--logging'],
                 'env': {
                     'muh_api_key': 'verynice'
-                }
+                },
             },
             'weather': {
                 'type': 'sse',
@@ -41,7 +41,8 @@ class MCPModel(Model):
             },
             'email': {
                 'type': 'mcp_class',
-                'class': 'GmailMCP'
+                'class': 'GmailMCP',
+                'hitl_tools': ['send_email', 'block_sender']
             }
         }
         """)
@@ -59,18 +60,21 @@ class MCPModel(Model):
         The context stack to use for the MCP servers.
         """)
     
-    tool_list = param.List(default=[], instantiate=True, doc="""
-        Derived from the MCPs and their tools.
-        [{
-            'name': 'mcp_name_tool_name',
-            'description': 'Tool description',
-            'inputSchema': {
-                'type': 'object',
-                'properties': {'property': {'type': 'string'}},
-        },]
+    tools = param.Dict(default={}, instantiate=True, doc="""
+        Derived from the MCPs and their tools. 
+        Dictionary mapping hybrid tool names (mcp_name_tool_name) to their tool definitions.
+        {
+            'mcp_name_tool_name': {
+                'description': 'Tool description',
+                'parameters': {
+                    'type': 'object',
+                    'properties': {'property': {'type': 'string'}},
+                }
+            },
+        }
     """)
 
-    hybrid_name_mcp_tool_map = param.Dict(doc="""
+    hybrid_name_mcp_tool_map = param.Dict(default={}, instantiate=True, doc="""
         A dictionary mapping hybrid tool names to their corresponding MCP name and tool name
         e.g.
         hybrid_name_mcp_tool_map = {
@@ -232,31 +236,33 @@ class MCPModel(Model):
         future = asyncio.run_coroutine_threadsafe(coro, self.mcp_loop)
         return future.result()
     
-    def create_tool_list_from_mcp(self, mcp_name):
-        """Create a tool list from an MCP session."""
+    def create_tools_from_mcp(self, mcp_name):
+        """Create a tool dictionary from an MCP session."""
         session = self.mcps[mcp_name]['session']
         tools = self.run_in_mcp_loop(session.list_tools())
-        tool_list = []
+        tool_dict = {}
         for tool in tools.tools:
-            tool_dict = tool.model_dump()
-            tool_dict['parameters'] = tool_dict['inputSchema']
-            del tool_dict['inputSchema']
-            vanilla_name = tool_dict['name']
-            tool_dict['name'] = f"{mcp_name}_{tool_dict['name']}"
-            self.hybrid_name_mcp_tool_map[tool_dict['name']] = {
+            tool_item = tool.model_dump()
+            tool_item['parameters'] = tool_item['inputSchema']
+            del tool_item['inputSchema']
+            vanilla_name = tool_item['name']
+            hybrid_name = f"{mcp_name}_{vanilla_name}"
+            # Don't store the name in the value since it's already the key
+            del tool_item['name']
+            self.hybrid_name_mcp_tool_map[hybrid_name] = {
                 'mcp_name': mcp_name,
                 'tool_name': vanilla_name
             }
-            tool_list.append(tool_dict)
-        return tool_list
+            tool_dict[hybrid_name] = tool_item
+        return tool_dict
     
     def tools_setup(self):
-        """Set up the tool list from all MCP sessions."""
-        tool_list = []
+        """Set up the tool dictionary from all MCP sessions."""
+        tool_dict = {}
         for mcp_name in self.mcps:
-            mcp_tool_list = self.create_tool_list_from_mcp(mcp_name)
-            tool_list.extend(mcp_tool_list)
-        self.tool_list = tool_list
+            mcp_tool_dict = self.create_tools_from_mcp(mcp_name)
+            tool_dict.update(mcp_tool_dict)
+        self.tools = tool_dict
 
     def create_calls(self, tool_calls: list[dict]):
         call_list = []
@@ -275,7 +281,8 @@ class MCPModel(Model):
         tool_name = mcp_tool['tool_name']
         session = self.mcps[mcp_name]['session']
         def call():
-            return self.run_in_mcp_loop(session.call_tool(tool_name, arguments=parameters))
+            call = self.run_in_mcp_loop(session.call_tool(tool_name, arguments=parameters))
+            return {name: call}
         return call
         
         
