@@ -3,7 +3,7 @@ import pytest
 from pyllments.elements import MCPElement, PipeElement
 from pyllments.payloads import StructuredPayload
 from pyllments.logging import setup_logging
-
+from loguru import logger
 setup_logging()
 
 @pytest.fixture
@@ -40,6 +40,7 @@ def test_tool_response():
             'script': 'test_mcp_server2.py',
         }
     })
+    # pipe_el = PipeElement(receive_callback=lambda p: p.model.call_tools())
     pipe_el = PipeElement(receive_callback=lambda p: p.model.call_tools())
     mcp_el.ports.tool_response_output > pipe_el.ports.pipe_input
     pipe_el.ports.pipe_output > mcp_el.ports.tool_request_structured_input
@@ -51,3 +52,12 @@ def test_tool_response():
         }
     ]))
 
+    logger.info(pipe_el.received_payloads[0].model.content)
+    # pipe_el.receive_callback = lambda payload: payload.model.content
+
+    # pipe_el.send_payload(StructuredPayload(data=[
+    #     {
+    #         'name': 'test_mcp_calculate',
+    #         'parameters': {'operation': 'add', 'a': 1, 'b': 2}
+    #     }
+    # ]))

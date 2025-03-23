@@ -4,16 +4,11 @@ __pycache__
 .env
 LICENSE
 .vscode
-projects
-examples/
 .ignore*
 assets/
-dev_sandbox/
-dev_nbs/
 # Log files to ignore
 *.log
 logs/
 docs/_site/
 docs/.quarto/
 docs/assets/
-dev/

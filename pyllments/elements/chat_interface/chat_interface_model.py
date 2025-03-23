@@ -2,11 +2,11 @@ import param
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
-
+from pyllments.payloads.tool_response import ToolResponsePayload
 
 class ChatInterfaceModel(Model):
     # TODO: Implement batch interface for messages - populating message_list > iterating
-    message_list = param.List(instantiate=True, item_type=MessagePayload)
+    message_list = param.List(instantiate=True, item_type=(MessagePayload, ToolResponsePayload))
     persist = param.Boolean(default=False, instantiate=True) # TODO: Implement persisting messages to disk
     new_message = param.ClassSelector(class_=MessagePayload)
     

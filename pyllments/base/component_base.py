@@ -57,7 +57,7 @@ class Component(param.Parameterized):
         - Merging of default function parameters with user-provided overrides.
         - Splitting of keyword arguments into:
             • Panel parameters: e.g., 'width', 'height', 'margin', etc., used by Panel
-              to control the layout of components. 
+              to control the layout of components.
               **Note:** Any Panel parameter that is explicitly set to `None` is filtered out,
               ensuring that only defined values override Panel's default responsive behavior.
             • Custom attributes: All additional parameters that are not recognized as Panel parameters.
@@ -67,6 +67,13 @@ class Component(param.Parameterized):
         Parameters such as `height` or `width` will only affect the view if they are explicitly set.
         If they are passed as `None`, they are ignored, allowing Panel's default behavior
         (for example, "stretch_both") to take effect.
+
+        **Caching Behavior:**
+        The decorated view is not automatically stored as a special Panel parameter or persistent attribute.
+        The decorator checks for an existing view attribute (e.g., `myview_view`) on the instance and returns it if found.
+        However, if the view does not exist, it is created on demand and returned without being automatically assigned
+        to the instance. If persistent caching is desired, the view should be explicitly assigned to the instance,
+        for example: setattr(self, view_attr_name, view).
 
         Parameters
         ----------
@@ -81,56 +88,55 @@ class Component(param.Parameterized):
         Notes
         -----
         Parameter Handling:
-            - Default parameters from the function signature are merged with provided kwargs
+            - Default parameters from the function signature are merged with provided kwargs.
             - Parameters are split into two categories:
                 1. Panel parameters: Standard Panel object parameters (width, height, etc.)
-                2. Custom attributes: All other parameters including CSS parameters
-            - Panel parameters are applied after view creation
-            - Custom attributes are passed to the view creation function
+                2. Custom attributes: All other parameters including CSS parameters.
+            - Panel parameters are applied after view creation.
+            - Custom attributes are passed to the view creation function.
 
         CSS Loading and Priority:
             1. Default view CSS (css/viewname.css):
-                - Loaded automatically if exists
-                - Applied as the first stylesheet
+                - Loaded automatically if exists.
+                - Applied as the first stylesheet.
             2. Part-specific CSS (css/viewname_part.css):
-                - Loaded for each parameter ending in '_css'
-                - Applied in order of parameter definition
+                - Loaded for each parameter ending in '_css'.
+                - Applied in order of parameter definition.
             3. User-provided CSS:
-                - Passed via '_css' parameters
-                - Can be string or list of strings
-                - Appended after corresponding file-based CSS
+                - Passed via '_css' parameters.
+                - Can be string or list of strings.
+                - Appended after corresponding file-based CSS.
 
         CSS File Structure:
             css/
-            ├── viewname.css           # Default CSS for the entire view
-            ├── viewname_button.css    # CSS for button parts
-            └── viewname_input.css     # CSS for input parts
+            ├── viewname.css           # Default CSS for the entire view.
+            ├── viewname_button.css    # CSS for button parts.
+            └── viewname_input.css     # CSS for input parts.
 
         Examples
         --------
-        >>> class MyComponent(Component):
-        ...     @view
-        ...     def create_main(self, button_css=None, input_css=['custom.css']):
-        ...         '''
-        ...         CSS Priority:
-        ...         1. main.css (if exists)
-        ...         2. main_button.css + button_css parameter
-        ...         3. main_input.css + ['custom.css']
-        ...         '''
-        ...         return pn.Column()
-        ...
-        ...     @view
-        ...     def create_button(self, width=100, height=30, custom_attr='value'):
-        ...         '''
-        ...         - width, height → Panel parameters (sizing_mode='fixed')
-        ...         - custom_attr → Passed to view creation
-        ...         '''
-        ...         return pn.widgets.Button()
+...     @view
+...     def create_main(self, button_css=None, input_css=['custom.css']):
+...         '''
+...         CSS Priority:
+...         1. main.css (if exists)
+...         2. main_button.css + button_css parameter.
+...         3. main_input.css + ['custom.css']
+...         '''
+...         return pn.Column()
+...
+...     @view
+...     def create_button(self, width=100, height=30, custom_attr='value'):
+...         '''
+...         - width, height → Panel parameters (sizing_mode='fixed').
+...         - custom_attr → Passed to view creation.
+...         '''
+...         return pn.widgets.Button()
 
         See Also
         --------
-        param.Parameterized : Base class for parameterized objects
-        panel.viewable.Viewable : Base class for Panel viewable objects
+        param.Parameterized : Base class for parameterized objects.
+        panel.viewable.Viewable : Base class for Panel viewable objects.
         """
         PANEL_PARAMS = {
             'width', 'height', 'min_width', 'max_width', 'min_height', 'max_height',

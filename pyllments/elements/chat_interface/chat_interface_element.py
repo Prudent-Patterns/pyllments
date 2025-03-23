@@ -24,6 +24,7 @@ class ChatInterfaceElement(Element):
     - input:
         - message_input: MessagePayload
         - message_emit_input: MessagePayload
+        - tool_response_input: ToolResponsePayloadf
     - output port
         - message_output: MessagePayload
     """

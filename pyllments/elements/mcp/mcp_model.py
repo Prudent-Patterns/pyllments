@@ -281,8 +281,7 @@ class MCPModel(Model):
         tool_name = mcp_tool['tool_name']
         session = self.mcps[mcp_name]['session']
         def call():
-            call = self.run_in_mcp_loop(session.call_tool(tool_name, arguments=parameters))
-            return {name: call}
+            return self.run_in_mcp_loop(session.call_tool(tool_name, arguments=parameters))
         return call
         
         
