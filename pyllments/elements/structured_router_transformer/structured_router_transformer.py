@@ -11,7 +11,9 @@ from pyllments.common.pydantic_models import CleanModel
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.ports import OutputPort
 
-
+# TODO: add an ability to pass extra fields into any given route
+# Use case: add a reason field which is used for sending a reason message back to the user
+# when choosing a route or tools
 class StructuredRouterTransformer(Element):
     """An Element that routes and transforms structured data based on a routing map.
     

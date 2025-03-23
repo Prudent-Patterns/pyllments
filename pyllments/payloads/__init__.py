@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from .file import FilePayload
     from .tool_list import ToolListPayload
     from .tool_call import ToolCallPayload
-    from .tool_response import ToolResponsePayload
+    from .tools_response import ToolsResponsePayload
     from .schema import SchemaPayload
     from .structured import StructuredPayload
 
@@ -19,7 +19,7 @@ PAYLOAD_MAPPING = {
     "FilePayload": ".file",
     "ToolListPayload": ".tool_list",
     "ToolCallPayload": ".tool_call",
-    "ToolResponsePayload": ".tool_response",
+    "ToolsResponsePayload": ".tools_response",
     "SchemaPayload": ".schema",
     "StructuredPayload": ".structured",
 }

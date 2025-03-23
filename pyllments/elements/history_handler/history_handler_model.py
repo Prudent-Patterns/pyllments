@@ -10,7 +10,7 @@ from sqlite_utils import Database
 from pyllments.base.model_base import Model
 from pyllments.common.tokenizers import get_token_len
 from pyllments.payloads.message import MessagePayload
-from pyllments.serve import LoopRegistry
+from pyllments.common.loop_registry import LoopRegistry
 
 
 class HistoryHandlerModel(Model):

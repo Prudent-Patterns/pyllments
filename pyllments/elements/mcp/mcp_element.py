@@ -5,7 +5,7 @@ from pydantic import Field, create_model, RootModel, BaseModel
 from loguru import logger
 
 from pyllments.base.element_base import Element
-from pyllments.payloads import SchemaPayload, StructuredPayload, ToolResponsePayload
+from pyllments.payloads import SchemaPayload, StructuredPayload, ToolsResponsePayload
 from pyllments.common.pydantic_models import CleanModel
 from .mcp_model import MCPModel
 
@@ -51,7 +51,7 @@ class MCPElement(Element):
 
     def _tool_response_output_setup(self):
         """For the purpose of passing tools to LLMs (see litellm tool call format)"""
-        def pack(tool_request_list: list) -> ToolResponsePayload:
+        def pack(tool_request_list: list) -> ToolsResponsePayload:
             tool_responses = {}
             for tool_request in tool_request_list:
                 hybrid_name = tool_request['name']
@@ -64,11 +64,13 @@ class MCPElement(Element):
                     
                 description = self.model.tools[hybrid_name]['description']
                 tool_responses[hybrid_name] = {
+                    'mcp_name': self.model.hybrid_name_mcp_tool_map[hybrid_name]['mcp_name'],
+                    'tool_name': self.model.hybrid_name_mcp_tool_map[hybrid_name]['tool_name'],
                     'description': description,
                     'parameters': parameters,
                     'call': self.model.create_call(hybrid_name, parameters)
                 }
-            return ToolResponsePayload(tool_responses=tool_responses)
+            return ToolsResponsePayload(tool_responses=tool_responses)
             
         self.ports.add_output(name='tool_response_output', pack_payload_callback=pack)
 

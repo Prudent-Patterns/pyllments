@@ -3,7 +3,7 @@ import jinja2
 from pyllments.base.model_base import Model
 
 
-class ToolResponseModel(Model):
+class ToolsResponseModel(Model):
     """
     Model representing a tool response.
     """
@@ -14,6 +14,8 @@ class ToolResponseModel(Model):
         The tool response(s). Response from the MCP SDK
         {
             'weather_temp_mcp': {
+                'mcp_name': 'weather_mcp',
+                'tool_name': 'temp',
                 'description': 'Get the temperature in a location',
                 'parameters': {'location': 'San Francisco'}, # parameters of the tool call
                 'response': {
@@ -27,6 +29,8 @@ class ToolResponseModel(Model):
                 }
             },
             'todo_mcp': {
+                'mcp_name': 'todo_mcp',
+                'tool_name': 'add',
                 'description': 'Add a todo item',
                 'parameters': None,
                 'response': {

@@ -11,6 +11,12 @@ class PipeElement(Element):
     Element used to test the inputs and outputs of other elements.
     When set up as an input element, it will store the received payloads in a list.
     When set up as an output element, it will emit the the specified payload with send_payload
+    
+    ports:
+        input:
+            pipe_input
+        output:
+            pipe_output
     """
     receive_callback = param.Callable(default=lambda x: x, doc="""
         Callback function for inspecting received payloads. 

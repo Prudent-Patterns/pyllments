@@ -1,4 +1,5 @@
 from typing import Optional
+from venv import create
 
 import panel as pn
 import param
@@ -6,8 +7,7 @@ import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
-from pyllments.payloads.message import MessagePayload
-
+from pyllments.payloads import MessagePayload, ToolsResponsePayload
 
 class ChatInterfaceElement(Element):
     """
@@ -40,6 +40,8 @@ class ChatInterfaceElement(Element):
         self._message_output_setup()
         self._message_input_setup()
         self._message_emit_input_setup()
+        self._tools_response_input_setup()
+
     def _message_output_setup(self):
         """Sets up the output message port"""
         def pack(new_message: MessagePayload) -> MessagePayload:
@@ -67,11 +69,19 @@ class ChatInterfaceElement(Element):
         self.ports.add_input(
             name='message_emit_input',
             unpack_payload_callback=unpack)
+    
+    def _tools_response_input_setup(self):
+        def unpack(payload: ToolsResponsePayload):
+            self.model.new_message = payload
 
+        self.ports.add_input(
+            name='tools_response_input',
+            unpack_payload_callback=unpack)
+        
     @Component.view
     def create_chatfeed_view(self) -> pn.Column:
         """
-        Creates and returns a new instance of the chatfeed which
+        create and returns a new instance of the chatfeed which
         contains the visual components of the message payloads.
         Needs a height to be set, otherwise it will collapse when
         messages are added.
@@ -81,22 +91,33 @@ class ChatInterfaceElement(Element):
             view_latest=True,
             auto_scroll_limit=1,
             )
-        message_views = [
-            self.inject_payload_css(
-                message.create_static_view,
-                show_role=True
-                ) 
-            for message in self.model.message_list
-        ]
-        self.chatfeed_view.extend(message_views)
-
-        def _update_chatfeed(event):
-            self.chatfeed_view.append(
-                self.inject_payload_css(
-                    event.new.create_static_view,
-                    show_role=True
+        message_and_tool_response_views = []
+        for message in self.model.message_list:
+            if isinstance(message, MessagePayload):
+                message_and_tool_response_views.append(
+                    self.inject_payload_css(
+                        message.create_static_view,
+                        show_role=True
+                    )
                 )
-            )
+            elif isinstance(message, ToolsResponsePayload):
+                message_and_tool_response_views.append(
+                    message.create_tool_response_view()
+                )
+
+        self.chatfeed_view.extend(message_and_tool_response_views)
+        def _update_chatfeed(event):
+            if isinstance(event.new, MessagePayload):
+                self.chatfeed_view.append(
+                    self.inject_payload_css(
+                        event.new.create_static_view,
+                        show_role=True
+                    )
+                )
+            elif isinstance(event.new, ToolsResponsePayload):
+                self.chatfeed_view.append(
+                    event.new.create_tool_response_view()
+                )
         # This watcher should be called before the payload starts streaming.
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
