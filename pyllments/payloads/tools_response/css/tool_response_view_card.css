@@ -1,0 +1,12 @@
+.card-button {
+    color: var(--secondary-accent-color);
+}
+
+.card-button > svg {
+    width: 18px;
+    height: 18px;
+}
+
+.card-header {
+    padding-left: 0px;
+}

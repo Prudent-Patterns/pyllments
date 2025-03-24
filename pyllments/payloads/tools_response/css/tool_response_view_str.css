@@ -1,0 +1,9 @@
+:host {
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--secondary-accent-color-transparent);
+    /* border-color: rgba(237, 183, 55, .5); */
+    border-radius: 5px;
+    padding: 1px 5px;
+    font-size: 13px;
+}

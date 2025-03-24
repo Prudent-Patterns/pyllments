@@ -15,9 +15,9 @@ class ToolsResponsePayload(Payload):
 
     parameters_template = Template("""```javascript
 {
-{% for key, value in parameters.items() %}
-{{ key }}: {{ value }}
-{% endfor %}
+{% for key, value in parameters.items() -%}
+{{ key }}: {{ value }}{% if not loop.last %},{% endif %}
+{%- endfor %}
 }
 ```""")
 
@@ -26,20 +26,37 @@ class ToolsResponsePayload(Payload):
         self.model = ToolsResponseModel(**params)
 
     @Component.view
-    def create_tool_response_view(self):
+    def create_tool_response_view(self, card_css: list = [], str_css: list = [], parameters_css: list = []):
         tool_cards = []
-        logger.info(f"Creating tool response view for {self.model.tool_responses}")
         for tool_name, tool_data in self.model.tool_responses.items():
-            tool_card_kwargs = {'collapsed': True}
+            tool_card_kwargs = {'collapsed': False}
+            tool_card_kwargs['objects'] = []
             if tool_data.get('parameters', None):
-                tool_card_kwargs['collapsible'] = True
                 parameters_str = self.parameters_template.render(parameters=tool_data['parameters'])
-                tool_card_kwargs['objects'] = [pn.pane.Markdown(parameters_str)]
-            else:
-                tool_card_kwargs['collapsible'] = False
-            card_title = f"{tool_data['mcp_name']} is running {tool_data['tool_name']}"
-            tool_card = pn.layout.Card(title=card_title, **tool_card_kwargs)
+                tool_card_kwargs['objects'].append(pn.pane.Markdown(
+                    parameters_str,
+                    # styles={'margin': '-9px 0px'},
+                    stylesheets=parameters_css
+                    )
+                )
+            card_header_row = pn.Row(
+                pn.pane.Str(tool_data['mcp_name'], stylesheets=str_css),
+                pn.pane.Str('is running', styles={'font-size': '14px'}),
+                pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
+            )
+            response_indicator = pn.pane.Str('Response:', stylesheets=str_css, styles={'margin-left': '0px'})
+            response_str = pn.pane.Str(tool_data['response']['content'][0]['text'])
+
+            response_row = pn.Row(response_indicator, response_str)
+            tool_card_kwargs['objects'].append(response_row)
+            
+            tool_card = pn.layout.Card(
+                header=card_header_row,
+                **tool_card_kwargs,
+                styles={'align-self': 'center', 'margin': '5px auto'},
+                stylesheets=card_css
+                )
             tool_cards.append(tool_card)
 
-        return pn.Column(*tool_cards)
+        return pn.Column(*tool_cards, styles={'flex': '0 1 auto', 'height': 'fit-content'})
     
