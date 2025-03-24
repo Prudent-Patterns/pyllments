@@ -6,7 +6,6 @@ from pyllments.base.payload_base import Payload
 
 from .tools_response_model import ToolsResponseModel
 
-from loguru import logger
 
 class ToolsResponsePayload(Payload):
     """
@@ -26,7 +25,13 @@ class ToolsResponsePayload(Payload):
         self.model = ToolsResponseModel(**params)
 
     @Component.view
-    def create_tool_response_view(self, card_css: list = [], str_css: list = [], parameters_css: list = []):
+    def create_tool_response_view(
+        self,
+        card_css: list = [],
+        str_css: list = [],
+        parameters_css: list = [],
+        response_md_css: list = []
+    ):
         tool_cards = []
         for tool_name, tool_data in self.model.tool_responses.items():
             tool_card_kwargs = {'collapsed': False}
@@ -45,18 +50,23 @@ class ToolsResponsePayload(Payload):
                 pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
             )
             response_indicator = pn.pane.Str('Response:', stylesheets=str_css, styles={'margin-left': '0px'})
-            response_str = pn.pane.Str(tool_data['response']['content'][0]['text'])
+            response_str = pn.pane.Str(tool_data['response']['content'][0]['text'],
+                                       stylesheets=response_md_css)
 
-            response_row = pn.Row(response_indicator, response_str)
-            tool_card_kwargs['objects'].append(response_row)
+            response_col = pn.Column(response_indicator, response_str)
+            tool_card_kwargs['objects'].append(response_col)
             
             tool_card = pn.layout.Card(
                 header=card_header_row,
                 **tool_card_kwargs,
-                styles={'align-self': 'center', 'margin': '5px auto'},
                 stylesheets=card_css
                 )
             tool_cards.append(tool_card)
 
-        return pn.Column(*tool_cards, styles={'flex': '0 1 auto', 'height': 'fit-content'})
+        return pn.Column(*tool_cards, styles={
+            'flex': '0 0 auto',
+            'height': 'fit-content',
+            'max-height': 'none',
+            'overflow': 'auto'
+            })
     

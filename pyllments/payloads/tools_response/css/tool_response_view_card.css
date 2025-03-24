@@ -10,3 +10,17 @@
 .card-header {
     padding-left: 0px;
 }
+
+:host(.card) {
+    width: 86%;
+    flex: 0 0 auto;
+    align-self: center;
+    margin: 5px auto;
+    max-height: fit-content;
+    /* overflow: auto; */
+    /* flex: 0 0 auto; */
+    /* height: auto;
+    box-sizing: border-box;
+    margin-bottom: 15px; */
+}
+
