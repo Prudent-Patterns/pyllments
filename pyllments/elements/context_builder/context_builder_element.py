@@ -13,6 +13,10 @@ class ContextBuilderElement(Element):
     """
     The ContextBuilder aggregates messages from multiple input ports and emits them
     as a single list of messages, handling constants, templates, and port persistence.
+
+    Uses conversion functions to convert payloads and lists of payloads to MessagePayloads
+    defined in .to_message.payload_message_mapping. Can define custom conversion functions
+    by setting the payload_message_mapping parameter.
     """
     input_map = param.Dict(default={}, doc="""
         A dictionary mapping the port name, a constant name, or a template name to their corresponding
@@ -22,7 +26,7 @@ class ContextBuilderElement(Element):
             Optional 'callback' function to transform the payload when it is received by the port.
                 e.g. 'callback': lambda payload: do_something(payload.model.content)
         - Constants: Keys ending with '_constant' with 'role' and 'message' keys.
-        - Templates: Keys ending with '_template' with 'role' and 'template' keys.
+        - Templates: Keys ending with '_template' with 'role' and 'template' keys. (defined after their ports)
         Example:
         input_map = {
             'port_a': {'role': 'user', 'persist': True, 'ports': [el1.ports.output['some_output']]},

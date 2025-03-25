@@ -74,7 +74,8 @@ class ToolsResponseModel(Model):
     
     def set_template(self):
         # Update the template to trim whitespace and reduce extra blank lines
-        self.template = jinja2.Template("""{%- for tool_name, tool_data in tool_responses.items() %}
+        self.template = jinja2.Template("""The following are responses from the tools used:
+{%- for tool_name, tool_data in tool_responses.items() %}
 ### Tool: {{ tool_name }}
 {%- if tool_data.description %}
 ### Description:
