@@ -59,7 +59,29 @@ class Port(param.Parameterized):
 
         # Handle List types
         if origin_output is list and origin_input is list:
-            return Port.is_payload_compatible(get_args(output_type)[0], get_args(input_type)[0])
+            output_elem_type = get_args(output_type)[0]
+            input_elem_type = get_args(input_type)[0]
+            
+            # Handle union types inside lists
+            if get_origin(output_elem_type) is Union and get_origin(input_elem_type) is Union:
+                # If both are unions, check if any output type is compatible with any input type
+                output_union_types = get_args(output_elem_type)
+                input_union_types = get_args(input_elem_type)
+                return any(any(Port.is_payload_compatible(ot, it) 
+                              for it in input_union_types)
+                          for ot in output_union_types)
+            elif get_origin(output_elem_type) is Union:
+                # If only output is a union, check if any of its types is compatible with input
+                return any(Port.is_payload_compatible(t, input_elem_type) 
+                          for t in get_args(output_elem_type))
+            elif get_origin(input_elem_type) is Union:
+                # If only input is a union, check if output is compatible with any of its types
+                return any(Port.is_payload_compatible(output_elem_type, t) 
+                          for t in get_args(input_elem_type))
+            else:
+                # Regular case - direct compatibility check
+                return Port.is_payload_compatible(output_elem_type, input_elem_type)
+            
         if origin_output is list:
             return Port.is_payload_compatible(get_args(output_type)[0], input_type)
         if origin_input is list:
@@ -125,9 +147,25 @@ class InputPort(Port):
                 if not payload:
                     raise ValueError(f"For port '{self.name}', payload is an empty list. "
                                      f"Expected a non-empty list of {get_args(expected_type)[0]}")
-                if not all(isinstance(item, get_args(expected_type)[0]) for item in payload):
-                    raise ValueError(f"For port '{self.name}', payload contains items "
-                                     f"that are not instances of {get_args(expected_type)[0]}")
+                
+                # Extract the inner type from the list
+                inner_type = args[0]
+                
+                # Handle union types inside lists
+                if get_origin(inner_type) is Union:
+                    # Get all allowed types from the union
+                    allowed_types = get_args(inner_type)
+                    # Check if each item in the list is an instance of at least one allowed type
+                    if not all(any(isinstance(item, t) for t in allowed_types) for item in payload):
+                        type_names = ", ".join(t.__name__ for t in allowed_types)
+                        raise ValueError(f"For port '{self.name}', payload contains items "
+                                       f"that are not instances of any of: {type_names}")
+                else:
+                    # Original case - single type checking
+                    if not all(isinstance(item, inner_type) for item in payload):
+                        raise ValueError(f"For port '{self.name}', payload contains items "
+                                       f"that are not instances of {inner_type}")
+                
                 return True  # If we've passed all checks for list type
             else:
                 return isinstance(payload, expected_type)
@@ -255,9 +293,24 @@ class OutputPort(Port):
                         if not value:
                             raise ValueError(f"For port '{self.name}', item '{name}' is an empty list. "
                                              f"Expected a non-empty list of {get_args(expected_type)[0]}")
-                        if not all(isinstance(item, get_args(expected_type)[0]) for item in value):
-                            raise ValueError(f"For port '{self.name}', item '{name}' contains items "
-                                             f"that are not instances of {get_args(expected_type)[0]}")
+                        
+                        # Get the inner type to check list contents
+                        inner_type = get_args(expected_type)[0]
+                        
+                        # Handle union types inside lists
+                        if get_origin(inner_type) is Union:
+                            # Get all allowed types from the union
+                            allowed_types = get_args(inner_type)
+                            # Check if each item in the list is an instance of at least one allowed type
+                            if not all(any(isinstance(item, t) for t in allowed_types) for item in value):
+                                type_names = ", ".join(t.__name__ for t in allowed_types)
+                                raise ValueError(f"For port '{self.name}', item '{name}' contains items "
+                                               f"that are not instances of any of: {type_names}")
+                        else:
+                            # Original case - single type checking
+                            if not all(isinstance(item, inner_type) for item in value):
+                                raise ValueError(f"For port '{self.name}', item '{name}' contains items "
+                                               f"that are not instances of {inner_type}")
                     elif not isinstance(value, expected_type):
                         raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
                                          f"is not an instance of {expected_type}")

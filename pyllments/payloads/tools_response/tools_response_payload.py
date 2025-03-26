@@ -70,3 +70,19 @@ class ToolsResponsePayload(Payload):
             'overflow': 'auto'
             })
     
+    @Component.view
+    def create_collapsible_view(
+        self,
+        card_css: list = [],
+        str_css: list = [],
+        parameters_css: list = [],
+        response_md_css: list = []
+    ):
+        """Creates a collapsible view of the tool response for use in history."""
+        return self.create_tool_response_view(
+            card_css=card_css,
+            str_css=str_css,
+            parameters_css=parameters_css,
+            response_md_css=response_md_css
+        )
+    

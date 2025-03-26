@@ -7,7 +7,7 @@ class ToolsResponseModel(Model):
     """
     Model representing a tool response.
     """
-    _content = param.String(default=None, doc="""
+    _content = param.String(default='', doc="""
         The string representation of the tool response.
         """)
     tool_responses = param.Dict(default=None, doc="""
@@ -60,11 +60,17 @@ class ToolsResponseModel(Model):
 
     # jinja_env = param.ClassSelector(default=None, class_=jinja2.Environment)
 
+    called = param.Boolean(default=False, doc="""
+        Whether the tool has been called.
+        """)
+
     def __init__(self, **params):
         super().__init__(**params)
         self.set_template()
         # self.jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
         # self.template = self.get_template_str()
+        # Keep track of watchers to clean up
+        self._called_watchers = []
     
     @property
     def content(self):
@@ -94,8 +100,17 @@ class ToolsResponseModel(Model):
 {%- endfor %}""")
     
     def call_tools(self):
+        """Call all tools and update responses. Cleans up any watchers when done."""
         for tool, tool_spec in self.tool_responses.items():
             tool_spec['response'] = tool_spec['call']().model_dump()
+        
+        self.called = True  # Set called first to trigger watchers
+        
+        # Clean up any watchers on 'called' if they exist
+        if (called_watchers := self.param.watchers.get('called')) is not None:
+            for watcher in called_watchers['value']:
+                self.param.unwatch(watcher)
+        
         return self.tool_responses
     # def get_template_str(self):
 
@@ -104,3 +119,8 @@ class ToolsResponseModel(Model):
 
     # def render_content(self):
     #     self.content = self.template.render(self.tool_response)
+
+    # def add_called_watcher(self, callback):
+    #     """Add a watcher for the called parameter. Will be cleaned up when called is set to True."""
+    #     self._called_watchers.append(callback)
+    #     self.param.watch(callback, 'called')

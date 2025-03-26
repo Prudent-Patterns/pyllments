@@ -1,12 +1,13 @@
 from collections import deque
 from itertools import islice
-from typing import Union
+from typing import Union, List
+
 import param
 import panel as pn
 
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
-from pyllments.payloads.message.message_payload import MessagePayload
+from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from .history_handler_model import HistoryHandlerModel
 
 
@@ -14,19 +15,24 @@ from .history_handler_model import HistoryHandlerModel
 class HistoryHandlerElement(Element):
     # TODO Add filtering support
     """
-    Responsible for building the context that is sent to the LLM
+    Responsible for building the context that is sent to the LLM, handling both messages and tool responses.
+    
     Model:
     - history responsible for building context
-    - new message
+    - new message/tool response
     - context
+    
     Views:
-    - current context column
+    - current context column showing messages and tool responses
+    
     Ports:
     - input:
         - message_emit_input: MessagePayload - Human and AI messages handled - triggers output of the current context
         - messages_input: MessagePayload | list[MessagePayload] - Messages to add to context
+        - tool_response_emit_input: ToolsResponsePayload - Tool responses that trigger output of current context
+        - tool_responses_input: ToolsResponsePayload | list[ToolsResponsePayload] - Tool responses to add to context
     - output:
-        - messages_output: list[MessagePayload]
+        - messages_tool_responses_output: list[Union[MessagePayload, ToolsResponsePayload]] - Current context including both messages and tool responses
     """
     context_view = param.ClassSelector(class_=pn.Column)
 
@@ -34,45 +40,102 @@ class HistoryHandlerElement(Element):
         super().__init__(**params)
         self.model = HistoryHandlerModel(**params)
         
+        # Message ports
         self._message_emit_input_setup()
-        self._messages_output_setup()
-
         self._messages_input_setup()
+        
+        # Tool response ports
+        self._tool_response_emit_input_setup()
+        self._tool_responses_input_setup()
+        
+        # Output port
+        self._messages_tool_responses_output_setup()
 
     def _message_emit_input_setup(self):
         def unpack(payload: MessagePayload):
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
-            if payload.model.mode == 'stream' and not payload.model.streamed:
+            if payload.mode == 'stream' and not payload.streamed:
                 def stream_callback(event):
-                    self.model.load_messages([payload])
+                    self.model.load_entries([payload])
 
-                payload.model.param.watch(stream_callback, 'streamed')
+                payload.param.watch(stream_callback, 'streamed')
             else:
-                self.model.load_messages([payload])
+                self.model.load_entries([payload])
             
             # Only stage_emit if context isn't an empty list
             if self.model.context:
-                self.ports.output['messages_output'].stage_emit(context=self.model.get_context_messages())
+                self.ports.output['messages_tool_responses_output'].stage_emit(context=self.model.get_context_messages())
 
         self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
-    def _messages_input_setup(self): # TODO: need better port naming
-        def unpack(payload: Union[list[MessagePayload], MessagePayload]):
+    def _messages_input_setup(self):
+        def unpack(payload: Union[List[MessagePayload], MessagePayload]):
             payloads = [payload] if not isinstance(payload, list) else payload
-            self.model.load_messages(payloads)
+            self.model.load_entries(payloads)
 
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
-    def _messages_output_setup(self):
-        def pack(context: list[MessagePayload]) -> list[MessagePayload]:
+    def _tool_response_emit_input_setup(self):
+        def unpack(payload: ToolsResponsePayload):
+            # Only process tool responses that have been called or wait for them to be called
+            if not payload.model.called:
+                def called_callback(event):
+                    if payload.model.tool_responses:  # Only process if there are responses
+                        self.model.load_entries([payload])
+                        # Only stage_emit if context isn't an empty list
+                        if self.model.context:
+                            self.ports.output['messages_tool_responses_output'].stage_emit(context=self.model.get_context_messages())
+
+                payload.model.param.watch(called_callback, 'called')
+            elif payload.model.tool_responses:  # If already called and has responses, process immediately
+                self.model.load_entries([payload])
+                # Only stage_emit if context isn't an empty list
+                if self.model.context:
+                    self.ports.output['messages_tool_responses_output'].stage_emit(context=self.model.get_context_messages())
+
+        self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
+
+    def _tool_responses_input_setup(self):
+        def unpack(payload: Union[List[ToolsResponsePayload], ToolsResponsePayload]):
+            payloads = [payload] if not isinstance(payload, list) else payload
+            
+            # Split payloads into called and uncalled
+            called_payloads = []
+            uncalled_payloads = []
+            
+            for p in payloads:
+                if p.model.called and p.model.tool_responses:
+                    called_payloads.append(p)
+                elif not p.model.called:
+                    uncalled_payloads.append(p)
+            
+            # Process called payloads immediately
+            if called_payloads:
+                self.model.load_entries(called_payloads)
+            
+            # Set up watchers for uncalled payloads
+            for p in uncalled_payloads:
+                def make_called_callback(payload):
+                    def called_callback(event):
+                        if payload.model.tool_responses:  # Only process if there are responses
+                            self.model.load_entries([payload])
+                    return called_callback
+
+                p.model.param.watch(make_called_callback(p), 'called')
+
+        self.ports.add_input(name='tool_responses_input', unpack_payload_callback=unpack)
+
+    def _messages_tool_responses_output_setup(self):
+        def pack(context: List[Union[MessagePayload, ToolsResponsePayload]]) -> List[Union[MessagePayload, ToolsResponsePayload]]:
             return context
         
         self.ports.add_output(
-            name='messages_output',
+            name='messages_tool_responses_output',
             pack_payload_callback=pack
         )
 
+    # TODO: Add a view for tool responses
     @Component.view
     def create_context_view(
         self,
@@ -82,11 +145,12 @@ class HistoryHandlerElement(Element):
         title_css: list = [],
         title_visible: bool = True
     ) -> pn.Column:
-        """Creates a view for displaying the message history."""
-        # Create a separate container for messages
+        """Creates a view for displaying the message and tool response history."""
+        # Create a separate container for messages and tool responses
         self.context_container = pn.Column(
-            *[msg[0].create_collapsible_view() 
-              for msg in self.model.context],
+            *[entry[0].create_collapsible_view() if isinstance(entry[0], MessagePayload)
+              else entry[0].create_collapsible_view()  # Tool responses should also have a create_collapsible_view method
+              for entry in self.model.context],
             scroll=True,
             sizing_mode='stretch_both',
             stylesheets=container_css
@@ -108,17 +172,18 @@ class HistoryHandlerElement(Element):
             current_len = len(self.model.context)
             container_len = len(self.context_container.objects)
             
-            # If messages were removed from the start (sliding window)
+            # If entries were removed from the start (sliding window)
             while container_len > current_len:
                 del self.context_container.objects[0]  # Remove from start
                 container_len -= 1
             
-            # Add any new messages at the end
+            # Add any new entries at the end
             if current_len > container_len:
-                # Use islice to efficiently get only the new messages
+                # Use islice to efficiently get only the new entries
                 new_views = [
-                    msg[0].create_collapsible_view()
-                    for msg in islice(self.model.context, container_len, None)
+                    entry[0].create_collapsible_view() if isinstance(entry[0], MessagePayload)
+                    else entry[0].create_collapsible_view()  # Tool responses should also have a create_collapsible_view method
+                    for entry in islice(self.model.context, container_len, None)
                 ]
                 self.context_container.extend(new_views)
             

@@ -1,7 +1,6 @@
 from collections import deque
 from pathlib import Path
-
-from typing import List
+from typing import List, Union, Tuple
 
 import param
 from loguru import logger
@@ -9,15 +8,15 @@ from sqlite_utils import Database
 
 from pyllments.base.model_base import Model
 from pyllments.common.tokenizers import get_token_len
-from pyllments.payloads.message import MessagePayload
+from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from pyllments.common.loop_registry import LoopRegistry
 
 
 class HistoryHandlerModel(Model):
     """
     Model for handling chat history with optional SQLite persistence.
-    When persist=True, messages are stored in SQLite and loaded on startup.
-    When persist=False, messages are only kept in memory and lost on restart.
+    When persist=True, messages and tool responses are stored in SQLite and loaded on startup.
+    When persist=False, messages and tool responses are only kept in memory and lost on restart.
     """
     history_token_limit = param.Integer(default=32000, bounds=(1, None), doc="""
         The max amount of tokens to keep in the history""")
@@ -45,11 +44,11 @@ class HistoryHandlerModel(Model):
         if self.persist:
             # Initialize database-related attributes only if persistence is enabled
             self._pending_deletes: List[float] = []
-            self._pending_inserts: List[MessagePayload] = []
+            self._pending_inserts: List[Union[MessagePayload, ToolsResponsePayload]] = []
             self._db_setup()
 
     def _db_setup(self):
-        """Sets up the SQLite database and loads existing messages."""
+        """Sets up the SQLite database and loads existing messages and tool responses."""
         # Set up database path
         path = Path(self.db_path) if self.db_path else Path(f"{self.name}.db")
         if not path.suffix == '.db':
@@ -63,60 +62,72 @@ class HistoryHandlerModel(Model):
         # Create table if it doesn't exist
         if not self.table.exists():
             self.table.create({
-                "role": str,
+                "type": str,  # 'message' or 'tool_response'
+                "role": str,  # For messages
                 "content": str,
-                "mode": str,
+                "mode": str,  # For messages
+                "tool_responses": str,  # JSON string for tool responses
                 "timestamp": float
             }, pk="timestamp")
-            return  # No messages to load from a new table
+            return  # No entries to load from a new table
         
-        # Load existing messages ordered by timestamp
+        # Load existing entries ordered by timestamp
         rows = self.table.rows_where(order_by="timestamp")
-        messages = []
+        entries = []
         for row in rows:
             try:
-                message = MessagePayload(
-                    role=row['role'],
-                    content=row['content'],
-                    mode=row.get('mode', 'atomic'),
-                    timestamp=row['timestamp']
-                )
-                messages.append(message)
+                if row['type'] == 'message':
+                    entry = MessagePayload(
+                        role=row['role'],
+                        content=row['content'],
+                        mode=row.get('mode', 'atomic'),
+                        timestamp=row['timestamp']
+                    )
+                else:  # tool_response
+                    import json
+                    tool_responses = json.loads(row['tool_responses'])
+                    entry = ToolsResponsePayload(
+                        tool_responses=tool_responses,
+                        content=row['content'],
+                        timestamp=row['timestamp']
+                    )
+                entries.append(entry)
             except Exception as e:
-                logger.warning(f"Failed to load message from database: {e}")
+                logger.warning(f"Failed to load entry from database: {e}")
                 continue
         
-        # Load messages into history (which will also handle context population)
-        if messages:
-            self.load_messages(messages)
+        # Load entries into history (which will also handle context population)
+        if entries:
+            self.load_entries(entries)
 
-    def update_history(self, message: MessagePayload, token_estimate: int):
+    def update_history(self, entry: Union[MessagePayload, ToolsResponsePayload], token_estimate: int):
+        """Update history with a new message or tool response."""
         if token_estimate > self.history_token_limit:
             raise ValueError(
-                f"The token count ({token_estimate}) of the new message exceeds the history limit ({self.history_token_limit})."
+                f"The token count ({token_estimate}) of the new entry exceeds the history limit ({self.history_token_limit})."
             )
             
-        # Track messages to be deleted if persistence is enabled
-        deleted_messages = []
+        # Track entries to be deleted if persistence is enabled
+        deleted_entries = []
         
-        # Remove messages from history until the new message will fit
+        # Remove entries from history until the new entry will fit
         while (
             self.history_token_count + token_estimate >
             self.history_token_limit
         ):
-            popped_message, popped_token_count = self.history.popleft()
+            popped_entry, popped_token_count = self.history.popleft()
             self.history_token_count -= popped_token_count
             if self.persist:
-                deleted_messages.append(popped_message)
+                deleted_entries.append(popped_entry)
 
-        self.history.append((message, token_estimate))
+        self.history.append((entry, token_estimate))
         self.history_token_count += token_estimate
         
         # Update database if persistence is enabled
-        if self.persist and (deleted_messages or message):
+        if self.persist and (deleted_entries or entry):
             # Add to pending changes
-            self._pending_deletes.extend(msg.model.timestamp for msg in deleted_messages)
-            self._pending_inserts.append(message)
+            self._pending_deletes.extend(e.timestamp for e in deleted_entries)
+            self._pending_inserts.append(entry)
             
             # Trigger database update
             loop = LoopRegistry.get_loop()
@@ -129,12 +140,29 @@ class HistoryHandlerModel(Model):
 
         # Get pending changes
         deletes = self._pending_deletes.copy()
-        inserts = [{
-            "role": msg.model.role,
-            "content": msg.model.content,
-            "mode": msg.model.mode,
-            "timestamp": msg.model.timestamp
-        } for msg in self._pending_inserts]
+        inserts = []
+        for entry in self._pending_inserts:
+            if isinstance(entry, MessagePayload):
+                inserts.append({
+                    "type": "message",
+                    "role": entry.role,
+                    "content": entry.content,
+                    "mode": entry.mode,
+                    "tool_responses": None,
+                    "timestamp": entry.timestamp
+                })
+            else:  # ToolsResponsePayload
+                import json
+                # Filter out the 'call' key from tool_responses
+                tool_responses = {k: v for k, v in entry.tool_responses.items() if k != 'call'}
+                inserts.append({
+                    "type": "tool_response",
+                    "role": None,
+                    "content": entry.content,
+                    "mode": None,
+                    "tool_responses": json.dumps(tool_responses),
+                    "timestamp": entry.timestamp
+                })
         
         # Clear pending changes
         self._pending_deletes.clear()
@@ -162,43 +190,58 @@ class HistoryHandlerModel(Model):
             if inserts:
                 self.table.insert_all(inserts)
 
-    def load_messages(self, messages: list[MessagePayload]):
-        """Batch load multiple messages efficiently."""
-        # Calculate token estimates for all messages first
-        message_tokens = [
-            (msg, get_token_len(msg.model.content, self.tokenizer_model))
-            for msg in messages
-        ]
+    def load_entries(self, entries: List[Union[MessagePayload, ToolsResponsePayload]]):
+        """Batch load multiple messages and tool responses efficiently."""
+        # Calculate token estimates for all entries first
+        entry_tokens = []
+        for entry in entries:
+            if isinstance(entry, MessagePayload):
+                token_estimate = get_token_len(entry.content, self.tokenizer_model)
+            else:  # ToolsResponsePayload
+                # Only count tokens if the tool has been called
+                if not entry.tool_responses:
+                    continue
+                token_estimate = get_token_len(entry.content, self.tokenizer_model)
+            entry_tokens.append((entry, token_estimate))
         
         # Update history and context in batch
-        for message, token_estimate in message_tokens:
-            self.update_history(message, token_estimate)
-            self.update_context(message, token_estimate)
+        for entry, token_estimate in entry_tokens:
+            self.update_history(entry, token_estimate)
+            self.update_context(entry, token_estimate)
         
-        # Trigger context update only once after all messages are processed
+        # Trigger context update only once after all entries are processed
         self.param.trigger('context')
 
     def load_message(self, message: MessagePayload):
         """Load a single message. For backwards compatibility."""
-        self.load_messages([message])
+        self.load_entries([message])
 
-    def update_context(self, message: MessagePayload, token_estimate: int):
+    def load_tool_response(self, tool_response: ToolsResponsePayload):
+        """Load a single tool response."""
+        if not tool_response.tool_responses:
+            return
+        self.load_entries([tool_response])
+
+    def update_context(self, entry: Union[MessagePayload, ToolsResponsePayload], token_estimate: int):
+        """Update context with a new message or tool response."""
         if token_estimate > self.context_token_limit:
             raise ValueError(
-                f"The token count ({token_estimate}) of the new message exceeds the context limit ({self.context_token_limit})."
+                f"The token count ({token_estimate}) of the new entry exceeds the context limit ({self.context_token_limit})."
             )
         while (
             self.context_token_count + token_estimate >
             self.context_token_limit
         ):
-            popped_message, popped_token_count = self.context.popleft()
+            popped_entry, popped_token_count = self.context.popleft()
             self.context_token_count -= popped_token_count
 
-        self.context.append((message, token_estimate))
+        self.context.append((entry, token_estimate))
         self.context_token_count += token_estimate
 
-    def get_context_messages(self) -> list[MessagePayload]:
-        return [message for message, _ in self.context]
+    def get_context_messages(self) -> List[Union[MessagePayload, ToolsResponsePayload]]:
+        """Get all messages and tool responses in the context window."""
+        return [entry for entry, _ in self.context]
 
-    def get_history_messages(self) -> list[MessagePayload]:
-        return [message for message, _ in self.history]
+    def get_history_messages(self) -> List[Union[MessagePayload, ToolsResponsePayload]]:
+        """Get all messages and tool responses in the history."""
+        return [entry for entry, _ in self.history]

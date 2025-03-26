@@ -42,6 +42,18 @@ def message_list2message(payload):
     """
     return payload
 
+def tool_response2message(payload):
+    pass
+
+def tool_response_list2message(payload):
+    pass
+
+def tool_result2message(payload):
+    pass
+
+def tool_result_list2message(payload):
+    pass
+
 payload_message_mapping = {
     ChunkPayload: chunk2message,
     list[ChunkPayload]: chunk_list2message,
