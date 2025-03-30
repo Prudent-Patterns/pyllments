@@ -12,7 +12,7 @@ class ToolsResponsePayload(Payload):
     A payload containing tool responses from one or many tool calls.
     """
 
-    parameters_template = Template("""```javascript
+    parameters_template = Template("""```
 {
 {% for key, value in parameters.items() -%}
 {{ key }}: {{ value }}{% if not loop.last %},{% endif %}

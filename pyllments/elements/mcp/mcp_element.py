@@ -34,11 +34,11 @@ class MCPElement(Element):
             name='tools_schema_output',
             pack_payload_callback=pack,
             on_connect_callback=lambda port: port.stage_emit(tools_schema=self.tools_schema))
-        # Emits the tools when it changes - for updates
-        self.model.param.watch(
-            lambda event: tools_schema_output.stage_emit(tools_schema=event.new),
-            'tools'
-            )
+        # Emits the tools schema when it changes - for updates
+        # self.model.param.watch(
+        #     lambda event: tools_schema_output.stage_emit(tools_schema=event.new),
+        #     'tools'
+        #     )
     
     def _tool_request_structured_input_setup(self):
         def unpack(payload: StructuredPayload):

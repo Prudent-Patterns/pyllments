@@ -32,7 +32,7 @@ class HistoryHandlerElement(Element):
         - tool_response_emit_input: ToolsResponsePayload - Tool responses that trigger output of current context
         - tool_responses_input: ToolsResponsePayload | list[ToolsResponsePayload] - Tool responses to add to context
     - output:
-        - messages_tool_responses_output: list[Union[MessagePayload, ToolsResponsePayload]] - Current context including both messages and tool responses
+        - history_output: list[Union[MessagePayload, ToolsResponsePayload]] - Current context including both messages and tool responses
     """
     context_view = param.ClassSelector(class_=pn.Column)
 
@@ -49,7 +49,7 @@ class HistoryHandlerElement(Element):
         self._tool_responses_input_setup()
         
         # Output port
-        self._messages_tool_responses_output_setup()
+        self._history_output_setup()
 
     def _message_emit_input_setup(self):
         def unpack(payload: MessagePayload):
@@ -65,7 +65,7 @@ class HistoryHandlerElement(Element):
             
             # Only stage_emit if context isn't an empty list
             if self.model.context:
-                self.ports.output['messages_tool_responses_output'].stage_emit(context=self.model.get_context_messages())
+                self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
 
         self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
@@ -85,14 +85,14 @@ class HistoryHandlerElement(Element):
                         self.model.load_entries([payload])
                         # Only stage_emit if context isn't an empty list
                         if self.model.context:
-                            self.ports.output['messages_tool_responses_output'].stage_emit(context=self.model.get_context_messages())
+                            self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
 
                 payload.model.param.watch(called_callback, 'called')
             elif payload.model.tool_responses:  # If already called and has responses, process immediately
                 self.model.load_entries([payload])
                 # Only stage_emit if context isn't an empty list
                 if self.model.context:
-                    self.ports.output['messages_tool_responses_output'].stage_emit(context=self.model.get_context_messages())
+                    self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
 
         self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
 
@@ -126,12 +126,12 @@ class HistoryHandlerElement(Element):
 
         self.ports.add_input(name='tool_responses_input', unpack_payload_callback=unpack)
 
-    def _messages_tool_responses_output_setup(self):
+    def _history_output_setup(self):
         def pack(context: List[Union[MessagePayload, ToolsResponsePayload]]) -> List[Union[MessagePayload, ToolsResponsePayload]]:
             return context
         
         self.ports.add_output(
-            name='messages_tool_responses_output',
+            name='history_output',
             pack_payload_callback=pack
         )
 

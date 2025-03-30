@@ -126,7 +126,7 @@ class HistoryHandlerModel(Model):
         # Update database if persistence is enabled
         if self.persist and (deleted_entries or entry):
             # Add to pending changes
-            self._pending_deletes.extend(e.timestamp for e in deleted_entries)
+            self._pending_deletes.extend(e.model.timestamp for e in deleted_entries)
             self._pending_inserts.append(entry)
             
             # Trigger database update
@@ -145,23 +145,23 @@ class HistoryHandlerModel(Model):
             if isinstance(entry, MessagePayload):
                 inserts.append({
                     "type": "message",
-                    "role": entry.role,
-                    "content": entry.content,
-                    "mode": entry.mode,
+                    "role": entry.model.role,
+                    "content": entry.model.content,
+                    "mode": entry.model.mode,
                     "tool_responses": None,
-                    "timestamp": entry.timestamp
+                    "timestamp": entry.model.timestamp
                 })
             else:  # ToolsResponsePayload
                 import json
                 # Filter out the 'call' key from tool_responses
-                tool_responses = {k: v for k, v in entry.tool_responses.items() if k != 'call'}
+                tool_responses = {k: v for k, v in entry.model.tool_responses.items() if k != 'call'}
                 inserts.append({
                     "type": "tool_response",
                     "role": None,
-                    "content": entry.content,
+                    "content": entry.model.content,
                     "mode": None,
                     "tool_responses": json.dumps(tool_responses),
-                    "timestamp": entry.timestamp
+                    "timestamp": entry.model.timestamp
                 })
         
         # Clear pending changes
@@ -196,12 +196,12 @@ class HistoryHandlerModel(Model):
         entry_tokens = []
         for entry in entries:
             if isinstance(entry, MessagePayload):
-                token_estimate = get_token_len(entry.content, self.tokenizer_model)
+                token_estimate = get_token_len(entry.model.content, self.tokenizer_model)
             else:  # ToolsResponsePayload
                 # Only count tokens if the tool has been called
-                if not entry.tool_responses:
+                if not entry.model.tool_responses:
                     continue
-                token_estimate = get_token_len(entry.content, self.tokenizer_model)
+                token_estimate = get_token_len(entry.model.content, self.tokenizer_model)
             entry_tokens.append((entry, token_estimate))
         
         # Update history and context in batch
@@ -218,7 +218,7 @@ class HistoryHandlerModel(Model):
 
     def load_tool_response(self, tool_response: ToolsResponsePayload):
         """Load a single tool response."""
-        if not tool_response.tool_responses:
+        if not tool_response.model.tool_responses:
             return
         self.load_entries([tool_response])
 

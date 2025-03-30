@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from pyllments.payloads import ChunkPayload, MessagePayload
+from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, ToolsResponsePayload
 
 
 def chunk2message(payload):
@@ -42,23 +42,25 @@ def message_list2message(payload):
     """
     return payload
 
-def tool_response2message(payload):
+def tools_response2message(payload):
+    return MessagePayload(content=payload.model.content, role='system')
+
+def tools_response_list2message(payload):
     pass
 
-def tool_response_list2message(payload):
-    pass
-
-def tool_result2message(payload):
-    pass
-
-def tool_result_list2message(payload):
-    pass
+def schema2message(payload):
+    json = payload.model.schema.model_dump_json()
+    return MessagePayload(content=json, role='system')
 
 payload_message_mapping = {
     ChunkPayload: chunk2message,
     list[ChunkPayload]: chunk_list2message,
     MessagePayload: message2message,
     list[MessagePayload]: message_list2message,
+    ToolsResponsePayload: tools_response2message,
+    list[ToolsResponsePayload]: tools_response_list2message,
+    SchemaPayload: schema2message,
+
 }
 
 def to_message_payload(payload, payload_message_mapping=payload_message_mapping, expected_type=None, role: Optional[str] = None):

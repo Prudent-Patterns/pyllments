@@ -5,6 +5,8 @@ import atexit
 from contextlib import AsyncExitStack
 from copy import deepcopy
 import signal
+import os
+import subprocess
 
 from loguru import logger
 from mcp import ClientSession, StdioServerParameters
@@ -18,8 +20,18 @@ from pyllments.common.loop_registry import LoopRegistry
 class MCPModel(Model):
     """
     A model that handles tool calling with the Model Context Protocol.
-    WARNING: May need to manually run the shutdown() method to gracefully
-    exit the servers.
+    
+    This model starts child processes for MCP servers and maintains connections
+    to them through asyncio. It provides automatic shutdown handling to ensure
+    all child processes are terminated when the main process exits.
+    
+    Shutdown Process:
+    1. Attempts graceful shutdown by signaling the main asyncio task to exit
+    2. If that fails, forcefully terminates child processes with SIGKILL
+    3. Uses multiple fallback mechanisms to ensure processes are terminated
+    
+    Note: The model uses a separate thread and event loop for MCP communication
+    to prevent blocking the main application thread.
     """
     mcps = param.Dict(default={}, doc="""
         A dictionary mapping server names to their corresponding MCP server specs.
@@ -105,9 +117,11 @@ class MCPModel(Model):
         self.setup_complete.wait()
         self.tools_setup()
         
-        # Register shutdown handler
-        atexit.register(self.shutdown)
-        self._register_shutdown_handler()
+        # Store process IDs for cleanup
+        self._child_processes = []
+        
+        # Add a more reliable shutdown handler
+        atexit.register(self._force_kill_processes)
 
     def run_mcp_loop(self):
         """Run the MCP event loop in a dedicated thread."""
@@ -186,6 +200,10 @@ class MCPModel(Model):
             ClientSession(*mcp_spec['read_write_streams'])
         )
         await mcp_spec['session'].initialize()
+        
+        # Store process for forced termination
+        if hasattr(mcp_spec['read_write_streams'], 'process'):
+            self._child_processes.append(mcp_spec['read_write_streams'].process)
 
     async def _mcp_sse_setup(self, mcp_name, mcp_spec):
         """Setup an SSE-based MCP server."""
@@ -199,9 +217,10 @@ class MCPModel(Model):
         """Register signal handlers for graceful shutdown."""
         loop = self.async_loop  # Main loop
         for sig in (signal.SIGINT, signal.SIGTERM):
+            # Use a proper shutdown sequence instead of directly stopping the loop
             loop.add_signal_handler(
                 sig,
-                lambda s=sig: self.mcp_loop.call_soon_threadsafe(self.mcp_loop.stop)
+                lambda s=sig: self.shutdown()
             )
 
     def shutdown(self):
@@ -214,20 +233,33 @@ class MCPModel(Model):
             return
         self._shutdown_in_progress = True
         
-        # Signal the asyncio event from the main thread
+        # Store process PIDs before terminating connections
+        pids_to_kill = []
+        for mcp_name, mcp_spec in self.mcps.items():
+            if 'read_write_streams' in mcp_spec and hasattr(mcp_spec['read_write_streams'], 'process'):
+                try:
+                    process = mcp_spec['read_write_streams'].process
+                    if process and process.poll() is None:
+                        pids_to_kill.append(process.pid)
+                except Exception:
+                    pass
+        
+        # Signal shutdown to the asyncio event
         if hasattr(self, '_shutdown_event') and self._shutdown_event is not None:
-            logger.info("Setting shutdown event")
             self.mcp_loop.call_soon_threadsafe(self._shutdown_event.set)
         
-        # Wait for the thread to exit
-        if hasattr(self, 'mcp_thread') and self.mcp_thread.is_alive():
-            logger.debug("Waiting for mcp_thread to finish")
-            self.mcp_thread.join(timeout=5)
-            
-            if self.mcp_thread.is_alive():
-                logger.debug("Warning: MCP thread did not exit within timeout")
-            else:
-                logger.info("MCP thread exited cleanly")
+        # Force kill the child processes directly
+        for pid in pids_to_kill:
+            try:
+                # SIGKILL ensures termination
+                os.kill(pid, signal.SIGKILL)
+                logger.debug(f"Killed process with PID {pid}")
+            except Exception as e:
+                logger.error(f"Error killing process {pid}: {e}")
+        
+        # Force stop the loop
+        if self.mcp_loop and self.mcp_loop.is_running():
+            self.mcp_loop.call_soon_threadsafe(self.mcp_loop.stop)
         
         logger.info("Exiting shutdown")
 
@@ -283,5 +315,26 @@ class MCPModel(Model):
         def call():
             return self.run_in_mcp_loop(session.call_tool(tool_name, arguments=parameters))
         return call
+
+    def _force_kill_processes(self):
+        """Force kill all child processes at exit."""
+        # First attempt normal shutdown
+        self.shutdown()
+        
+        # Force kill any remaining child processes
+        for process in self._child_processes:
+            if process and process.poll() is None:
+                try:
+                    # Use SIGKILL which cannot be caught or ignored
+                    process.kill()
+                except:
+                    # If Python process.kill() fails, use OS-level kill
+                    try:
+                        os.kill(process.pid, signal.SIGKILL)
+                    except:
+                        # As a last resort, use the system kill command
+                        subprocess.run(["kill", "-9", str(process.pid)], 
+                                      stderr=subprocess.DEVNULL, 
+                                      stdout=subprocess.DEVNULL)
         
         

@@ -30,7 +30,7 @@ ELEMENT_MAPPING = {
     "HistoryHandlerElement": ".history_handler",
     "TextChunkerElement": ".chunker",
     "APIElement": ".api",
-    "ContextBuilder": ".context_builder",
+    "ContextBuilderElement": ".context_builder",
     "DiscordElement": ".discord",
     "TelegramElement": ".telegram",
     "PipeElement": ".pipe",

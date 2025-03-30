@@ -1,4 +1,5 @@
 import json
+from os import name
 from typing import Union, Literal
 
 import param
@@ -33,20 +34,40 @@ class StructuredRouterTransformer(Element):
   
     """
     routing_map = param.Dict(default={}, doc="""
+        A dictionary defining the routing logic. Each key represents a route name.
+        The value is a dictionary with the following keys:
+
+        - 'schema': (dict) Defines the expected structure for this route.
+            - Can contain 'pydantic_model': (type[BaseModel] | type) directly specifying the Pydantic model or basic type (e.g., str).
+            - OR 'ports': (list[InputPort]) List of input ports to listen on for schema updates (e.g., from an MCPElement).
+            - OR 'payload_type': (type[Payload]) Expected payload type carrying the schema on the input ports. Defaults to SchemaPayload if 'ports' is used.
+            - 'extract_callback': (callable, optional) A function that takes the schema payload and returns the Pydantic model. Defaults to `lambda payload: payload.model.schema`.
+            - 'name': (str, optional) A name used for this route in the combined Pydantic schema. Defaults to the route key.
+        - 'payload_type': (type[Payload]) The type of Payload to emit from the output port associated with this route.
+        - 'ports': (list[InputPort], optional) A list of input ports that the corresponding output port for this route should connect to.
+        - 'transform': (callable, optional) A function to transform the extracted data before emitting it.
+            - This function receives one argument: the data extracted from the input message that corresponds to this route's key.
+              If the schema for the route defines a Pydantic `BaseModel`, the argument passed here will be the result of calling `.model_dump()` on that model instance (a dict).
+              Otherwise, it's the raw extracted value (e.g., a string, list, etc.).
+            - The function MUST return a Payload instance (matching the 'payload_type' defined for this route).
+            - If omitted, the element defaults to creating a `StructuredPayload` where its `data` attribute is the extracted value.
+        - 'content_callback': (callable, optional) Currently unused placeholder.
+
+        Example:
         routing_map = {
             'reply': {
-                'schema': {'pydantic_model': str,
+                'schema': {'pydantic_model': str},
                 'payload_type': MessagePayload,
-                             
+                'ports': [chat_interface_el.ports.message_input] # Output connects here
+            },
             'tools': {
                 'schema': {
-                    'ports': [mcp_el.ports.tools_schema_output],
-                    'extract_callback': lambda payload: payload.model.schema # uses payload.model.schema by default
-                    'name': 'tools' # Used in the schema for this route. Default name is the key in the routing_map
+                    'ports': [mcp_el.ports.tools_schema_output], # Input schema from here
+                    'name': 'tools_request' # Route named 'tools_request' in schema
                 },
-                'transform': lambda pydantic_model: ToolCallPayload(tools=pydantic_model.tools),
-                'ports': [mcp_el.ports.tool_call_input]
-                'content_callback': lambda payload: payload.model.content
+                'transform': lambda data_dict: ToolCallPayload(tools=data_dict['tools']), # Custom transform
+                'payload_type': ToolCallPayload,
+                'ports': [mcp_el.ports.tool_call_input] # Output connects here
             }
         }
         """)
@@ -79,8 +100,8 @@ class StructuredRouterTransformer(Element):
         flow_map = {'input': {}, 'output': {}}
         for route, route_params in self.routing_map.items():
             try:
-                if 'ports' in route_params:
-                    flow_map['output'][route] = {'ports': route_params['ports'], 'payload_type': route_params['payload_type']}
+                if ports := route_params.get('ports', None):
+                    flow_map['output'][route] = {'ports': ports}
                 else:
                     flow_map['output'][route] = {'payload_type': route_params['payload_type']}
             except KeyError:
