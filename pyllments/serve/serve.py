@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 import panel as pn
 from panel.io.fastapi import add_application
 from uvicorn import run as uvicorn_run
+import uvicorn
 
 from pyllments.logging import setup_logging, logger
 from pyllments.common.resource_loader import get_asset
@@ -284,6 +285,9 @@ def serve(
         final_loop = LoopRegistry.get_loop()
         logger.debug(f"Serve: Starting Uvicorn with loop ID: {id(final_loop)}")
         uvicorn_run(app, host=host, port=port)
+        # config = uvicorn.Config(app, host=host, port=port, log_level=logging_level)
+        # server = uvicorn.Server(config)
+        # server.run()
     else:
         loop = LoopRegistry.get_loop()
         logger.debug(f"Serve: Starting event loop forever with ID: {id(loop)}")
