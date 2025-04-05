@@ -281,7 +281,10 @@ def serve(
                 return tmpl
     if AppRegistry._app is not None:
         app = AppRegistry.get_app()
+        final_loop = LoopRegistry.get_loop()
+        logger.debug(f"Serve: Starting Uvicorn with loop ID: {id(final_loop)}")
         uvicorn_run(app, host=host, port=port)
     else:
         loop = LoopRegistry.get_loop()
+        logger.debug(f"Serve: Starting event loop forever with ID: {id(loop)}")
         loop.run_forever()

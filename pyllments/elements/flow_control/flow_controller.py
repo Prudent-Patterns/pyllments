@@ -1,10 +1,12 @@
 from collections import UserDict
 import param
 import asyncio
+from loguru import logger
 
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.ports.ports import InputPort, OutputPort, Ports
+from pyllments.common.loop_registry import LoopRegistry
 
 
 class FlowPort(param.Parameterized):
@@ -114,7 +116,7 @@ class FlowController(Element):
     ports to the FlowController's ports parameter in the __init__ method.
     """
 
-    flow_fn = param.Callable(default=None, doc="""
+    flow_fn = param.Parameter(default=None, allow_refs=False, doc="""
         Function to run every time a new input payload is received.
         The function should accept an active_input_port parameter, a context parameter 'c',
         and any other flow ports as specified in the flow_map.
@@ -242,21 +244,55 @@ class FlowController(Element):
 
         flow_port.payload = payload
 
+        logger.debug(f"FlowController: Invoking flow_fn for input port {input_port_name}")
         result = self.flow_fn(
             active_input_port=flow_port,
             c=self.context,
             **self.flow_port_map.list_view()
         )
         
-        if not self.flow_map['input'][input_port_name].get('persist', False):
-        # If result is a coroutine/task, create a task that waits for it before clearing
-            if asyncio.iscoroutine(result) or isinstance(result, asyncio.Task):
-                async def clear_after_complete():
-                    try:
-                        await result
-                    finally:
-                        flow_port.payload = None
-                asyncio.create_task(clear_after_complete())
-            else:
-                # Synchronous case - clear immediately as before
-                flow_port.payload = None
+        # Handle async result by creating a task
+        if asyncio.iscoroutine(result):
+            logger.debug(f"FlowController: flow_fn returned a coroutine for input port {input_port_name}")
+            
+            # Try both approaches to get a loop and create tasks
+            try:
+                # First try getting the currently running loop directly
+                try:
+                    direct_loop = asyncio.get_running_loop()
+                    logger.debug(f"FlowController: Using direct asyncio.get_running_loop() {id(direct_loop)}")
+                    result_task = direct_loop.create_task(result)
+                    
+                    if not self.flow_map['input'][input_port_name].get('persist', False):
+                        async def clear_after_complete():
+                            try:
+                                logger.debug(f"FlowController: Waiting for task to complete before clearing payload")
+                                await result_task
+                                logger.debug(f"FlowController: Task completed, clearing payload")
+                            finally:
+                                flow_port.payload = None
+                        direct_loop.create_task(clear_after_complete())
+                except RuntimeError:
+                    # Fallback to LoopRegistry if direct method fails
+                    registry_loop = LoopRegistry.get_loop()
+                    logger.debug(f"FlowController: Using LoopRegistry.get_loop() {id(registry_loop)}")
+                    result_task = registry_loop.create_task(result)
+                    
+                    if not self.flow_map['input'][input_port_name].get('persist', False):
+                        async def clear_after_complete():
+                            try:
+                                logger.debug(f"FlowController: Waiting for task to complete before clearing payload")
+                                await result_task
+                                logger.debug(f"FlowController: Task completed, clearing payload")
+                            finally:
+                                flow_port.payload = None
+                        registry_loop.create_task(clear_after_complete())
+            except Exception as e:
+                logger.error(f"FlowController: Error creating task: {e}")
+                # If we can't create a task with either method, we still need to clear the payload
+                if not self.flow_map['input'][input_port_name].get('persist', False):
+                    flow_port.payload = None
+        elif not self.flow_map['input'][input_port_name].get('persist', False):
+            # Synchronous case - clear immediately as before
+            logger.debug(f"FlowController: Synchronous flow_fn completed, clearing payload")
+            flow_port.payload = None

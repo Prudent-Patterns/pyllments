@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 from venv import create
 
@@ -106,17 +107,32 @@ class ChatInterfaceElement(Element):
                 )
 
         self.chatfeed_view.extend(message_and_tool_response_views)
-        def _update_chatfeed(event):
-            if isinstance(event.new, MessagePayload):
+        async def _update_chatfeed(event):
+            new_message = event.new
+            if isinstance(new_message, MessagePayload):
+                fake_it = (
+                    new_message.model.role == 'assistant' and 
+                    (new_message.model.mode == 'atomic' or new_message.model.streamed)
+                    )
+                if fake_it:
+                    loaded_content = new_message.model.content
+                    new_message.model.content = ''
+
                 self.chatfeed_view.append(
                     self.inject_payload_css(
                         event.new.create_static_view,
                         show_role=True
                     )
                 )
+                if fake_it:
+                    for i in range(0, len(loaded_content), 8):  # Load 8 characters at a time
+                        new_message.model.content += loaded_content[i:i + 8]  # Concatenate the next 8 characters to the content
+                        await asyncio.sleep(0.05)
+                    new_message.model.content = loaded_content
+
             elif isinstance(event.new, ToolsResponsePayload):
                 self.chatfeed_view.append(
-                    event.new.create_tool_response_view()
+                    new_message.create_tool_response_view()
                 )
         # This watcher should be called before the payload starts streaming.
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)

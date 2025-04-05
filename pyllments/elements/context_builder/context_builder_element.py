@@ -427,17 +427,16 @@ class ContextBuilderElement(Element):
             
             # 1. Check if the item itself is defined
             if real_name not in self.port_types:
-                logger.warning(f"Required item '{real_name}' listed in order is not defined in input_map.")
-                return False
+                raise ValueError(f"Required item '{real_name}' listed in order is not defined in input_map.")
             
             # 2. Check the pre-computed dependency set for validity
             dep_set = self._full_dependency_sets.get(real_name)
             if dep_set is None:
                  # Should not happen if pre-computation ran correctly, but safety check
-                 logger.error(f"Dependency set for required item '{real_name}' was not pre-computed.")
+                #  logger.error(f"Dependency set for required item '{real_name}' was not pre-computed.")
                  return False 
             if dep_set == _INVALID_DEPENDENCY_MARKER:
-                logger.warning(f"Required item '{real_name}' has an undefined non-optional dependency.")
+                # logger.warning(f"Required item '{real_name}' has an undefined non-optional dependency.")
                 return False
                 
             # 3. Add valid dependencies to the set to check for payloads
@@ -449,7 +448,7 @@ class ContextBuilderElement(Element):
             # We only store regular port names in the dependency sets
             port = self.flow_controller.flow_port_map.get(port_name)
             if not port or not port.payload:
-                logger.warning(f"Required dependency port '{port_name}' has no payload")
+                # logger.warning(f"Required dependency port '{port_name}' has no payload")
                 return False
         
         return True

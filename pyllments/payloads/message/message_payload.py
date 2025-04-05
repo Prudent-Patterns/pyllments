@@ -12,6 +12,7 @@ class MessagePayload(Payload):
         super().__init__(**params)
         self.model = MessageModel(**params)
 
+
     @Component.view
     def create_static_view(
         self,

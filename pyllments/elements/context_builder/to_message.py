@@ -49,7 +49,7 @@ def tools_response_list2message(payload):
     pass
 
 def schema2message(payload):
-    json = payload.model.schema.model_dump_json()
+    json = payload.model.schema.schema_json()
     return MessagePayload(content=json, role='system')
 
 payload_message_mapping = {

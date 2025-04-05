@@ -64,14 +64,18 @@ history_handler_el = HistoryHandlerElement(
 if config.system_prompt: # type: ignore
     from pyllments.elements import ContextBuilderElement
     context_builder = ContextBuilderElement(
-        connected_input_map={
-            'system_prompt': ('developer', config.system_prompt), # type: ignore
-            'history_messages_input': (None, history_handler_el.ports.messages_output)
+        input_map={
+            'system_prompt_constant': {
+                'role': 'system',
+                'message': config.system_prompt
+            }, # type: ignore
+            'history_messages_input': {'ports': [history_handler_el.ports.history_output]}
         }
+        
     )
     context_builder.ports.messages_output > llm_chat_el.ports.messages_emit_input
 else:
-    history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
+    history_handler_el.ports.history_output > llm_chat_el.ports.messages_emit_input
 
 chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
 # history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input

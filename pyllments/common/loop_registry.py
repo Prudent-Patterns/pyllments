@@ -1,4 +1,5 @@
 import asyncio
+from loguru import logger
 
 class LoopRegistry:
     """
@@ -18,7 +19,11 @@ class LoopRegistry:
         if cls._loop is None:
             try:
                 cls._loop = asyncio.get_running_loop()  # Returns if running.
+                logger.debug(f"LoopRegistry: Using running loop {id(cls._loop)}")
             except RuntimeError:
                 cls._loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(cls._loop)
+                logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
+        else:
+            logger.debug(f"LoopRegistry: Reusing existing loop {id(cls._loop)}")
         return cls._loop

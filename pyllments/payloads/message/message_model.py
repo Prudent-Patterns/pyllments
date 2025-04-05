@@ -5,6 +5,7 @@ from loguru import logger
 import param
 
 from pyllments.base.model_base import Model
+from pyllments.common.loop_registry import LoopRegistry
 # from pyllments.common.tokenizers import get_token_len
 
 
@@ -129,44 +130,43 @@ class MessageModel(Model):
         else:
             raise ValueError(f"Unsupported mode: {self.mode}")
 
-    def get_message(self) -> str:
-        """
-        Synchronously retrieves the complete message content.
-        For stream mode, if the message hasn't been fully streamed,
-        this method will block until the stream is complete.
-        For atomic mode, if there is a stored coroutine, it will be executed synchronously.
+    # TODO: CONFIRM REMOVAL -- CAUSES DEADLOCKS WHEN THERE IS A RUNNING LOOP
+    # NO BUENO
+    # def get_message(self) -> str:
+    #     """
+    #     Synchronously retrieves the complete message content.
+    #     For stream mode, if the message hasn't been fully streamed,
+    #     this method will block until the stream is complete.
+    #     For atomic mode, if there is a stored coroutine, it will be executed synchronously.
 
-        Returns
-        -------
-        str
-            The complete message content.
+    #     Returns
+    #     -------
+    #     str
+    #         The complete message content.
 
-        Raises
-        ------
-        RuntimeError
-            If called in an active asynchronous event loop.
-        """
-        if self.mode == 'atomic':
-            if self.message_coroutine is not None:
-                # Execute the stored atomic coroutine synchronously and extract message content
-               # TODO: Use the LoopRegistry to get the running loop.
-                response = asyncio.run(self.message_coroutine)
-                self.content = response['choices'][0]['message']['content']
-                self.message_coroutine = None
-            return self.content
-        elif self.mode == 'stream':
-            # If we're in an asynchronous context, advise using the async method.
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                return asyncio.run(self.aget_message())
-            else:
-                raise RuntimeError(
-                    "get_message() cannot be called synchronously while an event loop is running. "
-                    "Use 'await aget_message()' instead."
-                )
-        else:
-            raise ValueError(f"Unsupported mode: {self.mode}")
+    #     Raises
+    #     ------
+    #     RuntimeError
+    #         If called in an active asynchronous event loop.
+    #     """
+    #     loop = LoopRegistry.get_loop()
+    #     if self.mode == 'atomic':
+    #         if self.message_coroutine is not None:
+    #             if loop.is_running():
+    #                 # Use run_coroutine_threadsafe to get the result without disturbing the running Panel loop
+    #                 response = asyncio.run_coroutine_threadsafe(self.message_coroutine, loop).result()
+    #             else:
+    #                 response = loop.run_until_complete(self.message_coroutine)
+    #             self.content = response['choices'][0]['message']['content']
+    #             self.message_coroutine = None
+    #         return self.content
+    #     elif self.mode == 'stream':
+    #         if loop.is_running():
+    #             return asyncio.run_coroutine_threadsafe(self.aget_message(), loop).result()
+    #         else:
+    #             return loop.run_until_complete(self.aget_message())
+    #     else:
+    #         raise ValueError(f"Unsupported mode: {self.mode}")
         
 
 

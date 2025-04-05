@@ -5,10 +5,16 @@ from pyllments.elements import (
     MCPElement,
     HistoryHandlerElement,
     LLMChatElement,
+    PipeElement
 )
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.serve import flow
 
+pipe_el = PipeElement(receive_callback=lambda ps: [p for p in ps])
+
+reply_pipe_el = PipeElement(receive_callback=lambda p: f"Reply pipe received: {p}")
+tools_pipe_el = PipeElement(receive_callback=lambda p: f"Tools pipe received: {p}")
+initial_llm_pipe_el = PipeElement(receive_callback=lambda p: f"LLM output content: {p.model.content}")
 
 chat_interface_el = ChatInterfaceElement()
 
@@ -17,7 +23,8 @@ initial_context_builder_el = ContextBuilderElement(
         'main_system_message_constant': {
             'role': 'system',
             'message': "Your goal is to reply to the user in the best way possible using the tools you have access to. "
-                       "You will reply only in a JSON format that will comply with the JSON schema provided to you. "
+                       "You MUST reply ONLY in a valid JSON format that strictly complies with the JSON schema provided to you. "
+                       "Do not include any text outside of the JSON. "
                        "One of the options will be to choose replying to the user without tools, or responding with "
                        "tools and parameters which will return their values to you in a future message that you'll "
                        "be able to respond to and synthesize information from. You will also be provided with a history "
@@ -62,13 +69,15 @@ initial_context_builder_el = ContextBuilderElement(
 
 initial_llm_chat_el = LLMChatElement(model_name='gpt-4o')
 initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.messages_emit_input
+initial_llm_chat_el.ports.message_output > initial_llm_pipe_el.ports.pipe_input
+initial_context_builder_el.ports.messages_output > pipe_el.ports.pipe_input
 
 structured_router_el = StructuredRouterTransformer(
     routing_map={
         'reply': {
             'schema': {'pydantic_model': str},
             'ports': [chat_interface_el.ports.message_input],
-            'transform': lambda reply_content: MessagePayload(content=reply_content)
+            'transform': lambda reply_content: MessagePayload(content=reply_content, role='assistant')
         },
         'tools': {
             'schema': {'payload_type': SchemaPayload},
@@ -77,8 +86,10 @@ structured_router_el = StructuredRouterTransformer(
     }
 )
 
+structured_router_el.ports.reply > reply_pipe_el.ports.pipe_input
+structured_router_el.ports.tools > tools_pipe_el.ports.pipe_input
+
 initial_llm_chat_el.ports.message_output > structured_router_el.ports.message_input
-structured_router_el.ports.reply > chat_interface_el.ports.message_input
 
 mcp_el = MCPElement(mcps={
     'test_mcp': {
@@ -126,13 +137,15 @@ final_context_builder_el = ContextBuilderElement(
             'ports': [chat_interface_el.ports.message_output],
         }
     },
-    emit_order=['main_system_message_constant',
-                '[history_system_message_constant]',
-                '[history]',
-                'tools_header_template',
-                'tools',
-                'query_system_message_constant',
-                'user_message']
+    trigger_map={
+        'tools': [
+            'main_system_message_constant',
+            '[history_system_message_constant]',
+            '[history]',
+            'tools_template',
+            'query_system_message_constant',
+        ]
+    },
 )
 
 history_handler_el = HistoryHandlerElement()
@@ -144,10 +157,15 @@ structured_router_el.ports.reply > history_handler_el.ports.messages_input
 
 final_llm_chat_el = LLMChatElement(model_name='gpt-4o')
 final_context_builder_el.ports.messages_output > final_llm_chat_el.ports.messages_emit_input
-final_llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
+final_llm_chat_el.ports.message_output > history_handler_el.ports.message_emit_input
 final_llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
+
+from loguru import logger
+logger.debug(f"StructuredRouterTransformer: {structured_router_el.pydantic_model.model_json_schema()}")
 
 @flow
 def show_chat():
+    from pyllments.common.loop_registry import LoopRegistry
+    logger.debug(f"LoopRegistry: {id(LoopRegistry.get_loop())}")
     return chat_interface_el.create_interface_view(height=800, width=600)
 

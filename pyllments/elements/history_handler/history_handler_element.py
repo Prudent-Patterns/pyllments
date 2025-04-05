@@ -55,7 +55,7 @@ class HistoryHandlerElement(Element):
         def unpack(payload: MessagePayload):
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
-            if payload.mode == 'stream' and not payload.streamed:
+            if payload.model.mode == 'stream' and not payload.model.streamed:
                 def stream_callback(event):
                     self.model.load_entries([payload])
 
