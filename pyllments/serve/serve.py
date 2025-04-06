@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 import panel as pn
 from panel.io.fastapi import add_application
-from uvicorn import run as uvicorn_run
+# from uvicorn import run as uvicorn_run
 import uvicorn
 
 from pyllments.logging import setup_logging, logger
@@ -228,67 +228,80 @@ def serve(
     config : Optional[Dict[str, Any]], optional
         Configuration parameters to pass to the flow function, by default None.
     """
-    server_setup(logging=logging, logging_level=logging_level)
-    if env:
-        load_dotenv(env)
-    else:
-        load_dotenv()
-
-    if find_gui:
-        def view_check(obj):
-            return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
-        
-        func_list = []
-        if not inline:
-            if not filename:
-                raise ValueError("filename must be provided when inline=False")
-            try:
-                module = load_module_with_config('loaded_module', filename, config)
-                func_list = inspect.getmembers(module, view_check)
-            except Exception as e:
-                logger.error(f"Failed to load module from file {filename}: {e}")
-                raise
+    # Get the loop first
+    loop = LoopRegistry.get_loop()
+    logger.debug(f"Serve: Using loop with ID: {id(loop)}")
+    
+    async def async_serve_body_wrapper():
+        server_setup(logging=logging, logging_level=logging_level)
+        if env:
+            load_dotenv(env)
         else:
-            frame = sys._getframe(1)
-            while frame:
-                module = sys.modules.get(frame.f_globals.get('__name__'))
-                if module:
+            load_dotenv()
+
+        if find_gui:
+            def view_check(obj):
+                return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
+            
+            func_list = []
+            if not inline:
+                if not filename:
+                    raise ValueError("filename must be provided when inline=False")
+                try:
+                    module = load_module_with_config('loaded_module', filename, config)
                     func_list = inspect.getmembers(module, view_check)
-                    if func_list:
-                        break
-                frame = frame.f_back
+                except Exception as e:
+                    logger.error(f"Failed to load module from file {filename}: {e}")
+                    raise
+            else:
+                frame = sys._getframe(1)
+                while frame:
+                    module = sys.modules.get(frame.f_globals.get('__name__'))
+                    if module:
+                        func_list = inspect.getmembers(module, view_check)
+                        if func_list:
+                            break
+                    frame = frame.f_back
 
-        if (func_list_len := len(func_list)) >= 1:
-            if func_list_len > 1:
-                logger.warning(f'{func_list_len} @flow wrapped functions found in script, using first found')
-            elif func_list_len == 1:
-                logger.info(f"Found @flow wrapped function in script")
-            name, obj = func_list[0]
+            if (func_list_len := len(func_list)) >= 1:
+                if func_list_len > 1:
+                    logger.warning(f'{func_list_len} @flow wrapped functions found in script, using first found')
+                elif func_list_len == 1:
+                    logger.info(f"Found @flow wrapped function in script")
+                name, obj = func_list[0]
 
-            app = AppRegistry.get_app()
-            try:
-                asset_path = resources.files('pyllments').joinpath(ASSETS_PATH)
-                app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=str(asset_path)), name=ASSETS_PATH)
-            except Exception as e:
-                logger.error(f"Failed to mount static files: {e}")
+                app = AppRegistry.get_app()
+                try:
+                    asset_path = resources.files('pyllments').joinpath(ASSETS_PATH)
+                    app.mount(ASSETS_MOUNT_PATH, StaticFiles(directory=str(asset_path)), name=ASSETS_PATH)
+                except Exception as e:
+                    logger.error(f"Failed to mount static files: {e}")
 
-            @add_application('/', app=app, title='Pyllments')
-            def serve_gui():
-                template_path = resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH)
-                main_tmpl_str = template_path.read_text()
-                tmpl = pn.Template(main_tmpl_str)
-                tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
-                tmpl.add_panel('app_main', obj())
-                return tmpl
-    if AppRegistry._app is not None:
+                @add_application('/', app=app, title='Pyllments')
+                def serve_gui():
+                    template_path = resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH)
+                    main_tmpl_str = template_path.read_text()
+                    tmpl = pn.Template(main_tmpl_str)
+                    tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
+                    tmpl.add_panel('app_main', obj())
+                    return tmpl
+                
+        # Return whether an app is registered
+        return AppRegistry._app is not None
+
+    async def run_server():
         app = AppRegistry.get_app()
-        final_loop = LoopRegistry.get_loop()
-        logger.debug(f"Serve: Starting Uvicorn with loop ID: {id(final_loop)}")
-        uvicorn_run(app, host=host, port=port)
-        # config = uvicorn.Config(app, host=host, port=port, log_level=logging_level)
-        # server = uvicorn.Server(config)
-        # server.run()
+        config = uvicorn.Config(app, host=host, port=port)
+        server = uvicorn.Server(config)
+        await server.serve()
+    
+    # First, run the setup
+    has_app = loop.run_until_complete(async_serve_body_wrapper())
+    
+    # Then, conditionally run the server or just keep the loop running
+    if has_app:
+        logger.info(f"Starting Uvicorn server on {host}:{port}")
+        loop.run_until_complete(run_server())
     else:
-        loop = LoopRegistry.get_loop()
-        logger.debug(f"Serve: Starting event loop forever with ID: {id(loop)}")
-        loop.run_forever()
+        logger.debug(f"No FastAPI app found, running loop forever")
+        loop.run_forever()  # Only run forever if no Uvicorn server

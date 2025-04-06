@@ -3,27 +3,57 @@ from loguru import logger
 
 class LoopRegistry:
     """
-    Provides access to the application-wide asyncio event loop.
-    This class is responsible only for retrieving or creating the loop.
+    Singleton for managing the application-wide asyncio event loop.
+    Provides a centralized way to get or create an event loop.
     """
     _loop = None
 
     @classmethod
     def get_loop(cls):
         """
-        Retrieves the current event loop.
-
-        If a loop is already running, it is returned. If not, a new event loop is created
-        and set as the default before returning it.
+        Get the event loop, creating one if necessary.
+        
+        Returns
+        -------
+        asyncio.AbstractEventLoop
+            The event loop instance.
         """
-        if cls._loop is None:
-            try:
-                cls._loop = asyncio.get_running_loop()  # Returns if running.
-                logger.debug(f"LoopRegistry: Using running loop {id(cls._loop)}")
-            except RuntimeError:
-                cls._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(cls._loop)
-                logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
-        else:
-            logger.debug(f"LoopRegistry: Reusing existing loop {id(cls._loop)}")
+        # Return cached loop if we have one
+        if cls._loop is not None:
+            logger.debug(f"LoopRegistry: Using cached loop {id(cls._loop)}")
+            return cls._loop
+            
+        # Try to get the existing loop
+        policy = asyncio.get_event_loop_policy()
+        
+        # Check if a loop exists for this thread already
+        try:
+            cls._loop = policy.get_event_loop()
+            logger.debug(f"LoopRegistry: Using existing loop {id(cls._loop)}")
+        except RuntimeError:
+            # No loop exists yet, create a new one
+            cls._loop = policy.new_event_loop()
+            policy.set_event_loop(cls._loop)
+            logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
+            
         return cls._loop
+    
+    @classmethod
+    def reset(cls):
+        """
+        Reset the singleton loop reference.
+        Useful for testing scenarios.
+        """
+        if cls._loop is not None and cls._loop.is_running():
+            logger.warning("Resetting a running loop - this may cause issues")
+            
+        cls._loop = None
+        logger.debug("LoopRegistry: Reset loop reference")
+
+    @classmethod
+    def set(cls, loop):
+        """
+        Set the singleton loop reference.
+        """
+        cls._loop = loop
+        logger.debug(f"LoopRegistry: Set loop reference to {id(cls._loop)}")
