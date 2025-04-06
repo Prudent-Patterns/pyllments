@@ -23,7 +23,7 @@ initial_context_builder_el = ContextBuilderElement(
         'main_system_message_constant': {
             'role': 'system',
             'message': "Your goal is to reply to the user in the best way possible using the tools you have access to. "
-                       "You MUST reply ONLY in a valid JSON format that strictly complies with the JSON schema provided to you. "
+                       "You MUST reply ONLY in a valid JSON format in plain text without any code block notation or triple quotes that strictly complies with the JSON schema provided to you. "
                        "Do not include any text outside of the JSON. "
                        "One of the options will be to choose replying to the user without tools, or responding with "
                        "tools and parameters which will return their values to you in a future message that you'll "
@@ -70,7 +70,7 @@ initial_context_builder_el = ContextBuilderElement(
 initial_llm_chat_el = LLMChatElement(model_name='gpt-4o')
 initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.messages_emit_input
 initial_llm_chat_el.ports.message_output > initial_llm_pipe_el.ports.pipe_input
-initial_context_builder_el.ports.messages_output > pipe_el.ports.pipe_input
+# initial_context_builder_el.ports.messages_output > pipe_el.ports.pipe_input
 
 structured_router_el = StructuredRouterTransformer(
     routing_map={
