@@ -43,6 +43,7 @@ def message_list2message(payload):
     return payload
 
 def tools_response2message(payload):
+    
     return MessagePayload(content=payload.model.content, role='system')
 
 def tools_response_list2message(payload):

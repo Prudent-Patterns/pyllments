@@ -198,7 +198,7 @@ class StructuredRouterTransformer(Element):
                 
                 # Handle empty message content
                 if not message_content or message_content.strip() == "":
-                    logger.error("Received empty message content in StructuredRouterTransformer")
+                    logger.error("StructuredRouterTransformer: Received empty message content")
                     return
                 try:
                     model = self.pydantic_model.model_validate_json(message_content).root
@@ -206,7 +206,7 @@ class StructuredRouterTransformer(Element):
                     
                     route = model.route
                     if model.route not in self.routing_map:
-                        raise ValueError(f"Route {model.route} not found in routing_map keys: {self.routing_map.keys()}")
+                        raise ValueError(f"StructuredRouterTransformer: Route {model.route} not found in routing_map keys: {self.routing_map.keys()}")
                     output_model = getattr(model, route)
                     output_value = output_model.model_dump() if isinstance(output_model, BaseModel) else output_model
                     if transform := self.routing_map[route].get('transform', None):
@@ -216,8 +216,8 @@ class StructuredRouterTransformer(Element):
                         output_payload = StructuredPayload(data=output_value)
                     kwargs[route].emit(output_payload)
                 except Exception as e:
-                    logger.error(f"Error processing message in StructuredRouterTransformer: {e}")
-                    logger.error(f"Schema expected: {self.pydantic_model.model_json_schema()}")
+                    logger.error(f"StructuredRouterTransformer: Error processing message: {e}")
+                    logger.error(f"StructuredRouterTransformer: Schema expected: {self.pydantic_model.model_json_schema()}")
                     # Optionally, you could add a default route or error handling here
             # Set the pydantic schema based on the provided schema input
             elif active.name.endswith('_schema_input'):
@@ -228,10 +228,5 @@ class StructuredRouterTransformer(Element):
                     pydantic_schema = active.payload.model.schema
                 self.routing_map[route]['schema']['pydantic_model'] = pydantic_schema
                 self.set_pydantic_schema()
-                logger.debug(f"Updated schema: {self.pydantic_model.model_json_schema()}")
+                logger.debug(f"StructuredRouterTransformer: Updated schema: {self.pydantic_model.model_json_schema()}")
         return flow_fn
-            
-
-        
-
-        

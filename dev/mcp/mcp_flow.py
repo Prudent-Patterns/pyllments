@@ -126,7 +126,7 @@ final_context_builder_el = ContextBuilderElement(
         },
         'tools_template': {
             'role': 'system',
-            'template': "The following are the tool calls and their responses that you previously identified"
+            'template': "The following are the tool calls and their responses that you previously identified "
                         "as relevant to the user's query: \n {{ tools }}"
         },
         'query_system_message_constant': {
@@ -144,6 +144,7 @@ final_context_builder_el = ContextBuilderElement(
             '[history]',
             'tools_template',
             'query_system_message_constant',
+            'user_message'
         ]
     },
 )

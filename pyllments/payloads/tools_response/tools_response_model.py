@@ -63,6 +63,10 @@ class ToolsResponseModel(Model):
     called = param.Boolean(default=False, doc="""
         Whether the tool has been called.
         """)
+    
+    calling = param.Boolean(default=False, doc="""
+        Whether the tool is being called.
+        """)
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -101,6 +105,7 @@ class ToolsResponseModel(Model):
     
     def call_tools(self):
         """Call all tools and update responses. Cleans up any watchers when done."""
+        self.calling = True
         for tool, tool_spec in self.tool_responses.items():
             tool_spec['response'] = tool_spec['call']().model_dump()
         
@@ -110,7 +115,7 @@ class ToolsResponseModel(Model):
         if (called_watchers := self.param.watchers.get('called')) is not None:
             for watcher in called_watchers['value']:
                 self.param.unwatch(watcher)
-        
+        self.calling = False
         return self.tool_responses
     # def get_template_str(self):
 

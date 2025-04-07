@@ -1,6 +1,6 @@
 import panel as pn
 from jinja2 import Template
-
+from loguru import logger
 from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
 
@@ -34,6 +34,9 @@ class ToolsResponsePayload(Payload):
     ):
         tool_cards = []
         for tool_name, tool_data in self.model.tool_responses.items():
+            logger.debug(f"Tool data for {tool_name}: {tool_data}")
+            if 'response' in tool_data:
+                logger.debug(f"Response object: {tool_data['response']}")
             tool_card_kwargs = {'collapsed': False}
             tool_card_kwargs['objects'] = []
             if tool_data.get('parameters', None):
@@ -50,6 +53,7 @@ class ToolsResponsePayload(Payload):
                 pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
             )
             response_indicator = pn.pane.Str('Response:', stylesheets=str_css, styles={'margin-left': '0px'})
+            
             response_str = pn.pane.Str(tool_data['response']['content'][0]['text'],
                                        stylesheets=response_md_css)
 

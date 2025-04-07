@@ -108,15 +108,15 @@ class ChatInterfaceElement(Element):
 
         self.chatfeed_view.extend(message_and_tool_response_views)
         async def _update_chatfeed(event):
-            new_message = event.new
-            if isinstance(new_message, MessagePayload):
+            new_item = event.new
+            if isinstance(new_item, MessagePayload):
                 fake_it = (
-                    new_message.model.role == 'assistant' and 
-                    (new_message.model.mode == 'atomic' or new_message.model.streamed)
+                    new_item.model.role == 'assistant' and 
+                    (new_item.model.mode == 'atomic' or new_item.model.streamed)
                     )
                 if fake_it:
-                    loaded_content = new_message.model.content
-                    new_message.model.content = ''
+                    loaded_content = new_item.model.content
+                    new_item.model.content = ''
 
                 self.chatfeed_view.append(
                     self.inject_payload_css(
@@ -126,13 +126,14 @@ class ChatInterfaceElement(Element):
                 )
                 if fake_it:
                     for i in range(0, len(loaded_content), 8):  # Load 8 characters at a time
-                        new_message.model.content += loaded_content[i:i + 8]  # Concatenate the next 8 characters to the content
+                        new_item.model.content += loaded_content[i:i + 8]  # Concatenate the next 8 characters to the content
                         await asyncio.sleep(0.05)
-                    new_message.model.content = loaded_content
+                    new_item.model.content = loaded_content
 
-            elif isinstance(event.new, ToolsResponsePayload):
+            elif isinstance(new_item, ToolsResponsePayload):
+                new_item.model.call_tools()
                 self.chatfeed_view.append(
-                    new_message.create_tool_response_view()
+                    new_item.create_tool_response_view()
                 )
         # This watcher should be called before the payload starts streaming.
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
