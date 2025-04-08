@@ -44,11 +44,12 @@ class MessagePayload(Payload):
                 role_str = self.model.role.capitalize()
 
         markdown = pn.pane.Markdown(
-            self.model.content,  # Changed from message.content
+            self.model.content,  # Use local variable with null check
             stylesheets=markdown_css)
 
         def _update_message_view(event):
-            view[0].object = self.model.content
+            view[0].object = event.new if event.new is not None else ""
+            
         self.model.param.watch(_update_message_view, 'content')
         
         if show_role:

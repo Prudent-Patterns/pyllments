@@ -1,6 +1,7 @@
 from collections import deque
 from itertools import islice
 from typing import Union, List
+import asyncio
 
 import param
 import panel as pn
@@ -52,52 +53,81 @@ class HistoryHandlerElement(Element):
         self._history_output_setup()
 
     def _message_emit_input_setup(self):
-        def unpack(payload: MessagePayload):
+        async def unpack(payload: MessagePayload):
             # If message hasn't streamed:
             # Wait for stream to complete before adding to context
             if payload.model.mode == 'stream' and not payload.model.streamed:
+                # Create a future to resolve when streaming is complete
+                streaming_done = asyncio.Future()
+                
                 def stream_callback(event):
                     self.model.load_entries([payload])
+                    if not streaming_done.done():
+                        streaming_done.set_result(True)
 
-                payload.param.watch(stream_callback, 'streamed')
+                payload.model.param.watch(stream_callback, 'streamed')
+                
+                # If streaming doesn't complete in a reasonable time, continue anyway
+                try:
+                    await asyncio.wait_for(streaming_done, timeout=10.0)
+                except asyncio.TimeoutError:
+                    # Proceed even if streaming hasn't completed
+                    self.model.load_entries([payload])
             else:
                 self.model.load_entries([payload])
             
             # Only stage_emit if context isn't an empty list
             if self.model.context:
-                self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
+                await self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
 
         self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
     def _messages_input_setup(self):
-        def unpack(payload: Union[List[MessagePayload], MessagePayload]):
+        async def unpack(payload: Union[List[MessagePayload], MessagePayload]):
             payloads = [payload] if not isinstance(payload, list) else payload
             self.model.load_entries(payloads)
 
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
     def _tool_response_emit_input_setup(self):
-        def unpack(payload: ToolsResponsePayload):
+        async def unpack(payload: ToolsResponsePayload):
             # Only process tool responses that have been called or wait for them to be called
             if not payload.model.called:
+                # Create a future to resolve when the tool is called
+                tool_called = asyncio.Future()
+                
                 def called_callback(event):
                     if payload.model.tool_responses:  # Only process if there are responses
                         self.model.load_entries([payload])
                         # Only stage_emit if context isn't an empty list
                         if self.model.context:
-                            self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
+                            # Create async task since we can't await directly in callback
+                            asyncio.create_task(
+                                self.ports.output['history_output'].stage_emit(
+                                    context=self.model.get_context_messages()
+                                )
+                            )
+                        if not tool_called.done():
+                            tool_called.set_result(True)
 
                 payload.model.param.watch(called_callback, 'called')
+                
+                # If tool isn't called in a reasonable time, continue anyway
+                try:
+                    await asyncio.wait_for(tool_called, timeout=10.0)
+                except asyncio.TimeoutError:
+                    # Proceed without waiting further
+                    pass
             elif payload.model.tool_responses:  # If already called and has responses, process immediately
                 self.model.load_entries([payload])
                 # Only stage_emit if context isn't an empty list
                 if self.model.context:
-                    self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
+                    await self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
 
         self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
 
     def _tool_responses_input_setup(self):
-        def unpack(payload: Union[List[ToolsResponsePayload], ToolsResponsePayload]):
+        async def unpack(payload: Union[List[ToolsResponsePayload], ToolsResponsePayload]):
             payloads = [payload] if not isinstance(payload, list) else payload
             
             # Split payloads into called and uncalled
@@ -120,19 +150,32 @@ class HistoryHandlerElement(Element):
                     def called_callback(event):
                         if payload.model.tool_responses:  # Only process if there are responses
                             self.model.load_entries([payload])
+                            # We can't await directly in a callback, so use create_task
+                            asyncio.create_task(
+                                self._handle_tool_response_update()
+                            )
                     return called_callback
 
                 p.model.param.watch(make_called_callback(p), 'called')
 
         self.ports.add_input(name='tool_responses_input', unpack_payload_callback=unpack)
+    
+    async def _handle_tool_response_update(self):
+        """Helper method to handle tool response updates asynchronously"""
+        if self.model.context:
+            await self.ports.output['history_output'].stage_emit(
+                context=self.model.get_context_messages()
+            )
 
     def _history_output_setup(self):
-        def pack(context: List[Union[MessagePayload, ToolsResponsePayload]]) -> List[Union[MessagePayload, ToolsResponsePayload]]:
+        async def pack(context: List[Union[MessagePayload, ToolsResponsePayload]]) -> List[Union[MessagePayload, ToolsResponsePayload]]:
+            """Pack the context messages into a list"""
             return context
         
         self.ports.add_output(
             name='history_output',
-            pack_payload_callback=pack
+            pack_payload_callback=pack,
+            payload_type=List[Union[MessagePayload, ToolsResponsePayload]]
         )
 
     # TODO: Add a view for tool responses

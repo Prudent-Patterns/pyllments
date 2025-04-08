@@ -4,6 +4,7 @@ from venv import create
 
 import panel as pn
 import param
+from loguru import logger
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
@@ -45,7 +46,7 @@ class ChatInterfaceElement(Element):
 
     def _message_output_setup(self):
         """Sets up the output message port"""
-        def pack(new_message: MessagePayload) -> MessagePayload:
+        async def pack(new_message: MessagePayload) -> MessagePayload:
             return new_message
 
         self.ports.add_output(
@@ -54,7 +55,7 @@ class ChatInterfaceElement(Element):
     
     def _message_input_setup(self):
         """Sets up the input message port - does not emit from the message_output port"""
-        def unpack(payload: MessagePayload):
+        async def unpack(payload: MessagePayload):
             self.model.new_message = payload
         
         self.ports.add_input(
@@ -63,16 +64,16 @@ class ChatInterfaceElement(Element):
         
     def _message_emit_input_setup(self):
         """Sets up the message_emit_input port - emits from the message_output port"""
-        def unpack(payload: MessagePayload):
+        async def unpack(payload: MessagePayload):
             self.model.new_message = payload
-            self.ports.output['message_output'].stage_emit(new_message=payload)
+            await self.ports.output['message_output'].stage_emit(new_message=payload)
 
         self.ports.add_input(
             name='message_emit_input',
             unpack_payload_callback=unpack)
     
     def _tools_response_input_setup(self):
-        def unpack(payload: ToolsResponsePayload):
+        async def unpack(payload: ToolsResponsePayload):
             self.model.new_message = payload
 
         self.ports.add_input(
@@ -131,10 +132,11 @@ class ChatInterfaceElement(Element):
                     new_item.model.content = loaded_content
 
             elif isinstance(new_item, ToolsResponsePayload):
-                new_item.model.call_tools()
-                self.chatfeed_view.append(
-                    new_item.create_tool_response_view()
-                )
+                # Let the model handle the tool calls asynchronously
+                # The view will be updated once tools have been processed
+                tool_view = new_item.create_tool_response_view()
+                self.chatfeed_view.append(tool_view)
+
         # This watcher should be called before the payload starts streaming.
         self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
@@ -187,26 +189,35 @@ class ChatInterfaceElement(Element):
             height=height
         )
     
-    @Element.port_stage_emit('message_output', 'new_message')
-    def _on_send(self, event):
+    async def _on_send(self, event):
         """
         Handles the send button event by appending the user's message to the chat model,
         clearing the input field, and updating the chat feed view.
         """
+        # Get the input text from the appropriate source
+        input_text = None
+        
         if event.obj is self.send_button_view:
             if self.chat_input_view:
                 input_text = self.chat_input_view.value_input
                 self.chat_input_view.value_input = ''
-                new_message = MessagePayload(
-                    role='user',
-                    content=input_text,
-                    mode='atomic')
-                self.model.new_message = new_message
-            
+                
         elif event.obj is self.chat_input_view:
-            input_text = self.chat_input_view.value
-            new_message = MessagePayload(
-                role='user',
-                content=input_text,
-                mode='atomic')
-            self.model.new_message = new_message
+            # Use value_input for both cases to get what the user typed,
+            # not value (which is apparently empty on Enter key press)
+            input_text = self.chat_input_view.value_input
+            self.chat_input_view.value_input = ''
+            
+        # Skip if the input is empty
+        if not input_text or input_text.strip() == '':
+            return
+            
+        # Create and send the message
+        new_message = MessagePayload(
+            role='user',
+            content=input_text,
+            mode='atomic')
+        self.model.new_message = new_message
+        
+        # Explicitly stage and emit
+        await self.ports.output['message_output'].stage_emit(new_message=new_message)

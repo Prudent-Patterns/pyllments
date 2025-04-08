@@ -1,11 +1,13 @@
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, List
 
 import panel as pn
 import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads.message import MessagePayload
+from pyllments.payloads.tools_response import ToolsResponsePayload
 from pyllments.elements.llm_chat import LLMChatModel
+from loguru import logger
 
 
 class LLMChatElement(Element):
@@ -20,18 +22,47 @@ class LLMChatElement(Element):
         self._messages_emit_input_setup()
         
     def _message_output_setup(self):
-        def pack(message_payload: MessagePayload) -> MessagePayload:
+        async def pack(message_payload: MessagePayload) -> MessagePayload:
             return message_payload
             
         self.ports.add_output(name='message_output', pack_payload_callback=pack)
 
     def _messages_emit_input_setup(self):
-        def unpack(payload: Union[list[MessagePayload], MessagePayload]):
-            payloads = [payload] if not isinstance(payload, list) else payload
-            response = self.model.generate_response(payloads)
-            self.ports.output['message_output'].stage_emit(message_payload=response)
+        async def unpack(payload: Union[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]]):
+            """
+            Handle incoming payloads which may be a single message or a list of messages.
+            
+            Args:
+                payload: Single message payload or a list of message/tool response payloads
+                        (typically from history handler)
+            """
+            # Convert to list if it's a single payload
+            if not isinstance(payload, list):
+                payloads = [payload]
+            else:
+                # It's already a list
+                payloads = payload
+                
+            # Filter list to only include valid message payloads
+            valid_payloads = []
+            for item in payloads:
+                if isinstance(item, MessagePayload):
+                    valid_payloads.append(item)
+                else:
+                    logger.warning(f"Ignoring invalid payload type in messages_emit_input: {type(item)}")
+            
+            # Generate response from valid payloads
+            if valid_payloads:
+                response = self.model.generate_response(valid_payloads)
+                await self.ports.output['message_output'].stage_emit(message_payload=response)
+            else:
+                logger.warning("No valid message payloads found to generate a response")
 
-        self.ports.add_input(name='messages_emit_input', unpack_payload_callback=unpack)
+        self.ports.add_input(
+            name='messages_emit_input',
+            unpack_payload_callback=unpack,
+            payload_type=List[Union[MessagePayload, ToolsResponsePayload]]
+        )
 
     @Component.view
     def create_model_selector_view(

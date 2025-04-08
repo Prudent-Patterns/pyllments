@@ -1,4 +1,5 @@
 import param
+import asyncio
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
@@ -19,12 +20,15 @@ class ChatInterfaceModel(Model):
         async def _new_message_updated(event):
             if not event.new or (event.old is event.new):  # Skip if no message or same message
                 return
+                
             if isinstance(event.new, MessagePayload):
                 if (event.new.model.mode == 'stream' 
                     and not event.new.model.streamed):  # Handle streaming AI messages
                     await event.new.model.stream()
             elif isinstance(event.new, ToolsResponsePayload):
-                pass
+                # Ensure tool responses are properly handled asynchronously
+                if not getattr(event.new.model, 'called', False):
+                    asyncio.create_task(self._process_tool_response(event.new))
             self.message_list.append(event.new)  # Add message regardless of type
 
         self.param.watch(
@@ -33,3 +37,9 @@ class ChatInterfaceModel(Model):
             precedence=10,
             onlychanged=True
         )
+        
+    async def _process_tool_response(self, tools_response):
+        """Process tool response asynchronously"""
+        if hasattr(tools_response.model, 'call_tools'):
+            await tools_response.model.call_tools()
+        return tools_response

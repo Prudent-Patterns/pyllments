@@ -1,6 +1,7 @@
 import param
 from jinja2 import meta
 import jinja2
+import asyncio
 from loguru import logger
 
 from pyllments.elements.flow_control.flow_controller import FlowController
@@ -298,7 +299,7 @@ class ContextBuilderElement(Element):
 
     def _create_flow_function(self):
         """Create the flow function for the flow controller."""
-        def flow_fn(**kwargs):
+        async def flow_fn(**kwargs):
             active_port = kwargs['active_input_port']
             messages_output = kwargs['messages_output']
             port_name = active_port.name
@@ -322,7 +323,7 @@ class ContextBuilderElement(Element):
                     self._update_template_storage(port_name, active_port.payload)
                 
                 # Process messages using configured strategy
-                self._process_messages(kwargs, messages_output, port_name)
+                await self._process_messages(kwargs, messages_output, port_name)
             
             finally:
                 # --- Release Lock ---
@@ -356,7 +357,7 @@ class ContextBuilderElement(Element):
 
     # ---- Message Processing ----
     
-    def _process_messages(self, kwargs, messages_output, port_name):
+    async def _process_messages(self, kwargs, messages_output, port_name):
         """Process messages using the appropriate strategy."""
         # Get message ordering based on strategy
         order = self._get_message_order(kwargs, port_name)
@@ -383,7 +384,7 @@ class ContextBuilderElement(Element):
         
         # Emit messages if available
         if messages:
-            messages_output.emit(messages)
+            await messages_output.emit(messages)
 
     def _get_message_order(self, kwargs, port_name):
         """

@@ -1,22 +1,26 @@
-from typing import Union, get_origin, get_args, Any
+from typing import Union, get_origin, get_args, Any, List, Dict, Awaitable, TypeVar, Generic, Optional
 import inspect
+import asyncio
 from uuid import uuid4
 
 import param
+from loguru import logger
 
 from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive, log_connect
+from pyllments.common.loop_registry import LoopRegistry
+
+# Type variable for generic payload types
+T = TypeVar('T', bound=Payload)
 
 
 class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
-    # Name is set by the containing element
-    payload_type = param.Parameter(doc="""
-        The type of the payload - set by the unpack_payload_callback or pack_payload_callback""")
+    payload_type = param.Parameter(doc="The type of payload this port handles")
     connected_elements = param.List(doc="List of elements connected to this port")
     id = param.String(doc="Unique identifier for the port")
 
-    def __init__(self, containing_element: 'Element' = None, **params):
+    def __init__(self, containing_element=None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
         self.id = str(uuid4())
@@ -37,9 +41,8 @@ class Port(param.Parameterized):
         Checks if the output payload type is compatible with the input payload type.
         
         This method handles special cases like Any, Union, and list types.
+        It safely checks type compatibility at runtime even with parameterized generics.
         """
-        from typing import Any, Union, get_origin, get_args
-
         # If either type is Any, they're compatible
         if output_type is Any or input_type is Any:
             return True
@@ -50,15 +53,13 @@ class Port(param.Parameterized):
 
         origin_output = get_origin(output_type)
         origin_input = get_origin(input_type)
-
-        # Handle Union types
-        if origin_output is Union:
-            return any(Port.is_payload_compatible(t, input_type) for t in get_args(output_type))
-        if origin_input is Union:
-            return any(Port.is_payload_compatible(output_type, t) for t in get_args(input_type))
-
-        # Handle List types
+        
+        # If both are lists, compare element types
         if origin_output is list and origin_input is list:
+            # If we have no type args, any list matches any list
+            if not get_args(output_type) or not get_args(input_type):
+                return True
+                
             output_elem_type = get_args(output_type)[0]
             input_elem_type = get_args(input_type)[0]
             
@@ -82,358 +83,610 @@ class Port(param.Parameterized):
                 # Regular case - direct compatibility check
                 return Port.is_payload_compatible(output_elem_type, input_elem_type)
             
+        # Handle Union types (e.g., Union[A, B] or A | B in Python 3.10+)
+        if origin_output is Union:
+            return any(Port.is_payload_compatible(t, input_type) for t in get_args(output_type))
+        if origin_input is Union:
+            return any(Port.is_payload_compatible(output_type, t) for t in get_args(input_type))
+            
+        # If output is list but input isn't, maybe input accepts single items
         if origin_output is list:
             return Port.is_payload_compatible(get_args(output_type)[0], input_type)
+            
+        # If input is list but output isn't, maybe input can take single items
         if origin_input is list:
             return Port.is_payload_compatible(output_type, get_args(input_type)[0])
 
-        # For non-generic types, use subclass check
-        try:
-            return issubclass(output_type, input_type)
-        except TypeError:
-            # If types cannot be used in issubclass, consider them incompatible
-            return False
+        # If output_type is a non-generic class, check for subclass relationship
+        if origin_output is None and origin_input is None:
+            try:
+                return issubclass(output_type, input_type)
+            except TypeError:
+                # If types cannot be used in issubclass, consider them incompatible
+                return False
+                
+        # For other generic origins, check if they're compatible at the origin level
+        if origin_output is not None and origin_input is not None:
+            try:
+                return issubclass(origin_output, origin_input)
+            except TypeError:
+                return False
+                
+        # Default case - types are not compatible
+        return False
 
 
 class InputPort(Port):
-    output_ports = param.List(item_type=Port)
+    """
+    Asynchronous InputPort that receives payloads and processes them.
+    
+    The unpacking callback can be either synchronous or asynchronous.
+    Sequential processing is ensured for each input port.
+    """
     unpack_payload_callback = param.Callable(doc="""
-        The callback used to unpack the payload - has payload as its only argument.
-        Unpacks the payload and connects it to the element's model""")
-    output_ports_validation_map = param.Dict(default={}, doc="""
-        Flags whether a payload from the output port has been validated""")
-
+        Callback function that processes incoming payloads.
+        Can be a regular function or a coroutine function.""")
+    
     def __init__(self, **params):
         super().__init__(**params)
-        if self.unpack_payload_callback:
-            # Expects only one annotated argument
-            payload_type = next(iter(inspect.signature(self.unpack_payload_callback).parameters.values())).annotation
-            if payload_type is inspect._empty:
-                raise ValueError(f"unpack_payload_callback must have a return type annotation for port '{self.name}'")
+        
+        # Cache for validated output ports
+        self._validated_output_ports = set()
+        
+        # Sequential processing lock
+        self._processing_lock = asyncio.Lock()
+        
+        # Connections tracking
+        self.output_ports = []
+        
+        # Infer payload type from callback if not explicitly provided
+        if self.unpack_payload_callback and not self.payload_type:
+            self._infer_payload_type()
+    
+    def _infer_payload_type(self):
+        """Extract payload type from the callback's signature."""
+        sig = inspect.signature(self.unpack_payload_callback)
+        params = list(sig.parameters.values())
+        
+        if not params:
+            raise ValueError(f"unpack_payload_callback must have at least one parameter")
             
-            self.payload_type = payload_type
-
-    def receive(self, payload: Payload, output_port: 'OutputPort'):
+        first_param = params[0]
+        if first_param.annotation is inspect._empty:
+            raise ValueError(f"First parameter of unpack_payload_callback must have a type annotation")
+            
+        self.payload_type = first_param.annotation
+    
+    async def receive(self, payload: Payload, output_port: 'OutputPort') -> None:
+        """
+        Process a received payload, ensuring sequential processing.
+        
+        Args:
+            payload: The payload to process
+            output_port: The port that emitted the payload
+        """
         if not self.unpack_payload_callback:
             raise ValueError(f"unpack_payload_callback must be set for port '{self.name}'")
-        # Check if the incoming payload is compatible with the payload_type
-        if output_port not in self.output_ports_validation_map:
-            if not self._validate_payload(payload):
+        
+        # Validate payload type if not already validated for this output port
+        if output_port not in self._validated_output_ports:
+            valid = await self._validate_payload(payload)
+            if not valid:
                 raise TypeError(f"Incompatible payload type for port '{self.name}'. "
-                                f"Expected {self.payload_type}, got {type(payload)}")
+                               f"Expected {self.payload_type}, got {type(payload)}")
+            self._validated_output_ports.add(output_port)
+        
+        # Log reception 
         log_receive(self, payload)
-        self.unpack_payload_callback(payload)
-        self.output_ports_validation_map[output_port] = True
-
-
-    def _validate_payload(self, payload):
+        
+        # Process sequentially
+        async with self._processing_lock:
+            result = self.unpack_payload_callback(payload)
+            
+            # Handle async callbacks
+            if asyncio.iscoroutine(result):
+                await result
+    
+    async def _validate_payload(self, payload) -> bool:
         """
-        Validates if the payload is compatible with the port's payload_type.
+        Validate payload against the expected type, safely handling parameterized generics.
+        
+        Args:
+            payload: The payload to validate
+            
+        Returns:
+            bool: True if the payload is valid for this port, False otherwise
         """
         if self.payload_type is None:
-            return True  # If no type is specified, accept any payload
-
-
-        def validate_type(payload, expected_type):
-            origin = get_origin(expected_type)
-            args = get_args(expected_type)
-
-            if origin is Union:
-                return any(validate_type(payload, arg) for arg in args)
-            elif origin is list:
-                if not isinstance(payload, list):
-                    raise ValueError(f"For port '{self.name}', payload is not a list. "
-                                     f"Expected a list of {get_args(expected_type)[0]}")
-                if not payload:
-                    raise ValueError(f"For port '{self.name}', payload is an empty list. "
-                                     f"Expected a non-empty list of {get_args(expected_type)[0]}")
-                
-                # Extract the inner type from the list
-                inner_type = args[0]
-                
-                # Handle union types inside lists
-                if get_origin(inner_type) is Union:
-                    # Get all allowed types from the union
-                    allowed_types = get_args(inner_type)
-                    # Check if each item in the list is an instance of at least one allowed type
-                    if not all(any(isinstance(item, t) for t in allowed_types) for item in payload):
-                        type_names = ", ".join(t.__name__ for t in allowed_types)
-                        raise ValueError(f"For port '{self.name}', payload contains items "
-                                       f"that are not instances of any of: {type_names}")
-                else:
-                    # Original case - single type checking
-                    if not all(isinstance(item, inner_type) for item in payload):
-                        raise ValueError(f"For port '{self.name}', payload contains items "
-                                       f"that are not instances of {inner_type}")
-                
-                return True  # If we've passed all checks for list type
-            else:
-                return isinstance(payload, expected_type)
+            return True
             
-        return validate_type(payload, self.payload_type)
-
+        # Handle Any type
+        if self.payload_type is Any:
+            return True
+            
+        # Get origin and args for generic types
+        origin = get_origin(self.payload_type)
+        args = get_args(self.payload_type)
+        
+        # Handle Union types (e.g., Union[A, B] or A | B in Python 3.10+)
+        if origin is Union:
+            for arg_type in args:
+                if self._validate_single_type(payload, arg_type):
+                    return True
+            return False
+        
+        # Handle List types (e.g., list[MessagePayload])
+        if origin is list and isinstance(payload, list):
+            # Empty list is valid
+            if not payload:
+                return True
+                
+            # If no type args provided, any list is valid
+            if not args:
+                return True
+                
+            # Get element type and check each item
+            elem_type = args[0]
+            
+            # Handle union types inside lists
+            if get_origin(elem_type) is Union:
+                union_types = get_args(elem_type)
+                for item in payload:
+                    if not any(self._validate_single_type(item, t) for t in union_types):
+                        return False
+                return True
+            else:
+                # Check each item against the element type
+                for item in payload:
+                    if not self._validate_single_type(item, elem_type):
+                        return False
+                return True
+        
+        # For other generic types, check against origin
+        if origin is not None:
+            return isinstance(payload, origin)
+            
+        # For normal types, do a direct instance check
+        return isinstance(payload, self.payload_type)
+        
+    def _validate_single_type(self, value, expected_type):
+        """
+        Helper method to validate a single value against a type.
+        Handles special type checking cases.
+        """
+        # Any type is always valid
+        if expected_type is Any:
+            return True
+            
+        # Handle generic types
+        origin = get_origin(expected_type)
+        if origin is not None:
+            # For generic types like list, dict, etc.
+            if not isinstance(value, origin):
+                return False
+                
+            # Additional checks for specific generic types could be added here
+            return True
+            
+        # For normal types, do a direct instance check
+        try:
+            return isinstance(value, expected_type)
+        except TypeError:
+            # Handle cases where isinstance doesn't work with the type
+            logger.warning(f"Type check failed for {value} against {expected_type}")
+            return False
+    
+    def __gt__(self, other):
+        """Support for the '>' operator to connect ports in reverse."""
+        if isinstance(other, OutputPort):
+            other.connect(self)
+        return self
 
 
 class OutputPort(Port):
     """
-    Handles the intake of data and packing into a payload and
-    is meant to connect to an InputPort in order to emit the packed payload
+    Asynchronous OutputPort that packs and emits payloads.
+    
+    Ensures ordered delivery to input ports in the order they were connected.
+    Supports both synchronous and asynchronous packing callbacks.
     """
+    # Configuration params
     required_items = param.Dict(doc="""
         Dictionary of required items with their types and values.
         Structure: {item_name: {'value': None, 'type': type}}""")
-
+    
     emit_when_ready = param.Boolean(default=True, doc="""
-        If true, the payload will be emitted when the required items are staged""")
-
-    emit_ready = param.Boolean(default=False, doc="""
-        True when the required items have been staged and the payload can be emitted""")
-
+        If true, automatically emit when all required items are staged""")
+    
     infer_from_callback = param.Boolean(default=True, doc="""
-        If true, infers the required items from pack_payload_callback
-        and required_items is set to None""")
-
-    input_ports = param.List(item_type=InputPort, doc="""
-        The connected InputPorts which emit() will contact""")
-
+        Infer required items from pack_payload_callback signature""")
+    
     pack_payload_callback = param.Callable(default=None, doc="""
-        The callback used to create the payload. When used in conjunction with
-        infer_required_items == True, an annotated callback can replace passing in
-        a payload and required_items while enabling type-checking.
-        Kwargs, their types, and the return type are required annotations.""")
-        
-    staged_items = param.List(item_type=str, doc="""
-        The items that have been staged and are awaiting emission""")
-    
-    type_checking = param.Boolean(default=False, doc="""
-        If true, type-checking is enabled. Uses a single pass for efficiency.""")
-    
-    type_check_successful = param.Boolean(default=False, doc="""
-        Is set to True once a single type-check has been completed successfully""")
+        Callback to pack staged items into a payload.
+        Can be a regular function or a coroutine function.""")
     
     on_connect_callback = param.Callable(default=None, doc="""
-        A callback that is called when the port is connected to an input port""")
+        Callback executed when a port is connected.
+        Can be a regular function or a coroutine function.""")
     
-
-    def __init__(self, **params: param.Parameter):
+    # State tracking
+    emit_ready = param.Boolean(default=False, doc="""
+        True when all required items are staged and ready to emit""")
+    
+    def __init__(self, **params):
         super().__init__(**params)
-
-        if self.pack_payload_callback and self.infer_from_callback:
-            annotations = inspect.getfullargspec(self.pack_payload_callback).annotations
-            if not annotations:
-                raise ValueError("pack_payload_callback must have annotations if infer_from_callback is True")
-            
-            return_annotation = annotations.pop('return', None)
-            if return_annotation is None:
-                raise ValueError("pack_payload_callback must have a return type annotation")
-            
-            self.payload_type = return_annotation
-            self.required_items = {
-                name: {'value': None, 'type': type_}
-                for name, type_ in annotations.items()
-            }
-            self.type_checking = True
-        elif self.required_items and isinstance(next(iter(self.required_items)), dict):
-            self.type_checking = True
-        elif self.required_items:
-            self.required_items = {item: {'value': None, 'type': Any} for item in self.required_items}
-        else:
-            # If no required_items are specified, assume a single 'payload' item of Any type
-            self.required_items = {'payload': {'value': None, 'type': Any}}
-            self.type_checking = False
-
-    def connect(self, input_ports: Union[InputPort, tuple[InputPort], list[InputPort]]):
-        """Connects self to the provided InputPort(s) after validating payload compatibility."""
-        is_iterable = isinstance(input_ports, (tuple, list))
         
-        # Connect each InputPort in the iterable
-        for port in (input_ports if is_iterable else (input_ports,)):
-            if not isinstance(port, InputPort):
-                raise ValueError(f"Can only connect OutputPorts to InputPorts. "
-                                 f"Attempted to connect '{self.name}' "
-                                 f"to '{port.name}' ({type(port).__name__})")
+        # Queue for ordered emission processing
+        self._emission_queue = asyncio.Queue()
+        self._emission_task = None
+        
+        # Connected input ports in order of connection
+        self.input_ports = []
+        
+        # Process callback annotations
+        self._process_callback_annotations()
+        
+        # Start the emission processor
+        self._start_emission_processor()
+    
+    def _process_callback_annotations(self):
+        """Extract parameter and return types from pack_payload_callback."""
+        if not self.pack_payload_callback:
+            self.required_items = {'payload': {'value': None, 'type': Any}}
+            return
             
-            # Use the centralized compatibility helper
+        if not self.infer_from_callback:
+            if not self.required_items:
+                self.required_items = {'payload': {'value': None, 'type': Any}}
+            return
+        
+        annotations = inspect.getfullargspec(self.pack_payload_callback).annotations
+        if not annotations:
+            raise ValueError("pack_payload_callback must have annotations for inference")
+        
+        return_annotation = annotations.pop('return', None)
+        if return_annotation is None:
+            raise ValueError("pack_payload_callback must have a return type annotation")
+        
+        self.payload_type = return_annotation
+        self.required_items = {
+            name: {'value': None, 'type': type_}
+            for name, type_ in annotations.items()
+        }
+    
+    def _start_emission_processor(self):
+        """Start the queue processor task for handling emissions."""
+        try:
+            loop = LoopRegistry.get_loop()
+            self._emission_task = loop.create_task(self._process_emission_queue())
+            logger.debug(f"Started emission processor for port {self.name}")
+        except Exception as e:
+            logger.error(f"Failed to start emission processor: {e}")
+    
+    async def _process_emission_queue(self):
+        """Process emissions in order as they arrive in the queue."""
+        try:
+            while True:
+                emission = await self._emission_queue.get()
+                
+                try:
+                    payload = emission['payload']
+                    # Process each input port in the order they were connected
+                    for port in self.input_ports:
+                        await port.receive(payload, self)
+                except Exception as e:
+                    logger.error(f"Error processing emission from {self.name}: {e}")
+                finally:
+                    self._emission_queue.task_done()
+        except asyncio.CancelledError:
+            logger.debug(f"Emission processor for {self.name} cancelled")
+    
+    async def connect(self, input_ports):
+        """
+        Connect this output port to one or more input ports.
+        
+        Args:
+            input_ports: A single InputPort or a list/tuple of InputPorts
+        """
+        ports_list = input_ports if isinstance(input_ports, (list, tuple)) else [input_ports]
+        
+        for port in ports_list:
+            # Type check
+            if not isinstance(port, InputPort):
+                raise ValueError(f"Can only connect OutputPorts to InputPorts")
+            
+            # Payload compatibility check
             if not Port.is_payload_compatible(self.payload_type, port.payload_type):
                 raise ValueError(
-                    f"InputPort and OutputPort payload types are not compatible:\n"
-                    f"OutputPort '{self.name}' in element '{self.containing_element.__class__.__name__}' "
-                    f"with payload type {self.payload_type}\n"
-                    f"InputPort '{port.name}' in element '{port.containing_element.__class__.__name__}' "
-                    f"with payload type {port.payload_type}"
+                    f"Incompatible payload types:\n"
+                    f"OutputPort '{self.name}' with type {self.payload_type}\n"
+                    f"InputPort '{port.name}' with type {port.payload_type}"
                 )
-                
+            
+            # Add connections
             self.input_ports.append(port)
+            port.output_ports.append(self)
+            
+            # Update connection tracking
             self.connected_elements.append(port.containing_element)
             port.connected_elements.append(self.containing_element)
-            port.output_ports.append(self)
-            port.output_ports_validation_map[self] = False
+            
+            # Log the connection
             log_connect(self, port)
+            
+            # Execute connect callback if provided
             if self.on_connect_callback:
-                self.on_connect_callback(self)
-        if not is_iterable:
-            return input_ports
-
-    def stage(self, bypass_type_check: bool = False, **kwargs):
-        """Stages the values within the port before packing"""
+                result = self.on_connect_callback(self)
+                if asyncio.iscoroutine(result):
+                    await result
+        
+        # For chaining support
+        return input_ports if isinstance(input_ports, (list, tuple)) else input_ports
+    
+    async def stage(self, **kwargs):
+        """
+        Stage values for later emission.
+        
+        Args:
+            **kwargs: Key-value pairs to stage, matching required_items
+        """
         for name, value in kwargs.items():
+            # Check if the item is required
             if name not in self.required_items:
                 raise ValueError(f"'{name}' is not a required item for port '{self.name}'")
-            if self.type_checking and not bypass_type_check:
-                expected_type = self.required_items[name]['type']
-                if expected_type is not Any:
-                    if get_origin(expected_type) is Union:
-                        if not any(isinstance(value, t) for t in get_args(expected_type)):
-                            raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
-                                             f"is not an instance of any type in {expected_type}")
-                    elif get_origin(expected_type) is list:
-                        if not isinstance(value, list):
-                            raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
-                                             f"is not a list")
-                        if not value:
-                            raise ValueError(f"For port '{self.name}', item '{name}' is an empty list. "
-                                             f"Expected a non-empty list of {get_args(expected_type)[0]}")
-                        
-                        # Get the inner type to check list contents
-                        inner_type = get_args(expected_type)[0]
-                        
-                        # Handle union types inside lists
-                        if get_origin(inner_type) is Union:
-                            # Get all allowed types from the union
-                            allowed_types = get_args(inner_type)
-                            # Check if each item in the list is an instance of at least one allowed type
-                            if not all(any(isinstance(item, t) for t in allowed_types) for item in value):
-                                type_names = ", ".join(t.__name__ for t in allowed_types)
-                                raise ValueError(f"For port '{self.name}', item '{name}' contains items "
-                                               f"that are not instances of any of: {type_names}")
-                        else:
-                            # Original case - single type checking
-                            if not all(isinstance(item, inner_type) for item in value):
-                                raise ValueError(f"For port '{self.name}', item '{name}' contains items "
-                                               f"that are not instances of {inner_type}")
-                    elif not isinstance(value, expected_type):
-                        raise ValueError(f"For port '{self.name}', item '{name}' with value '{value}' "
-                                         f"is not an instance of {expected_type}")
+            
+            # Type checking
+            expected_type = self.required_items[name]['type']
+            if expected_type is not Any:
+                # Check if value matches expected type
+                if not self._check_type(value, expected_type):
+                    raise TypeError(f"Value for '{name}' has incorrect type. "
+                                  f"Expected {expected_type}, got {type(value)}")
+            
+            # Store the value
             self.required_items[name]['value'] = value
             
-            # Log each individual staged item
+            # Log the staging
             log_staging(self, name, value)
-
-        if self._emit_ready_check():
+        
+        # Check if all required items are staged
+        if self._is_ready_to_emit():
             self.emit_ready = True
+            
+            # Auto-emit if configured
+            if self.emit_when_ready:
+                await self.emit()
+    
+    def _check_type(self, value, expected_type):
+        """
+        Check if a value matches the expected type, safely handling parameterized generics.
         
-        if self.emit_when_ready and self.emit_ready:
-            self.emit()
-
-    def emit(self):
-        """Packs the payload and emits it to all registered observers"""
+        This method performs runtime type checking, respecting Python's type annotation
+        system even with parameterized generics like list[MessagePayload].
+        
+        Args:
+            value: The value to check
+            expected_type: The expected type annotation
+            
+        Returns:
+            bool: True if the value matches the expected type, False otherwise
+        """
+        # Handle Any type - anything goes
+        if expected_type is Any:
+            return True
+            
+        origin = get_origin(expected_type)
+        args = get_args(expected_type)
+        
+        # Handle Union types (e.g., Union[A, B] or A | B in Python 3.10+)
+        if origin is Union:
+            return any(self._check_type(value, arg_type) for arg_type in args)
+        
+        # Handle List types (e.g., list[MessagePayload])
+        if origin is list:
+            # First check if the value is a list
+            if not isinstance(value, list):
+                return False
+            
+            # Empty list is valid
+            if not value:
+                return True
+            
+            # If we have list element type specs, check each element
+            if args:
+                elem_type = args[0]
+                
+                # Handle union types inside lists (e.g., list[Union[A, B]])
+                if get_origin(elem_type) is Union:
+                    union_types = get_args(elem_type)
+                    # Each item must match at least one of the union types
+                    for item in value:
+                        if not any(self._check_item_type(item, ut) for ut in union_types):
+                            return False
+                    return True
+                else:
+                    # Regular list[Type] - check each item against Type
+                    return all(self._check_item_type(item, elem_type) for item in value)
+            
+            # If list has no type args, any list is valid
+            return True
+            
+        # For other generic types, check against the origin type
+        if origin is not None:
+            return isinstance(value, origin)
+            
+        # For non-generic types, use regular isinstance
+        return isinstance(value, expected_type)
+    
+    def _check_item_type(self, item, expected_type):
+        """
+        Helper method to check an individual item's type, handling special cases.
+        
+        This separates the item-level type checking logic for reusability.
+        """
+        # Special case for Any
+        if expected_type is Any:
+            return True
+            
+        # Handle runtime generics
+        origin = get_origin(expected_type)
+        if origin is not None:
+            # For generic types, first check the origin
+            if not isinstance(item, origin):
+                return False
+                
+            # Then handle specific generic patterns as needed
+            # (Add specific cases here if needed)
+            return True
+            
+        # For non-generic types, use regular isinstance
+        try:
+            return isinstance(item, expected_type)
+        except TypeError:
+            # If isinstance fails (e.g., with a TypeVar), conservatively return False
+            logger.warning(f"Type check failed for {item} against {expected_type}")
+            return False
+            
+    def _is_ready_to_emit(self):
+        """Check if all required items have been staged."""
+        return all(item['value'] is not None for item in self.required_items.values())
+    
+    async def emit(self):
+        """
+        Pack the staged values into a payload and emit it to all connected input ports.
+        """
         if not self.emit_ready:
-            raise ValueError(f"Emit failed for port '{self.name}' in element '{type(self.containing_element).__name__}': "
-                             f"Not all required items have been staged. "
-                             f"Required items: {list(self.required_items.keys())}. "
-                             f"Staged items: {[name for name, item in self.required_items.items() if item['value'] is not None]}. "
-                             "Please ensure all required items are staged before emitting.")
-        else:
-            packed_payload = self.pack_payload()        
-        # Log the element name, port name, and type of payload being emitted
-        log_emit(self, packed_payload)
-        for port in self.input_ports:
-            port.receive(packed_payload, self)
+            missing_items = [name for name, item in self.required_items.items() 
+                           if item['value'] is None]
+            raise ValueError(f"Cannot emit from {self.name}: missing required items {missing_items}")
         
-        # Reset emit_ready and staged_items after emission
+        # Pack the payload
+        payload = await self._pack_payload()
+        
+        # Log the emission
+        log_emit(self, payload)
+        
+        # Queue the emission for ordered processing
+        await self._emission_queue.put({
+            'payload': payload,
+            'timestamp': asyncio.get_event_loop().time()
+        })
+        
+        # Reset state
         self.emit_ready = False
-        self.staged_items = []
-        
-        # Reset the values in required_items
         for item in self.required_items.values():
             item['value'] = None
         
-        # For returning the payload to the caller 
-        return packed_payload
+        return payload
     
-    def stage_emit(self, bypass_type_check: bool = False, **kwargs):
-        """Stages the payload and emits it - All required params need be present"""
-        self.stage(bypass_type_check=bypass_type_check, **kwargs)
-        if not self.emit_when_ready: # avoid redundant emit
-            self.emit()
-
-    def pack_payload(self):
+    async def stage_emit(self, **kwargs):
         """
-        Called to pack the payload - 
-        Only after all of the required items have been staged
+        Stage values and immediately emit a payload.
+        
+        This is a convenience method that combines stage() and emit().
         """
-        if self.pack_payload_callback:
-            staged_dict = {
-                name: item['value'] 
-                for name, item in self.required_items.items()
-                }
-            return self.pack_payload_callback(**staged_dict)
-        else:
-            raise ValueError(f"pack_payload_callback must be set for port '{self.name}'")
-
+        await self.stage(**kwargs)
+        
+        # Only emit if not already emitted by stage() due to emit_when_ready
+        if not self.emit_when_ready and self.emit_ready:
+            return await self.emit()
+        
+        return True
+    
+    async def _pack_payload(self):
+        """Pack staged items into a payload using the callback."""
+        if not self.pack_payload_callback:
+            raise ValueError(f"pack_payload_callback not set for port '{self.name}'")
+        
+        # Build arguments dict from staged items
+        args = {name: item['value'] for name, item in self.required_items.items()}
+        
+        # Call the callback
+        result = self.pack_payload_callback(**args)
+        
+        # Handle async callbacks
+        if asyncio.iscoroutine(result):
+            return await result
+        
+        return result
+    
     def __gt__(self, other):
-        """Implements self.connect(other) through el1.some_output > el2.some_input"""
-        self.connect(other)
+        """Support for the '>' operator to connect ports."""
+        # Create a task for the connection - can't use await in operator overloads
+        asyncio.create_task(self.connect(other))
         return other
-
-    def _emit_ready_check(self):
-        return all(item['value'] is not None for item in self.required_items.values())
-
-    @param.depends('emit_ready', watch=True)
-    def _emit_ready_watcher(self):
-        """
-        When the emit is ready, we can assume that the type-checks
-        have been successful, and so, we set type_check_successful to True
-        """
-        if self._emit_ready_check():
-            self.type_check_successful = True
 
 
 class Ports(param.Parameterized):
-    """Keeps track of InputPorts and OutputPorts and handles their creation"""
-    input = param.Dict(default={}, doc="Dictionary to store input ports")
-    output = param.Dict(default={}, doc="Dictionary to store output ports")
-
+    """
+    Manages input and output ports for an element.
+    
+    Provides easy access to ports with dot notation:
+        element.ports.input_name
+        element.ports.output_name
+    """
+    input = param.Dict(default={}, doc="Dictionary of input ports")
+    output = param.Dict(default={}, doc="Dictionary of output ports")
+    
     def __init__(self, containing_element=None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
-
-
-    def add_input(self, name: str, unpack_payload_callback, **kwargs):
+    
+    def add_input(self, name: str, unpack_payload_callback, payload_type=None, **kwargs):
+        """
+        Add an input port.
+        
+        Args:
+            name: Name of the port
+            unpack_payload_callback: Function to process incoming payloads
+            payload_type: Expected payload type
+            **kwargs: Additional parameters for the port
+        """
         input_port = InputPort(
             name=name,
             unpack_payload_callback=unpack_payload_callback,
+            payload_type=payload_type,
             containing_element=self.containing_element,
-            **kwargs)
+            **kwargs
+        )
         self.input[name] = input_port
         return input_port
     
-    def add_output(self, name: str, pack_payload_callback, on_connect_callback=None, **kwargs):
+    def add_output(self, name: str, pack_payload_callback, payload_type=None, 
+                 on_connect_callback=None, **kwargs):
+        """
+        Add an output port.
+        
+        Args:
+            name: Name of the port
+            pack_payload_callback: Function to pack payloads
+            payload_type: Type of payload produced
+            on_connect_callback: Called when port is connected
+            **kwargs: Additional parameters for the port
+        """
         output_port = OutputPort(
             name=name,
             pack_payload_callback=pack_payload_callback,
-            containing_element=self.containing_element,
+            payload_type=payload_type,
             on_connect_callback=on_connect_callback,
-            **kwargs)
+            containing_element=self.containing_element,
+            **kwargs
+        )
         self.output[name] = output_port
         return output_port
-
+    
     def __getattr__(self, name: str):
         """Enable dot notation access to ports."""
-        # First check if it's in input ports
         if name in self.input:
             return self.input[name]
-        # Then check output ports
-        elif name in self.output:
+        if name in self.output:
             return self.output[name]
-        # If not found in either, raise a descriptive error
+        
         available_ports = list(self.input.keys()) + list(self.output.keys())
-        raise AttributeError(
-            f"Port '{name}' not found. Available ports: {available_ports}"
-        )
-
+        raise AttributeError(f"Port '{name}' not found. Available ports: {available_ports}")
+    
     def __setattr__(self, name: str, value):
-        """Handle attribute setting while preserving dot notation access for ports."""
+        """Handle attribute setting with port awareness."""
         if isinstance(value, InputPort):
             self.input[name] = value
         elif isinstance(value, OutputPort):
