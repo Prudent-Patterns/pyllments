@@ -138,7 +138,7 @@ class ChatInterfaceElement(Element):
                 self.chatfeed_view.append(tool_view)
 
         # This watcher should be called before the payload starts streaming.
-        self.model.param.watch(_update_chatfeed, 'new_message', precedence=0)
+        self.watch_once(_update_chatfeed, 'new_message', precedence=0)
         return self.chatfeed_view
 
     @Component.view

@@ -82,11 +82,11 @@ chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_i
 llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 
-interface_view = chat_interface_el.create_interface_view(width=config.width, height=config.height) # type: ignore
-model_selector_view = llm_chat_el.create_model_selector_view(models=config.custom_models, model=config.default_model) # type: ignore
-
 @flow
 def my_flow():
+    interface_view = chat_interface_el.create_interface_view(width=config.width, height=config.height) # type: ignore
+    model_selector_view = llm_chat_el.create_model_selector_view(models=config.custom_models, model=config.default_model) # type: ignore
+
     main_view = pn.Column(
         model_selector_view,
         pn.Spacer(height=10),

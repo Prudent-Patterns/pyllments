@@ -17,6 +17,8 @@ class Component(param.Parameterized):
     id = param.String()
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
+    _watchers = param.Dict(default={}, doc="""
+        Registry for watchers to prevent duplicates.""")
 
     def __init__(self, **params):
         self.id = str(uuid4())
@@ -157,21 +159,13 @@ class Component(param.Parameterized):
                 if param.default is not inspect.Parameter.empty
             }
             merged_kwargs = {**defaults, **kwargs}
-            
-            # Get the view attribute name from the function name
-            view_attr_name = func.__name__.replace('create_', '') + '_view'
-            # The expected class is checked due to Row and Column layouts using __len__ in if statements
-            if hasattr(self, view_attr_name):
-                existing_view = getattr(self, view_attr_name)
-                expected_class = self.param[view_attr_name].class_
-                if isinstance(existing_view, expected_class):
-                    warnings.warn(f'{view_attr_name} already exists. Returning existing view.')
-                    return existing_view
 
-            # If the view doesn't exist, proceed with CSS loading and view creation
             view_name = func.__name__.replace('create_', '')
+            
+            # Proceed with creation...
+            logger.debug(f"Creating new view for {view_name}")
 
-            # Initialize cache for this view if needed
+            # Initialize CSS cache for this view if needed
             if view_name not in self.css_cache:
                 self.css_cache[view_name] = {}
 
@@ -275,3 +269,21 @@ class Component(param.Parameterized):
             return view
 
         return wrapper
+    
+    def watch_once(self, callback, parameter_name, parameterized_class=None, **kwargs):
+        """
+        Set up a watcher only once for a given method and parameter.
+        Automatically generates a unique key based on the *calling method*.
+        By default, the watcher is set up for the model, but can be augmented
+        by passing a parameterized class.
+        """
+        if parameterized_class is None:
+            parameterized_class = self.model
+        # Get the name of the calling method (e.g., 'create_chatfeed_view')
+        caller = inspect.currentframe().f_back.f_code.co_name
+        # Create a unique key combining the method name and parameter
+        key = f"{caller}_{parameter_name}"
+        # Only set up the watcher if it doesn’t already exist
+        if key not in self._watchers:
+            watcher = parameterized_class.param.watch(callback, parameter_name, **kwargs)
+            self._watchers[key] = watcher
