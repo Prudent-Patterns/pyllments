@@ -28,12 +28,13 @@ class HistoryHandlerElement(Element):
     
     Ports:
     - input:
-        - message_emit_input: MessagePayload - Human and AI messages handled - triggers output of the current context
+        - message_emit_input: MessagePayload - Human and AI messages handled - triggers output of the message context
         - messages_input: MessagePayload | list[MessagePayload] - Messages to add to context
-        - tool_response_emit_input: ToolsResponsePayload - Tool responses that trigger output of current context
+        - tool_response_emit_input: ToolsResponsePayload - Tool responses that trigger output of tool response context
         - tool_responses_input: ToolsResponsePayload | list[ToolsResponsePayload] - Tool responses to add to context
     - output:
-        - history_output: list[Union[MessagePayload, ToolsResponsePayload]] - Current context including both messages and tool responses
+        - message_history_output: List[MessagePayload] - Current message context
+        - tool_response_history_output: List[ToolsResponsePayload] - Current tool response context
     """
     context_view = param.ClassSelector(class_=pn.Column)
 
@@ -49,8 +50,9 @@ class HistoryHandlerElement(Element):
         self._tool_response_emit_input_setup()
         self._tool_responses_input_setup()
         
-        # Output port
-        self._history_output_setup()
+        # Output ports
+        self._message_history_output_setup()
+        self._tool_response_history_output_setup()
 
     def _message_emit_input_setup(self):
         async def unpack(payload: MessagePayload):
@@ -76,9 +78,10 @@ class HistoryHandlerElement(Element):
             else:
                 self.model.load_entries([payload])
             
-            # Only stage_emit if context isn't an empty list
-            if self.model.context:
-                await self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
+            # Only stage_emit if message context isn't an empty list
+            message_context = self.model.get_context_message_payloads()
+            if message_context:
+                await self.ports.output['message_history_output'].stage_emit(context=message_context)
 
         self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
@@ -99,12 +102,13 @@ class HistoryHandlerElement(Element):
                 def called_callback(event):
                     if payload.model.tool_responses:  # Only process if there are responses
                         self.model.load_entries([payload])
-                        # Only stage_emit if context isn't an empty list
-                        if self.model.context:
+                        tool_context = self.model.get_context_tool_response_payloads()
+                        # Only stage_emit if tool response context isn't an empty list
+                        if tool_context:
                             # Create async task since we can't await directly in callback
                             asyncio.create_task(
-                                self.ports.output['history_output'].stage_emit(
-                                    context=self.model.get_context_messages()
+                                self.ports.output['tool_response_history_output'].stage_emit(
+                                    context=tool_context
                                 )
                             )
                         if not tool_called.done():
@@ -120,9 +124,10 @@ class HistoryHandlerElement(Element):
                     pass
             elif payload.model.tool_responses:  # If already called and has responses, process immediately
                 self.model.load_entries([payload])
-                # Only stage_emit if context isn't an empty list
-                if self.model.context:
-                    await self.ports.output['history_output'].stage_emit(context=self.model.get_context_messages())
+                tool_context = self.model.get_context_tool_response_payloads()
+                # Only stage_emit if tool response context isn't an empty list
+                if tool_context:
+                    await self.ports.output['tool_response_history_output'].stage_emit(context=tool_context)
 
         self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
 
@@ -152,7 +157,7 @@ class HistoryHandlerElement(Element):
                             self.model.load_entries([payload])
                             # We can't await directly in a callback, so use create_task
                             asyncio.create_task(
-                                self._handle_tool_response_update()
+                                self._handle_tool_response_update() # This will emit tool response history
                             )
                     return called_callback
 
@@ -162,20 +167,32 @@ class HistoryHandlerElement(Element):
     
     async def _handle_tool_response_update(self):
         """Helper method to handle tool response updates asynchronously"""
-        if self.model.context:
-            await self.ports.output['history_output'].stage_emit(
-                context=self.model.get_context_messages()
+        tool_context = self.model.get_context_tool_response_payloads()
+        if tool_context:
+            await self.ports.output['tool_response_history_output'].stage_emit(
+                context=tool_context
             )
 
-    def _history_output_setup(self):
-        async def pack(context: List[Union[MessagePayload, ToolsResponsePayload]]) -> List[Union[MessagePayload, ToolsResponsePayload]]:
-            """Pack the context messages into a list"""
+    def _message_history_output_setup(self):
+        async def pack(context: List[MessagePayload]) -> List[MessagePayload]:
+            """Pack the message context into a list"""
             return context
         
         self.ports.add_output(
-            name='history_output',
+            name='message_history_output',
             pack_payload_callback=pack,
-            payload_type=List[Union[MessagePayload, ToolsResponsePayload]]
+            payload_type=List[MessagePayload]
+        )
+
+    def _tool_response_history_output_setup(self):
+        async def pack(context: List[ToolsResponsePayload]) -> List[ToolsResponsePayload]:
+            """Pack the tool response context into a list"""
+            return context
+        
+        self.ports.add_output(
+            name='tool_response_history_output',
+            pack_payload_callback=pack,
+            payload_type=List[ToolsResponsePayload]
         )
 
     # TODO: Add a view for tool responses

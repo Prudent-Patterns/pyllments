@@ -2,6 +2,8 @@ from typing import Union, get_origin, get_args, Any, List, Dict, Awaitable, Type
 import inspect
 import asyncio
 from uuid import uuid4
+import signal
+import weakref
 
 import param
 from loguru import logger
@@ -9,6 +11,7 @@ from loguru import logger
 from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive, log_connect
 from pyllments.common.loop_registry import LoopRegistry
+from pyllments.ports.lifecycle_manager import manager as lifecycle_manager
 
 # Type variable for generic payload types
 T = TypeVar('T', bound=Payload)
@@ -38,82 +41,94 @@ class Port(param.Parameterized):
     @staticmethod
     def is_payload_compatible(output_type: type, input_type: type) -> bool:
         """
-        Checks if the output payload type is compatible with the input payload type.
-        
-        This method handles special cases like Any, Union, and list types.
-        It safely checks type compatibility at runtime even with parameterized generics.
+        Checks if the output payload type can be safely received by the input payload type.
+        Follows covariance rules for generics like List and Union. Type compatibility
+        means that an instance of `output_type` can be safely passed to something
+        expecting `input_type`.
+
+        Args:
+            output_type: The type annotation of the payload emitted by the output port.
+            input_type: The type annotation of the payload expected by the input port.
+
+        Returns:
+            bool: True if the types are compatible for connection, False otherwise.
         """
-        # If either type is Any, they're compatible
+        # Handle Any type - always compatible
         if output_type is Any or input_type is Any:
             return True
 
-        # If types are identical, they're compatible
+        # Identical types are compatible
         if output_type == input_type:
             return True
 
         origin_output = get_origin(output_type)
         origin_input = get_origin(input_type)
-        
-        # If both are lists, compare element types
-        if origin_output is list and origin_input is list:
-            # If we have no type args, any list matches any list
-            if not get_args(output_type) or not get_args(input_type):
-                return True
-                
-            output_elem_type = get_args(output_type)[0]
-            input_elem_type = get_args(input_type)[0]
-            
-            # Handle union types inside lists
-            if get_origin(output_elem_type) is Union and get_origin(input_elem_type) is Union:
-                # If both are unions, check if any output type is compatible with any input type
-                output_union_types = get_args(output_elem_type)
-                input_union_types = get_args(input_elem_type)
-                return any(any(Port.is_payload_compatible(ot, it) 
-                              for it in input_union_types)
-                          for ot in output_union_types)
-            elif get_origin(output_elem_type) is Union:
-                # If only output is a union, check if any of its types is compatible with input
-                return any(Port.is_payload_compatible(t, input_elem_type) 
-                          for t in get_args(output_elem_type))
-            elif get_origin(input_elem_type) is Union:
-                # If only input is a union, check if output is compatible with any of its types
-                return any(Port.is_payload_compatible(output_elem_type, t) 
-                          for t in get_args(input_elem_type))
-            else:
-                # Regular case - direct compatibility check
-                return Port.is_payload_compatible(output_elem_type, input_elem_type)
-            
-        # Handle Union types (e.g., Union[A, B] or A | B in Python 3.10+)
-        if origin_output is Union:
-            return any(Port.is_payload_compatible(t, input_type) for t in get_args(output_type))
-        if origin_input is Union:
-            return any(Port.is_payload_compatible(output_type, t) for t in get_args(input_type))
-            
-        # If output is list but input isn't, maybe input accepts single items
-        if origin_output is list:
-            return Port.is_payload_compatible(get_args(output_type)[0], input_type)
-            
-        # If input is list but output isn't, maybe input can take single items
-        if origin_input is list:
-            return Port.is_payload_compatible(output_type, get_args(input_type)[0])
+        args_output = get_args(output_type)
+        args_input = get_args(input_type)
 
-        # If output_type is a non-generic class, check for subclass relationship
-        if origin_output is None and origin_input is None:
-            try:
-                return issubclass(output_type, input_type)
-            except TypeError:
-                # If types cannot be used in issubclass, consider them incompatible
-                return False
-                
-        # For other generic origins, check if they're compatible at the origin level
-        if origin_output is not None and origin_input is not None:
-            try:
-                return issubclass(origin_output, origin_input)
-            except TypeError:
-                return False
-                
-        # Default case - types are not compatible
-        return False
+        # Case 1: Input is Union
+        if origin_input is Union:
+            # Output must be compatible with *at least one* type in the Input Union.
+            # This handles T -> Union[T, U].
+            if origin_output is Union:
+                # If output is also Union, *all* output types must be compatible
+                # with *at least one* input type. This handles Union[T, U] -> Union[T, U, V].
+                return all(any(Port.is_payload_compatible(ot, it) for it in args_input)
+                           for ot in args_output)
+            else:
+                # If output is not Union, it must be compatible with *at least one* input type.
+                return any(Port.is_payload_compatible(output_type, it) for it in args_input)
+
+        # Case 2: Output is Union (and Input is not Union)
+        elif origin_output is Union:
+            # *All* types in the Output Union must be compatible with the single Input type.
+            # This handles Union[T, U] -> T (only if U is also compatible with T).
+            return all(Port.is_payload_compatible(ot, input_type) for ot in args_output)
+
+        # Case 3: Both are Lists
+        elif origin_output is list and origin_input is list:
+            # List compatibility is covariant: List[Sub] is compatible with List[Super].
+            # Compare the element types recursively.
+            output_elem_type = args_output[0] if args_output else Any
+            input_elem_type = args_input[0] if args_input else Any
+            return Port.is_payload_compatible(output_elem_type, input_elem_type)
+
+        # Case 4: One is List, the other is not (and not Any/Union handled above)
+        elif (origin_output is list) != (origin_input is list):
+            # Direct mismatch between List and non-List types is incompatible.
+            return False
+
+        # Case 5: Neither is List nor Union - check non-generic types and other generics
+        else:
+            # Check for simple non-generic subclass relationship (Output can be subclass of Input)
+            if origin_output is None and origin_input is None:
+                try:
+                    # Must handle non-type elements like TypeVar
+                    if isinstance(output_type, type) and isinstance(input_type, type):
+                         return issubclass(output_type, input_type)
+                    else:
+                         return False # Cannot compare non-type elements directly
+                except TypeError:
+                    # issubclass fails if types are not classes (e.g., primitive types if used)
+                    return False # Cannot compare types
+
+            # Check for other generic types (e.g., dict, tuple) - check origin compatibility first
+            # This assumes covariance for other generics, which might not always be true.
+            # A more robust implementation might need specific handling for different generics.
+            elif origin_output is not None and origin_input is not None:
+                 try:
+                     # Origin check: Output origin must be subclass of Input origin
+                     if not issubclass(origin_output, origin_input):
+                         return False
+                     # TODO: Add recursive check for type arguments compatibility if necessary for other generics
+                     # For now, just matching origins if Input is superclass of Output origin
+                     return True
+                 except TypeError:
+                     return False # Cannot compare origins
+
+            # All other cases (e.g., generic vs non-generic that isn't List/Union) are incompatible
+            else:
+                 return False
 
 
 class InputPort(Port):
@@ -328,6 +343,9 @@ class OutputPort(Port):
         
         # Start the emission processor
         self._start_emission_processor()
+        
+        # Register with the manager
+        lifecycle_manager.register_port(self)
     
     def _process_callback_annotations(self):
         """Extract parameter and return types from pack_payload_callback."""
@@ -615,6 +633,47 @@ class OutputPort(Port):
         # Create a task for the connection - can't use await in operator overloads
         asyncio.create_task(self.connect(other))
         return other
+
+    async def close(self):
+        """Perform graceful shutdown of the port, ensuring background task stops."""
+        logger.debug(f"Attempting to close port {self.name} ({self.id}).")
+
+        # Cancel the emission processor task and wait for it if possible
+        if self._emission_task and not self._emission_task.done():
+            self._emission_task.cancel()
+            try:
+                # Get the loop the task runs on and the current loop
+                task_loop = self._emission_task.get_loop()
+                current_loop = asyncio.get_running_loop()
+                
+                # Only await if the task is on the currently running loop and that loop isn't closed
+                if task_loop is current_loop and not current_loop.is_closed():
+                    logger.debug(f"Waiting for emission task cancellation for port {self.name} on current loop...")
+                    # Wait for the task to acknowledge cancellation
+                    await asyncio.gather(self._emission_task, return_exceptions=True)
+                    logger.debug(f"Emission task for port {self.name} finished cancellation.")
+                else:
+                    logger.warning(f"Emission task for port {self.name} is on a different or closed loop. Cannot confirm cancellation (expected during atexit). Task Loop ID: {id(task_loop)}, Current Loop ID: {id(current_loop)}")
+                    
+            except asyncio.CancelledError:
+                # This is expected when the task is successfully cancelled on the current loop
+                logger.debug(f"Emission task for port {self.name} confirmed cancelled.")
+            except Exception as e:
+                # Log any other unexpected errors during cancellation
+                logger.error(f"Error processing emission task cancellation for port {self.name}: {e}")
+        
+        self._emission_task = None # Clear the reference
+
+        # Clear connections (safe to do after task is stopped)
+        self.input_ports.clear()
+        self.connected_elements.clear()
+        
+        # Reset state
+        self.emit_ready = False
+        for item in self.required_items.values():
+            item['value'] = None
+        
+        logger.info(f"Port {self.name} ({self.id}) closed successfully.")
 
 
 class Ports(param.Parameterized):

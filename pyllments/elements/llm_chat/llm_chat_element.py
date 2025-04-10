@@ -61,7 +61,7 @@ class LLMChatElement(Element):
         self.ports.add_input(
             name='messages_emit_input',
             unpack_payload_callback=unpack,
-            payload_type=List[Union[MessagePayload, ToolsResponsePayload]]
+            payload_type=Union[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]]
         )
 
     @Component.view

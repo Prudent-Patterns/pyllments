@@ -18,6 +18,9 @@ from pyllments.logging import setup_logging, logger
 from pyllments.common.resource_loader import get_asset
 from pyllments.common.app_registry import AppRegistry
 from pyllments.common.loop_registry import LoopRegistry
+# Import lifecycle manager
+from pyllments.ports.lifecycle_manager import manager as lifecycle_manager
+
 ASSETS_PATH = 'assets'
 ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'
 FILE_ICONS_MOUNT_PATH = f'{ASSETS_MOUNT_PATH}/file_icons/tabler-icons-outline.min.css'
@@ -270,6 +273,7 @@ def serve(
                     logger.info(f"Found @flow wrapped function in script")
                 name, obj = func_list[0]
 
+                # Get the FastAPI app (which now includes lifespan)
                 app = AppRegistry.get_app()
                 try:
                     asset_path = resources.files('pyllments').joinpath(ASSETS_PATH)
@@ -286,6 +290,21 @@ def serve(
                     tmpl.add_panel('app_main', obj())
                     return tmpl
                 
+                # ---- Register Panel unload hook ----
+                try:
+                    async def panel_shutdown_hook():
+                        logger.info("Panel unload hook triggered. Cleaning up resources...")
+                        await lifecycle_manager.shutdown()
+                        logger.info("Panel unload hook: Resource cleanup complete.")
+                        
+                    # Only register if we are actually serving a GUI via Panel
+                    pn.state.onload(lambda: logger.info("Pyllments Lifecycle Manager active with Panel."))
+                    pn.state.on_unload(panel_shutdown_hook)
+                    logger.info("Registered Panel unload hook for resource cleanup.")
+                except Exception as e:
+                    logger.error(f"Failed to register Panel unload hook: {e}")
+                # ---- End Panel hook registration ----
+                 
         # Return whether an app is registered
         return AppRegistry._app is not None
 

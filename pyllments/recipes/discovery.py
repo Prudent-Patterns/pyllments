@@ -176,10 +176,16 @@ def discover_recipes() -> Dict[str, Dict]:
     Discover all available recipes and return their metadata.
     """
     recipes = {}
-    recipes_dir = Path(__file__).parent
+    # Define the base directory where discovery.py resides
+    recipes_base_dir = Path(__file__).parent
+    # Define the subdirectory where actual recipes are stored
+    available_recipes_dir = recipes_base_dir / 'available_recipes'
 
-    for recipe_path in recipes_dir.glob('**/[!_]*.py'):
+    # Search for Python files within the 'available_recipes' subdirectory, excluding __init__.py etc.
+    for recipe_path in available_recipes_dir.glob('**/[!_]*.py'):
+        # Ensure we are not picking up discovery.py or runner.py if they were somehow copied there
         if recipe_path.stem not in ['discovery', 'runner']:
             if (metadata := get_recipe_metadata(recipe_path)):
+                # Use the stem of the file as the recipe name key
                 recipes[recipe_path.stem] = metadata
     return recipes

@@ -30,101 +30,27 @@ import typer
 from pyllments.logging import logger
 from pyllments.recipes.runner import run_recipe
 from .state import recipe_app
+from pyllments.recipes.discovery import get_recipe_metadata
 
 
-@dataclass
-class RecipeMetadata:
-    """Metadata about a recipe extracted from its source code."""
-    name: str
-    path: Path
-    docstring: Optional[str] = None
-    config_class: Optional[Dict] = None
-
-
-def extract_config_metadata(node: ast.ClassDef) -> Dict:
-    """Extract metadata from a Config class definition.
-    
-    Parameters
-    ----------
-    node : ast.ClassDef
-        The AST node for the Config class
-        
-    Returns
-    -------
-    Dict
-        Dictionary containing the config class metadata
-    """
-    result = {
-        'docstring': ast.get_docstring(node),
-        'fields': {}
-    }
-    
-    for item in node.body:
-        if isinstance(item, ast.AnnAssign):  # This is a type-annotated field
-            field_name = item.target.id
-            
-            # We only need to extract the help text and constraints from metadata
-            if isinstance(item.value, ast.Call) and isinstance(item.value.func, ast.Name) and item.value.func.id == 'field':
-                field_data = {}
-                for kw in item.value.keywords:
-                    if kw.arg == 'metadata':
-                        if isinstance(kw.value, ast.Dict):
-                            metadata = {}
-                            for k, v in zip(kw.value.keys, kw.value.values):
-                                if isinstance(k, ast.Str):
-                                    # Only extract help text and validation constraints
-                                    if k.value in ('help', 'min', 'max', 'pattern'):
-                                        metadata[k.value] = v.value
-                            if metadata:
-                                field_data['metadata'] = metadata
-                result['fields'][field_name] = field_data
-    
-    return result
-
-
-def get_recipe_metadata(recipe_path: Path) -> Optional[RecipeMetadata]:
-    """Extract metadata from a recipe file without importing it.
-    
-    Parameters
-    ----------
-    recipe_path : Path
-        Path to the recipe file
-        
-    Returns
-    -------
-    Optional[RecipeMetadata]
-        Metadata about the recipe if successfully parsed
-    """
-    try:
-        with open(recipe_path, 'r', encoding='utf-8') as f:
-            tree = ast.parse(f.read())
-        
-        metadata = RecipeMetadata(
-            name=recipe_path.stem,
-            path=recipe_path,
-            docstring=ast.get_docstring(tree)
-        )
-        
-        # Look for Config class
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef) and node.name == 'Config':
-                # Check if it's a dataclass
-                for decorator in node.decorator_list:
-                    if isinstance(decorator, ast.Name) and decorator.id == 'dataclass':
-                        metadata.config_class = extract_config_metadata(node)
-                        break
-        
-        return metadata
-    except Exception as e:
-        logger.error(f"Failed to parse recipe {recipe_path}: {e}")
-        return None
-
-
-def create_recipe_command(metadata: RecipeMetadata) -> None:
+def create_recipe_command(recipe_name: str, metadata: Dict) -> None:
     """Create a Typer command for a recipe using its metadata."""
-    help_text = metadata.docstring or f"Run the {metadata.name} recipe"
+    # Use the module docstring if available, otherwise generate a default help text.
+    help_text = metadata.get('docstring') or f"Run the {recipe_name} recipe"
+    # Generate a description using the Config class docstring, if available.
+    config_doc = metadata.get('config', {}).get('docstring', '')
+    if config_doc:
+        help_text += f"\n\n{config_doc}"
+    
+    # Add help text for individual config fields if available.
+    config_fields = metadata.get('config', {}).get('fields', {})
+    if config_fields:
+        help_text += "\n\nConfiguration Options:"
+        for field_name, field_info in config_fields.items():
+            field_help = field_info.get('metadata', {}).get('help', 'No description')
+            help_text += f"\n  --config {field_name}=<value>  : {field_help}"
 
-    @recipe_app.command(name=metadata.name.replace('_', '-'), help=help_text)
+    @recipe_app.command(name=recipe_name.replace('_', '-'), help=help_text)
     def recipe_command(
         logging: bool = typer.Option(False, help="Enable logging"),
         logging_level: str = typer.Option("INFO", help="Set logging level"),
@@ -163,7 +89,7 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
 
         try:
             run_recipe(
-                recipe_name=metadata.name,
+                recipe_name=recipe_name,
                 logging=logging,
                 logging_level=logging_level,
                 no_gui=no_gui,
@@ -173,7 +99,7 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
                 config=config_dict
             )
         except Exception as e:
-            logger.error(f"Failed to run recipe {metadata.name}: {str(e)}")
+            logger.error(f"Failed to run recipe {recipe_name}: {str(e)}")
             raise
         finally:
             if profile:
@@ -186,13 +112,16 @@ def create_recipe_command(metadata: RecipeMetadata) -> None:
 
 def discover_recipes():
     """Discover and create commands for all available recipes."""
-    recipes_dir = Path(__file__).parent.parent / 'recipes'
+    # Locate the base 'recipes' directory where this cli/recipes.py resides
+    # then navigate to the 'available_recipes' subdirectory.
+    available_recipes_dir = Path(__file__).parent.parent / 'recipes' / 'available_recipes'
     
-    # Look for recipe modules
-    for recipe_path in recipes_dir.glob('**/[!_]*.py'):
-        if recipe_path.stem != 'runner':  # Skip the runner module
+    # Look for recipe modules within the 'available_recipes' directory
+    for recipe_path in available_recipes_dir.glob('**/[!_]*.py'):
+        # Skip the helper modules like runner.py or discovery.py if they exist here
+        if recipe_path.stem not in ['discovery', 'runner']:
             if metadata := get_recipe_metadata(recipe_path):
-                create_recipe_command(metadata)
+                create_recipe_command(recipe_path.stem, metadata)
 
 
 __all__ = ['discover_recipes'] 

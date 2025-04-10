@@ -12,6 +12,7 @@ from pydantic._internal._model_construction import ModelMetaclass
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.common.app_registry import AppRegistry
+from pyllments.common.loop_registry import LoopRegistry
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import InputPort
 
@@ -113,6 +114,8 @@ class APIElement(Element):
 
     timeout = param.Number(default=30.0, doc="Timeout for API requests in seconds.")
 
+    loop = param.Parameter(default=LoopRegistry.get_loop(), doc="The event loop to use for the API.")
+
     def __init__(self, **params):
         super().__init__(**params)
         self.app = AppRegistry.get_app()
@@ -213,7 +216,7 @@ class APIElement(Element):
             return self._set_response(return_dict)
         
         # Schedule the async task
-        asyncio.create_task(process_response())
+        self.loop.create_task(process_response())
         return None
 
     def _process_trigger_callback(self, callback_fn, required_ports):
@@ -235,7 +238,7 @@ class APIElement(Element):
                     raise
             
             # Schedule the async task
-            asyncio.create_task(process_async_callback())
+            self.loop.create_task(process_async_callback())
             return None
         else:
             try:
@@ -261,7 +264,7 @@ class APIElement(Element):
                 return None
             
             # Schedule the async task
-            asyncio.create_task(process_async_build())
+            self.loop.create_task(process_async_build())
             return None
         else:
             # Synchronous build_fn
@@ -317,8 +320,12 @@ class APIElement(Element):
     def _route_setup(self):
         output_port_payload_type = signature(self.request_output_fn).return_annotation
         # Set up the output port for the Element
-        def pack_payload_callback(request_dict: dict) -> output_port_payload_type: # type: ignore
-            return self.request_output_fn(**request_dict)
+        # Define an async callback that handles both sync and async request_output_fn
+        async def pack_payload_callback(request_dict: dict) -> output_port_payload_type: # type: ignore
+            result = self.request_output_fn(**request_dict)
+            if asyncio.iscoroutine(result):
+                return await result
+            return result
         self.ports.add_output('api_output', pack_payload_callback=pack_payload_callback)
         
         @self.app.post(f"/{self.endpoint}")
@@ -329,12 +336,13 @@ class APIElement(Element):
             logger.info(f"[APIElement] Request received: {item}")
             if self.response_future and not self.response_future.done():
                 raise HTTPException(
-                    status_code=429, 
+                    status_code=429,
                     detail="Another request is being processed"
                 )
             
             self.response_future = asyncio.Future()
-            self.ports.output['api_output'].stage_emit(request_dict=item)
+            # Await stage_emit as it's now async
+            await self.ports.output['api_output'].stage_emit(request_dict=item)
             
             try:
                 response = await asyncio.wait_for(
@@ -345,7 +353,7 @@ class APIElement(Element):
             except asyncio.TimeoutError:
                 logger.error(f"[APIElement] Request timed out after {self.timeout} seconds")
                 raise HTTPException(
-                    status_code=408, 
+                    status_code=408,
                     detail=f"Request timed out after {self.timeout} seconds"
                 )
             finally:

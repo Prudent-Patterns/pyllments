@@ -4,7 +4,7 @@ import jinja2
 import asyncio
 from loguru import logger
 
-from pyllments.elements.flow_control.flow_controller import FlowController
+from pyllments.elements.flow_control import FlowController
 from pyllments.payloads.message import MessagePayload
 from pyllments.ports import InputPort, Ports
 from pyllments.base.element_base import Element

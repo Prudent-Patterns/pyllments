@@ -238,10 +238,18 @@ class HistoryHandlerModel(Model):
         self.context.append((entry, token_estimate))
         self.context_token_count += token_estimate
 
-    def get_context_messages(self) -> List[Union[MessagePayload, ToolsResponsePayload]]:
-        """Get all messages and tool responses in the context window."""
-        return [entry for entry, _ in self.context]
+    def get_context_message_payloads(self) -> List[MessagePayload]:
+        """Get all message payloads in the context window."""
+        return [entry for entry, _ in self.context if isinstance(entry, MessagePayload)]
 
-    def get_history_messages(self) -> List[Union[MessagePayload, ToolsResponsePayload]]:
-        """Get all messages and tool responses in the history."""
-        return [entry for entry, _ in self.history]
+    def get_context_tool_response_payloads(self) -> List[ToolsResponsePayload]:
+        """Get all tool response payloads in the context window."""
+        return [entry for entry, _ in self.context if isinstance(entry, ToolsResponsePayload)]
+
+    def get_history_message_payloads(self) -> List[MessagePayload]:
+        """Get all message payloads in the history."""
+        return [entry for entry, _ in self.history if isinstance(entry, MessagePayload)]
+        
+    def get_history_tool_response_payloads(self) -> List[ToolsResponsePayload]:
+        """Get all tool response payloads in the history."""
+        return [entry for entry, _ in self.history if isinstance(entry, ToolsResponsePayload)]

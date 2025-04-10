@@ -52,19 +52,22 @@ def get_recipe_path(recipe_name: str) -> Path:
     FileNotFoundError
         If the recipe cannot be found
     """
-    recipes_dir = Path(__file__).parent
+    # Base directory for recipes helper modules
+    recipes_base_dir = Path(__file__).parent
+    # Subdirectory where actual recipe implementations are stored
+    available_recipes_dir = recipes_base_dir / 'available_recipes'
     
-    # Try directory-based recipe first
-    recipe_file = recipes_dir / recipe_name / f"{recipe_name}.py"
+    # Try directory-based recipe structure within available_recipes first
+    recipe_file = available_recipes_dir / recipe_name / f"{recipe_name}.py"
     if recipe_file.exists():
         return recipe_file
         
-    # Try flat file structure
-    recipe_file = recipes_dir / f"{recipe_name}.py"
+    # Try flat file structure within available_recipes
+    recipe_file = available_recipes_dir / f"{recipe_name}.py"
     if recipe_file.exists():
         return recipe_file
         
-    raise FileNotFoundError(f"Recipe {recipe_name} not found")
+    raise FileNotFoundError(f"Recipe {recipe_name} not found in {available_recipes_dir}")
 
 
 def run_recipe(

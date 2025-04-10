@@ -90,7 +90,7 @@ class ChatFlowManager:
         
         # Connect the elements using dot notation for ports
         flow['chat_interface'].ports.message_output > flow['history_handler'].ports.message_emit_input
-        flow['history_handler'].ports.messages_output > flow['llm_chat'].ports.messages_emit_input
+        flow['history_handler'].ports.message_history_output > flow['llm_chat'].ports.messages_emit_input
         flow['llm_chat'].ports.message_output > flow['chat_interface'].ports.message_input
         flow['llm_chat'].ports.message_output > flow['history_handler'].ports.messages_input
         # Create view with unique name
