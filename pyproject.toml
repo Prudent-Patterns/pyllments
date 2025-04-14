@@ -57,7 +57,8 @@ dev = [
     "ipykernel",
     "ipython",
     "ipywidgets",
-    "pytest"
+    "pytest",
+    "pytest-asyncio"
 ]
 
 [project.scripts]

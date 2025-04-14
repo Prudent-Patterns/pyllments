@@ -1,6 +1,7 @@
 import json
 from os import name
 from typing import Union, Literal
+import asyncio
 
 import param
 from pydantic import BaseModel, create_model, RootModel
@@ -129,7 +130,7 @@ class StructuredRouterTransformer(Element):
         return flow_map
     
     def setup_schema_output(self):
-        def pack(pydantic_model: type(RootModel)) -> SchemaPayload:
+        async def pack(pydantic_model: type(RootModel)) -> SchemaPayload:
             return SchemaPayload(schema=pydantic_model)
 
         self.ports.add_output(
@@ -138,8 +139,12 @@ class StructuredRouterTransformer(Element):
             on_connect_callback=lambda port: port.stage_emit(pydantic_model=self.pydantic_model)
             )
         # Emits the schema payload when the pydantic model changes
+        async def emit_on_change(event):
+            logger.info(f"StructuredRouterTransformer: pydantic_model changed, emitting updated schema")
+            await self.ports.schema_output.stage_emit(pydantic_model=event.new)
+            
         self.param.watch(
-            lambda event: self.ports.schema_output.stage_emit(pydantic_model=event.new),
+            emit_on_change,
             'pydantic_model'
             )
         
@@ -214,7 +219,7 @@ class StructuredRouterTransformer(Element):
                     else: # Default to message payload
                         # json_str = output_model.model_dump_json()
                         output_payload = StructuredPayload(data=output_value)
-                    kwargs[route].emit(output_payload)
+                    await kwargs[route].emit(output_payload)
                 except Exception as e:
                     logger.error(f"StructuredRouterTransformer: Error processing message: {e}")
                     logger.error(f"StructuredRouterTransformer: Schema expected: {self.pydantic_model.model_json_schema()}")

@@ -630,8 +630,8 @@ class OutputPort(Port):
     
     def __gt__(self, other):
         """Support for the '>' operator to connect ports."""
-        # Create a task for the connection - can't use await in operator overloads
-        asyncio.create_task(self.connect(other))
+        loop = LoopRegistry.get_loop()
+        loop.create_task(self.connect(other))
         return other
 
     async def close(self):

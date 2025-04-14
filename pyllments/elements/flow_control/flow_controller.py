@@ -23,8 +23,8 @@ class OutputFlowPort(FlowPort):
     def __init__(self, **params):
         super().__init__(**params)
 
-    def emit(self, payload: Payload):
-        self.output_port.stage_emit(payload=payload)
+    async def emit(self, payload: Payload):
+        await self.output_port.stage_emit(payload=payload)
 
 class InputFlowPort(FlowPort):
     input_port = param.ClassSelector(class_=InputPort, doc="Input port the flow port wraps")

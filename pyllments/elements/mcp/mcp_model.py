@@ -174,6 +174,7 @@ class MCPModel(Model):
                 await self._mcp_sse_setup(mcp_name)
             elif mcp_spec['type'] == 'mcp_class':
                 await self._mcp_class_setup(mcp_name)
+        
     
     async def _mcp_script_setup(self, mcp_name):
         """Set up a script-based MCP server."""
@@ -295,6 +296,7 @@ class MCPModel(Model):
             mcp_tool_dict = self.create_tools_from_mcp(mcp_name)
             tool_dict.update(mcp_tool_dict)
         self.tools = tool_dict
+        logger.debug(f"MCPModel: Tools ready: {list(self.tools.keys())}")
 
     def create_calls(self, tool_calls: list[dict]):
         call_list = []

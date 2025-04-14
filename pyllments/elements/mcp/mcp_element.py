@@ -27,13 +27,17 @@ class MCPElement(Element):
         # self._tool_response_output_setup()
     
     def _tools_schema_output_setup(self):
-        def pack(tools_schema: type(BaseModel)) -> SchemaPayload:
+        async def pack(tools_schema: type(BaseModel)) -> SchemaPayload:
             return SchemaPayload(schema=tools_schema)
+
+        async def on_connect(port):
+            logger.info(f"MCPElement: tools_schema_output connected, emitting schema: {self.tools_schema}")
+            await port.stage_emit(tools_schema=self.tools_schema)
 
         tools_schema_output = self.ports.add_output(
             name='tools_schema_output',
             pack_payload_callback=pack,
-            on_connect_callback=lambda port: port.stage_emit(tools_schema=self.tools_schema))
+            on_connect_callback=on_connect)
         # Emits the tools schema when it changes - for updates
         # self.model.param.watch(
         #     lambda event: tools_schema_output.stage_emit(tools_schema=event.new),
@@ -41,9 +45,9 @@ class MCPElement(Element):
         #     )
     
     def _tool_request_structured_input_setup(self):
-        def unpack(payload: StructuredPayload):
+        async def unpack(payload: StructuredPayload):
             tool_request_list = payload.model.data
-            self.ports.tool_response_output.stage_emit(tool_request_list=tool_request_list)
+            await self.ports.tool_response_output.stage_emit(tool_request_list=tool_request_list)
 
         self.ports.add_input(
             name='tool_request_structured_input',
@@ -51,7 +55,7 @@ class MCPElement(Element):
 
     def _tool_response_output_setup(self):
         """For the purpose of passing tools to LLMs (see litellm tool call format)"""
-        def pack(tool_request_list: list) -> ToolsResponsePayload:
+        async def pack(tool_request_list: list) -> ToolsResponsePayload:
             tool_responses = {}
             for tool_request in tool_request_list:
                 hybrid_name = tool_request['name']

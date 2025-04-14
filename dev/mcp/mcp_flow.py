@@ -10,7 +10,7 @@ from pyllments.elements import (
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.serve import flow
 
-pipe_el = PipeElement(receive_callback=lambda ps: [p for p in ps])
+initial_context_pipe_el = PipeElement(receive_callback=lambda ps: [p for p in ps])
 
 reply_pipe_el = PipeElement(receive_callback=lambda p: f"Reply pipe received: {p}")
 tools_pipe_el = PipeElement(receive_callback=lambda p: f"Tools pipe received: {p}")
@@ -70,7 +70,7 @@ initial_context_builder_el = ContextBuilderElement(
 initial_llm_chat_el = LLMChatElement(model_name='gpt-4o')
 initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.messages_emit_input
 initial_llm_chat_el.ports.message_output > initial_llm_pipe_el.ports.pipe_input
-# initial_context_builder_el.ports.messages_output > pipe_el.ports.pipe_input
+initial_context_builder_el.ports.messages_output > initial_context_pipe_el.ports.pipe_input
 
 structured_router_el = StructuredRouterTransformer(
     routing_map={
@@ -105,6 +105,14 @@ mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_schema_input
 structured_router_el.ports.tools > mcp_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
 mcp_el.ports.tool_response_output > chat_interface_el.ports.tools_response_input
+
+#########
+mcp_schema_pipe_el = PipeElement(receive_callback=lambda p: f"Schema from MCP received in pipe: {p.model.schema.model_json_schema()}")
+mcp_el.ports.tools_schema_output > mcp_schema_pipe_el.ports.pipe_input
+#########
+schema_pipe_el = PipeElement(receive_callback=lambda p: f"Schema from StructuredRouterTransformer received in pipe: {p.model.schema.model_json_schema()}")
+structured_router_el.ports.schema_output > schema_pipe_el.ports.pipe_input
+#########
 
 final_context_builder_el = ContextBuilderElement(
     input_map={
@@ -150,8 +158,8 @@ final_context_builder_el = ContextBuilderElement(
 )
 
 history_handler_el = HistoryHandlerElement()
-history_handler_el.ports.history_output > initial_context_builder_el.ports.history
-history_handler_el.ports.history_output > final_context_builder_el.ports.history
+history_handler_el.ports.message_history_output > initial_context_builder_el.ports.history
+history_handler_el.ports.message_history_output > final_context_builder_el.ports.history
 chat_interface_el.ports.output['message_output'] > history_handler_el.ports.messages_input
 structured_router_el.ports.reply > history_handler_el.ports.messages_input
 
@@ -161,12 +169,11 @@ final_context_builder_el.ports.messages_output > final_llm_chat_el.ports.message
 final_llm_chat_el.ports.message_output > history_handler_el.ports.message_emit_input
 final_llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 
-from loguru import logger
-logger.debug(f"StructuredRouterTransformer: {structured_router_el.pydantic_model.model_json_schema()}")
+# from loguru import logger
+# logger.debug(f"StructuredRouterTransformer: {structured_router_el.pydantic_model.model_json_schema()}")
 
 @flow
 def show_chat():
-    from pyllments.common.loop_registry import LoopRegistry
-    logger.debug(f"LoopRegistry: {id(LoopRegistry.get_loop())}")
+    # from pyllments.common.loop_registry import LoopRegistry
     return chat_interface_el.create_interface_view(height=800, width=600)
 

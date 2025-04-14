@@ -1,9 +1,11 @@
 from typing import Any
+import asyncio
 
 import param
 
 from pyllments.base.element_base import Element
 from loguru import logger
+from pyllments.common.loop_registry import LoopRegistry
 
 
 class PipeElement(Element):
@@ -59,4 +61,8 @@ class PipeElement(Element):
         self.received_payloads = []
 
     def send_payload(self, payload: Any):
-        self.ports.output['pipe_output'].stage_emit(payload=payload)
+        """Synchronously schedules the async stage_emit coroutine."""
+        loop = LoopRegistry.get_loop()
+        coro = self.ports.output['pipe_output'].stage_emit(payload=payload)
+        # Schedule the coroutine to run on the loop, but don't wait here.
+        loop.create_task(coro)
