@@ -26,9 +26,9 @@ class ChatInterfaceModel(Model):
                     and not event.new.model.streamed):  # Handle streaming AI messages
                     await event.new.model.stream()
             elif isinstance(event.new, ToolsResponsePayload):
-                # Ensure tool responses are properly handled asynchronously
-                if not getattr(event.new.model, 'called', False):
-                    asyncio.create_task(self._process_tool_response(event.new))
+                # Process tool responses if not already called or in progress
+                if not event.new.model.called and not event.new.model.calling:
+                    await event.new.model.call_tools()
             self.message_list.append(event.new)  # Add message regardless of type
 
         self.param.watch(
@@ -37,9 +37,3 @@ class ChatInterfaceModel(Model):
             precedence=10,
             onlychanged=True
         )
-        
-    async def _process_tool_response(self, tools_response):
-        """Process tool response asynchronously"""
-        if hasattr(tools_response.model, 'call_tools'):
-            await tools_response.model.call_tools()
-        return tools_response

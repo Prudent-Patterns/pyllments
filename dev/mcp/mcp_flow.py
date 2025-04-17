@@ -130,7 +130,7 @@ final_context_builder_el = ContextBuilderElement(
             'payload_type': list[MessagePayload],
         },
         'tools': {
-            'ports': [mcp_el.ports.tool_response_output]
+            'ports': [chat_interface_el.ports.tool_response_output]
         },
         'tools_template': {
             'role': 'system',
@@ -156,6 +156,10 @@ final_context_builder_el = ContextBuilderElement(
         ]
     },
 )
+
+final_context_pipe_el = PipeElement(receive_callback=lambda ps: [p for p in ps])
+final_context_builder_el.ports.messages_output > final_context_pipe_el.ports.pipe_input
+
 
 history_handler_el = HistoryHandlerElement()
 history_handler_el.ports.message_history_output > initial_context_builder_el.ports.history

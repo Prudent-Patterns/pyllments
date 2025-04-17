@@ -70,7 +70,7 @@ class DiscordModel(Model):
         @self.client.event
         async def on_ready():
             """Called when the bot has successfully connected to Discord."""
-            logger.info(f"Discord bot {self.client.user} is ready")
+            self.logger.info(f"Discord bot {self.client.user} is ready")
             self.is_ready = True
 
         @self.client.event
@@ -97,12 +97,12 @@ class DiscordModel(Model):
         dispatch an outgoing message from the bot.
         """
         if not self.is_ready or not self._last_dm_channel:
-            logger.warning("Discord client not ready or no DM channel available")
+            self.logger.warning("Client not ready or no DM channel available")
             return
         
         # Ensure that only messages from valid roles are sent.
         if payload.model.role not in ["assistant", "system"]:
-            logger.info("Message role not valid for sending via Discord DM: ignoring")
+            self.logger.info("Message role not valid for sending: ignoring")
             return
         
         # Schedule the asynchronous send operation using the cached event loop.
@@ -116,7 +116,7 @@ class DiscordModel(Model):
             message = await payload.model.aget_message()
             await self._last_dm_channel.send(message)
         except Exception as e:
-            logger.error(f"Error sending message: {str(e)}")
+            self.logger.error(f"Error sending message: {str(e)}")
     
     async def start(self):
         """Start the Discord client."""
@@ -126,7 +126,7 @@ class DiscordModel(Model):
         try:
             await self.client.start(self.bot_token)
         except Exception as e:
-            logger.error(f"Error starting Discord client: {str(e)}")
+            self.logger.error(f"Error starting client: {str(e)}")
             raise
 
     async def stop(self):

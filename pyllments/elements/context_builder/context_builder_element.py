@@ -167,6 +167,8 @@ class ContextBuilderElement(Element):
         # Initialize storage collections
         self._initialize_storage()
         
+        self._pending_trigger = None
+        
         self._process_input_map(params['input_map'])
         
         super().__init__(**params)
@@ -265,14 +267,14 @@ class ContextBuilderElement(Element):
         # Create flow map and flow function
         flow_map = self._create_flow_map()
         flow_fn = self._create_flow_function()
-        
+
         # Create flow controller
         self.flow_controller = FlowController(
             containing_element=self,
             flow_map=flow_map,
             flow_fn=flow_fn
         )
-        
+
         # Use flow controller's ports as our ports
         self.ports = self.flow_controller.ports
 
@@ -302,37 +304,53 @@ class ContextBuilderElement(Element):
         async def flow_fn(**kwargs):
             active_port = kwargs['active_input_port']
             messages_output = kwargs['messages_output']
-            port_name = active_port.name
+            active_name = active_port.name
+            total_required = len(self.required_ports)
+            ready = [
+                name for name in self.required_ports
+                if getattr(self.flow_controller.flow_port_map.get(name), 'payload', None) is not None
+            ]
+            missing = [name for name in self.required_ports if name not in ready]
 
-            # --- Processing Lock Logic ---
-            if self._is_processing:
-                logger.debug(f"ContextBuilder: Already processing, ignoring trigger from {port_name}")
-                return None # Ignore trigger if already processing another flow
-            
-            self._is_processing = True # Acquire lock
-            logger.debug(f"ContextBuilder: Acquired lock for trigger {port_name}")
-            # --- End Lock Logic ---
+            self.logger.debug(
+                f"Received payload on '{active_name}'. Progress: {len(ready)}/{total_required} ready; Missing: {missing}"
+            )
 
-            try:
-                # Apply callback if exists
-                if port_name in self.callbacks and active_port.payload is not None:
-                    active_port.payload = self.callbacks[port_name](active_port.payload)
+            if active_name in self.callbacks and active_port.payload is not None:
+                active_port.payload = self.callbacks[active_name](active_port.payload)
+            if active_port.payload is not None:
+                self._update_template_storage(active_name, active_port.payload)
 
-                # Update template storage
-                if active_port.payload is not None:
-                    self._update_template_storage(port_name, active_port.payload)
-                
-                # Process messages using configured strategy
-                await self._process_messages(kwargs, messages_output, port_name)
-            
-            finally:
-                # --- Release Lock ---
+            # Determine if this arrival should start or feed the pending trigger
+            if self.build_fn:
+                triggerable = True
+            elif self.trigger_map:
+                triggerable = active_name in self.trigger_map
+            elif self.emit_order:
+                real_emit = [self._get_real_name(n) for n in self.emit_order]
+                triggerable = active_name in real_emit
+            else:
+                triggerable = False
+
+            if not self._is_processing:
+                if not triggerable:
+                    self.logger.trace(f"Ignoring non-trigger port {active_name}")
+                    return None
+                # Begin a new trigger flow
+                self._is_processing = True
+                self._pending_trigger = active_name
+                self.logger.debug(f"Acquired lock for trigger {active_name}")
+            else:
+                self.logger.debug(f"Received dependency {active_name} for trigger {self._pending_trigger}")
+
+            # Process messages for the pending trigger
+            emitted = await self._process_messages(kwargs, messages_output, self._pending_trigger)
+            # Release lock if we fulfilled and emitted
+            if emitted:
+                self.logger.debug(f"Emitted and releasing lock for trigger {self._pending_trigger}")
                 self._is_processing = False
-                logger.debug(f"ContextBuilder: Released lock for trigger {port_name}")
-                # --- End Release Lock ---
-
+                self._pending_trigger = None
             return None
-        
         return flow_fn
 
     def _update_template_storage(self, port_name, payload):
@@ -364,7 +382,7 @@ class ContextBuilderElement(Element):
         
         # Skip processing if there's no ordering or if required dependencies are missing
         if not order or not self._has_required_dependencies(order):
-            return
+            return False
             
         # If we get here, all required dependencies are satisfied
         messages = []
@@ -380,11 +398,13 @@ class ContextBuilderElement(Element):
                     messages.append(msg)
             # If the message is required but missing, log a warning (could be an error in configuration)
             elif not self._is_optional(name):
-                logger.warning(f"Warning: Required item '{name}' produced no message")
+                self.logger.warning(f"Warning: Required item '{name}' produced no message")
         
         # Emit messages if available
         if messages:
             await messages_output.emit(messages)
+            return True
+        return False
 
     def _get_message_order(self, kwargs, port_name):
         """
@@ -434,10 +454,10 @@ class ContextBuilderElement(Element):
             dep_set = self._full_dependency_sets.get(real_name)
             if dep_set is None:
                  # Should not happen if pre-computation ran correctly, but safety check
-                #  logger.error(f"Dependency set for required item '{real_name}' was not pre-computed.")
+                #  self.logger.error(f"Dependency set for required item '{real_name}' was not pre-computed.")
                  return False 
             if dep_set == _INVALID_DEPENDENCY_MARKER:
-                # logger.warning(f"Required item '{real_name}' has an undefined non-optional dependency.")
+                # self.logger.warning(f"Required item '{real_name}' has an undefined non-optional dependency.")
                 return False
                 
             # 3. Add valid dependencies to the set to check for payloads
@@ -449,7 +469,7 @@ class ContextBuilderElement(Element):
             # We only store regular port names in the dependency sets
             port = self.flow_controller.flow_port_map.get(port_name)
             if not port or not port.payload:
-                # logger.warning(f"Required dependency port '{port_name}' has no payload")
+                # self.logger.warning(f"Required dependency port '{port_name}' has no payload")
                 return False
         
         return True
@@ -459,14 +479,14 @@ class ContextBuilderElement(Element):
         dep_type = self.port_types.get(dep_name)
         if dep_type is None:
             # Dependency itself is not defined
-            logger.debug(f"Dependency '{dep_name}' not defined.")
+            self.logger.debug(f"Dependency '{dep_name}' not defined.")
             return False
         
         if dep_type == 'regular':
             port = self.flow_controller.flow_port_map.get(dep_name)
             if not port or not port.payload:
                 # Regular port dependency exists but has no payload
-                logger.debug(f"Dependency port '{dep_name}' has no payload.")
+                self.logger.debug(f"Dependency port '{dep_name}' has no payload.")
                 return False
                 
         # Dependency exists and is either not a regular port (e.g., constant) 
@@ -500,7 +520,7 @@ class ContextBuilderElement(Element):
                  if not self._is_optional(dep_spec):
                       real_dep_name = self._get_real_name(dep_spec)
                       if not self._check_dependency_payload(real_dep_name):
-                           logger.debug(f"Item '{real_name}' skipped: non-optional dependency '{real_dep_name}' not met.")
+                           self.logger.debug(f"Item '{real_name}' skipped: non-optional dependency '{real_dep_name}' not met.")
                            return None # Cannot produce message if required dependencies are missing
         # --- END ADD BACK ---
 
@@ -525,7 +545,7 @@ class ContextBuilderElement(Element):
                 return result
             else:
                 # Template definition not found (should not happen if defined in input_map)
-                 logger.error(f"Template definition for '{real_name}' not found.")
+                 self.logger.error(f"Template definition for '{real_name}' not found.")
                  return None
         
         elif port_type == 'regular':
@@ -540,7 +560,7 @@ class ContextBuilderElement(Element):
                 return None
         
         # If port_type is None (item not defined), return None
-        logger.warning(f"Item '{real_name}' requested in order but not defined or processed.")
+        self.logger.warning(f"Item '{real_name}' requested in order but not defined or processed.")
         return None
 
     def _process_template(self, template_data, template_name):
@@ -576,7 +596,7 @@ class ContextBuilderElement(Element):
                 else:
                     # This is a required dependency but has no payload.
                     # This *should not happen* if _has_required_dependencies worked correctly.
-                    logger.error(f"Required template dependency '{real_dep_name}' for '{template_name}' has no payload, despite passing initial checks.")
+                    self.logger.error(f"Required template dependency '{real_dep_name}' for '{template_name}' has no payload, despite passing initial checks.")
                     return None # Fail template processing
 
             # Convert payload to message content for the template context
@@ -587,7 +607,7 @@ class ContextBuilderElement(Element):
                  if is_optional:
                       continue
                  else:
-                      logger.error(f"Failed to convert payload for required template dependency '{real_dep_name}' in template '{template_name}'.")
+                      self.logger.error(f"Failed to convert payload for required template dependency '{real_dep_name}' in template '{template_name}'.")
                       return None
                       
             context[real_dep_name] = msg.model.content if hasattr(msg, 'model') else str(msg)
@@ -600,10 +620,10 @@ class ContextBuilderElement(Element):
             return MessagePayload(content=rendered, role=role)
         except jinja2.exceptions.UndefinedError as e:
              # This usually happens if an optional dependency was skipped
-             logger.debug(f"Template rendering skipped for '{template_name}' due to missing optional variable: {e}")
+             self.logger.debug(f"Template rendering skipped for '{template_name}' due to missing optional variable: {e}")
              return None # Fail template processing gracefully for missing optional vars
         except Exception as e:
-            logger.error(f"Error rendering template '{template_name}': {str(e)}", exc_info=True)
+            self.logger.error(f"Error rendering template '{template_name}': {str(e)}", exc_info=True)
             # Return an error message payload instead of None? Or stick with None?
             # Returning None indicates failure to build this part of the context.
             return None 
@@ -646,7 +666,7 @@ class ContextBuilderElement(Element):
                      self._compute_full_dependencies(item_name, set())
              computed_count += 1 # Prevent infinite loops in weird edge cases
         if len(self._full_dependency_sets) != len(all_items):
-             logger.error("Could not pre-compute dependencies for all items. Check for complex definition issues.")
+             self.logger.error("Could not pre-compute dependencies for all items. Check for complex definition issues.")
 
     def _compute_full_dependencies(self, item_name, visited):
         """Recursively computes the full set of required regular ports for an item.
@@ -669,12 +689,12 @@ class ContextBuilderElement(Element):
         item_type = self.port_types.get(real_name)
         if item_type is None:
              # This can happen if called for a dependency that isn't defined
-             logger.debug(f"Dependency '{real_name}' is not defined in input_map.")
+             self.logger.debug(f"Dependency '{real_name}' is not defined in input_map.")
              return _INVALID_DEPENDENCY_MARKER
 
         # Detect cycles
         if real_name in visited:
-            logger.warning(f"Dependency cycle detected involving '{real_name}'. Treating as invalid for this path.")
+            self.logger.warning(f"Dependency cycle detected involving '{real_name}'. Treating as invalid for this path.")
             return _INVALID_DEPENDENCY_MARKER # Cycles involving required dependencies make it impossible to satisfy
             
         visited.add(real_name)

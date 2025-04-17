@@ -27,10 +27,10 @@ class RetrieverElement(Element):
         """For the collection populating process"""
         def unpack(payload: Union[ChunkPayload, list[ChunkPayload]]):
             start_time = time.time()
-            logger.info("RetrieverElement: Starting chunk input processing")
+            self.logger.info("RetrieverElement: Starting chunk input processing")
             chunks = payload if isinstance(payload, list) else [payload]
             self.model.add_items(chunks)  # Use add_items to process all chunks at once
-            logger.info(f"RetrieverElement: Finished processing {len(chunks)} chunks. Total time: {time.time() - start_time:.2f} seconds")
+            self.logger.info(f"RetrieverElement: Finished processing {len(chunks)} chunks. Total time: {time.time() - start_time:.2f} seconds")
         
         self.ports.add_input('chunk_input', unpack)
 
@@ -38,12 +38,12 @@ class RetrieverElement(Element):
         """The input query used for retrieval"""
         def unpack(payload: MessagePayload):
             start_time = time.time()
-            logger.info("RetrieverElement: Starting retrieval process")
+            self.logger.info("Starting retrieval process")
             chunks = self.model.retrieve(payload)
-            logger.info(f"RetrieverElement: Retrieval completed. Time elapsed: {time.time() - start_time:.2f} seconds")
+            self.logger.info(f"Retrieval completed. Time elapsed: {time.time() - start_time:.2f} seconds")
             if chunks:
                 self.ports.output['chunk_output'].stage_emit(chunk_payload=chunks)
-                logger.info(f"RetrieverElement: Chunks staged for emission. Time elapsed: {time.time() - start_time:.2f} seconds")
+                self.logger.info(f"Chunks staged for emission. Time elapsed: {time.time() - start_time:.2f} seconds")
         
         self.ports.add_input('message_input', unpack)
 

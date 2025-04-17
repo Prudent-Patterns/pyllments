@@ -104,9 +104,9 @@ class TelegramModel(Model):
                 async for dialog in self.client.iter_dialogs():
                     if dialog.entity.username and dialog.entity.username.lower() == username.lower():
                         return dialog.id
-                logger.warning(f"Could not find chat ID for username {target}")
+                self.logger.warning(f"Could not find chat ID for username {target}")
             except Exception as e:
-                logger.error(f"Error resolving username {target}: {str(e)}")
+                self.logger.error(f"Error resolving username {target}: {str(e)}")
         return None
                 
     def send_message(self, payload: MessagePayload):
@@ -117,16 +117,16 @@ class TelegramModel(Model):
         dispatch an outgoing message from the bot.
         """
         if not self.is_ready:
-            logger.warning("Telegram client not ready")
+            self.logger.warning("Client not ready")
             return
             
         if not self._last_chat and not isinstance(payload, tuple):
-            logger.warning("No chat available and no target specified")
+            self.logger.warning("No chat available and no target specified")
             return
         
         # Ensure that only messages from valid roles are sent
         if payload.model.role not in ["assistant", "system"]:
-            logger.info("Message role not valid for sending via Telegram: ignoring")
+            self.logger.info("Message role not valid for sending: ignoring")
             return
         
         # Schedule the asynchronous send operation using the cached event loop
@@ -152,11 +152,11 @@ class TelegramModel(Model):
                 if chat_id:
                     await self.client.send_message(chat_id, message)
                 else:
-                    logger.error(f"Could not resolve chat ID for target {target}")
+                    self.logger.error(f"Could not resolve chat ID for target {target}")
             else:
                 await self.client.send_message(self._last_chat, message)
         except Exception as e:
-            logger.error(f"Error sending message: {str(e)}")
+            self.logger.error(f"Error sending message: {str(e)}")
     
     async def start(self):
         """Start the Telegram client and optionally send initial message."""
@@ -167,7 +167,7 @@ class TelegramModel(Model):
             # Connect and sign in
             await self.client.connect()
             self.is_ready = True
-            logger.info("Telegram bot is ready")
+            self.logger.info("Bot is ready")
             
             # Send initial message if start_message_with is set
             if self.start_message_with:
@@ -180,17 +180,17 @@ class TelegramModel(Model):
                             mode="atomic"
                         )
                         await self._async_send_message(initial_message, chat_id)
-                        logger.info(f"Sent initial message to chat ID {chat_id}")
+                        self.logger.info(f"Sent initial message to chat ID {chat_id}")
                     else:
-                        logger.warning(
+                        self.logger.warning(
                             f"Could not send initial message: Unable to resolve chat ID for {self.start_message_with}. "
                             "Note: Bots can only message users who have previously interacted with them."
                         )
                 except Exception as e:
-                    logger.error(f"Failed to send initial message: {str(e)}")
+                    self.logger.error(f"Failed to send initial message: {str(e)}")
                     
         except Exception as e:
-            logger.error(f"Error starting Telegram client: {str(e)}")
+            self.logger.error(f"Error starting client: {str(e)}")
             raise
 
     async def stop(self):

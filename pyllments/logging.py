@@ -8,8 +8,11 @@ def setup_logging(
 
     logger.remove()
     
+    # Make sure every record has an 'element' key (defaults to empty string)
+    logger.configure(extra={"element": ""})
+    
     # Adding stdout logging with formatted time and level for better alignment
-    log_format = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level:^8}</level> | {message}"
+    log_format = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level:^8}</level> | <cyan>{extra[element]}</cyan> | {message}"
     logger.add(sys.stdout, level=stdout_log_level, format=log_format, enqueue=True)
     
     if log_file:
@@ -30,14 +33,11 @@ def log_staging(port: object, item_name: str, item_value: any):
         item_name (str): The name of the staged item.
         item_value (any): The value of the staged item.
     """
-    # Get the class name of the element to log its type
-    element_type = port.containing_element.__class__.__name__
-    
-    # Get the type of the staged item
-    item_type = type(item_value).__name__
-    
-    # Log the information in a single line
-    logger.info(f"Staging: {element_type} | Port: {port.name} | Staged Item: {item_name}: {item_type}")
+    # use the Element's own logger so extra['element'] is set
+    element_logger = port.containing_element.logger
+    element_logger.info(
+        f"Staging: {port.name} | Staged Item: {item_name}: {type(item_value).__name__}"
+    )
 
 def log_emit(port: object, payload: object):
     """
@@ -48,11 +48,11 @@ def log_emit(port: object, payload: object):
         port (object): The port instance emitting the payload.
         payload (object): The payload being emitted.
     """
-    # Get the class name of the element to log its type
-    element_type = port.containing_element.__class__.__name__
-    
-    # Log the information in a single line
-    logger.info(f"Emitting from {element_type} | Port: {port.name} | Payload: {type(payload).__name__}")
+    # use the Element's own logger so extra['element'] is set
+    element_logger = port.containing_element.logger
+    element_logger.info(
+        f"Emitting from {port.name} | Payload: {type(payload).__name__}"
+    )
 
 def log_receive(port: object, payload: object):
     """
@@ -63,11 +63,9 @@ def log_receive(port: object, payload: object):
         port (object): The port instance receiving the payload.
         payload (object): The payload being received.
     """
-    # Get the class name of the element to log its type
-    element_type = port.containing_element.__class__.__name__
-    
-    # Log the information in a single line
-    logger.info(f"Receiving in {element_type} | Port: {port.name} | Payload: {type(payload).__name__}")
+    # Fetch the element‑bound logger so it carries element=<instanceName>
+    element_logger = port.containing_element.logger
+    element_logger.info(f"Receiving | Port: {port.name} | Payload: {type(payload).__name__}")
 
 def log_connect(output_port: object, input_port: object):
     """

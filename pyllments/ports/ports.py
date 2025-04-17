@@ -134,16 +134,27 @@ class Port(param.Parameterized):
 class InputPort(Port):
     """
     Asynchronous InputPort that receives payloads and processes them.
-    
+
     The unpacking callback can be either synchronous or asynchronous.
     Sequential processing is ensured for each input port.
+
+    Parameters
+    ----------
+    readiness_check : Optional[Callable[[], Awaitable[None]]]
+        An optional coroutine function that is awaited before processing any payload.
+        This can be used to ensure that the port or its containing element is ready
+        (e.g., resources initialized, external dependencies available) before
+        payloads are processed. The readiness check is only awaited once per port
+        instance, and is cached as ready after the first successful check.
     """
     unpack_payload_callback = param.Callable(doc="""
         Callback function that processes incoming payloads.
         Can be a regular function or a coroutine function.""")
     
-    def __init__(self, **params):
+    def __init__(self, readiness_check=None, **params):
         super().__init__(**params)
+        self.readiness_check = readiness_check  # Optional coroutine to await before unpack
+        self._is_ready = False  # Flag to avoid repeated readiness checks
         
         # Cache for validated output ports
         self._validated_output_ports = set()
@@ -175,13 +186,22 @@ class InputPort(Port):
     async def receive(self, payload: Payload, output_port: 'OutputPort') -> None:
         """
         Process a received payload, ensuring sequential processing.
-        
+        Await readiness if a readiness check is provided.
+
+        The readiness check, if provided, is awaited before the first payload is processed.
+        This allows the port to defer processing until it is ready (e.g., after initialization).
+
         Args:
             payload: The payload to process
             output_port: The port that emitted the payload
         """
         if not self.unpack_payload_callback:
             raise ValueError(f"unpack_payload_callback must be set for port '{self.name}'")
+        
+        # Ensure readiness before processing
+        if self.readiness_check and not self._is_ready:
+            await self.readiness_check()
+            self._is_ready = True  # Cache readiness to avoid future checks
         
         # Validate payload type if not already validated for this output port
         if output_port not in self._validated_output_ports:
@@ -301,9 +321,18 @@ class InputPort(Port):
 class OutputPort(Port):
     """
     Asynchronous OutputPort that packs and emits payloads.
-    
+
     Ensures ordered delivery to input ports in the order they were connected.
     Supports both synchronous and asynchronous packing callbacks.
+
+    Parameters
+    ----------
+    readiness_check : Optional[Callable[[], Awaitable[None]]]
+        An optional coroutine function that is awaited before emitting a payload.
+        This can be used to ensure that the port or its containing element is ready
+        (e.g., resources initialized, external dependencies available) before
+        payloads are emitted. The readiness check is awaited each time an emit is
+        triggered (if provided), allowing for dynamic readiness checks.
     """
     # Configuration params
     required_items = param.Dict(doc="""
@@ -328,8 +357,9 @@ class OutputPort(Port):
     emit_ready = param.Boolean(default=False, doc="""
         True when all required items are staged and ready to emit""")
     
-    def __init__(self, **params):
-        super().__init__(**params)
+    def __init__(self, containing_element=None, readiness_check=None, **params):
+        super().__init__(containing_element=containing_element, **params)
+        self.readiness_check = readiness_check  # Optional coroutine to await before emit
         
         # Queue for ordered emission processing
         self._emission_queue = asyncio.Queue()
@@ -393,7 +423,8 @@ class OutputPort(Port):
                     for port in self.input_ports:
                         await port.receive(payload, self)
                 except Exception as e:
-                    logger.error(f"Error processing emission from {self.name}: {e}")
+                    import traceback
+                    logger.error(f"Error processing emission from {self.name}: {e}\n{traceback.format_exc()}")
                 finally:
                     self._emission_queue.task_done()
         except asyncio.CancelledError:
@@ -572,6 +603,9 @@ class OutputPort(Port):
     async def emit(self):
         """
         Pack the staged values into a payload and emit it to all connected input ports.
+
+        If a readiness_check coroutine was provided, it is awaited before emitting.
+        This allows the port to defer emission until it is ready (e.g., after initialization).
         """
         if not self.emit_ready:
             missing_items = [name for name, item in self.required_items.items() 
@@ -600,13 +634,16 @@ class OutputPort(Port):
     async def stage_emit(self, **kwargs):
         """
         Stage values and immediately emit a payload.
-        
-        This is a convenience method that combines stage() and emit().
+        Await readiness if a readiness check is provided.
+
+        If a readiness_check coroutine was provided, it is awaited before emitting.
         """
         await self.stage(**kwargs)
         
         # Only emit if not already emitted by stage() due to emit_when_ready
         if not self.emit_when_ready and self.emit_ready:
+            if self.readiness_check:
+                await self.readiness_check()
             return await self.emit()
         
         return True
@@ -691,20 +728,25 @@ class Ports(param.Parameterized):
         super().__init__(**params)
         self.containing_element = containing_element
     
-    def add_input(self, name: str, unpack_payload_callback, payload_type=None, **kwargs):
+    def add_input(self, name: str, unpack_payload_callback, payload_type=None, readiness_check=None, **kwargs):
         """
         Add an input port.
-        
+
         Args:
             name: Name of the port
             unpack_payload_callback: Function to process incoming payloads
             payload_type: Expected payload type
+            readiness_check: Optional coroutine to await before processing payloads.
+                If provided, this coroutine will be awaited before the first payload
+                is processed by the input port. This is useful for ensuring that
+                the port or its containing element is ready before accepting data.
             **kwargs: Additional parameters for the port
         """
         input_port = InputPort(
             name=name,
             unpack_payload_callback=unpack_payload_callback,
             payload_type=payload_type,
+            readiness_check=readiness_check,
             containing_element=self.containing_element,
             **kwargs
         )
@@ -712,15 +754,19 @@ class Ports(param.Parameterized):
         return input_port
     
     def add_output(self, name: str, pack_payload_callback, payload_type=None, 
-                 on_connect_callback=None, **kwargs):
+                 on_connect_callback=None, readiness_check=None, **kwargs):
         """
         Add an output port.
-        
+
         Args:
             name: Name of the port
             pack_payload_callback: Function to pack payloads
             payload_type: Type of payload produced
             on_connect_callback: Called when port is connected
+            readiness_check: Optional coroutine to await before emitting a payload.
+                If provided, this coroutine will be awaited before each emit operation.
+                This is useful for ensuring that the port or its containing element is
+                ready before emitting data.
             **kwargs: Additional parameters for the port
         """
         output_port = OutputPort(
@@ -728,6 +774,7 @@ class Ports(param.Parameterized):
             pack_payload_callback=pack_payload_callback,
             payload_type=payload_type,
             on_connect_callback=on_connect_callback,
+            readiness_check=readiness_check,
             containing_element=self.containing_element,
             **kwargs
         )

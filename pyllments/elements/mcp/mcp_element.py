@@ -31,13 +31,15 @@ class MCPElement(Element):
             return SchemaPayload(schema=tools_schema)
 
         async def on_connect(port):
-            logger.info(f"MCPElement: tools_schema_output connected, emitting schema: {self.tools_schema}")
+            await self.model.await_ready()
+            self.logger.info(f"tools_schema_output connected, emitting schema: {self.tools_schema}")
             await port.stage_emit(tools_schema=self.tools_schema)
 
         tools_schema_output = self.ports.add_output(
             name='tools_schema_output',
             pack_payload_callback=pack,
-            on_connect_callback=on_connect)
+            on_connect_callback=on_connect,
+            readiness_check=self.model.await_ready)
         # Emits the tools schema when it changes - for updates
         # self.model.param.watch(
         #     lambda event: tools_schema_output.stage_emit(tools_schema=event.new),
@@ -51,7 +53,8 @@ class MCPElement(Element):
 
         self.ports.add_input(
             name='tool_request_structured_input',
-            unpack_payload_callback=unpack)
+            unpack_payload_callback=unpack,
+            readiness_check=self.model.await_ready)
 
     def _tool_response_output_setup(self):
         """For the purpose of passing tools to LLMs (see litellm tool call format)"""

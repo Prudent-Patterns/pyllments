@@ -21,10 +21,22 @@ class Element(Component):
     payload_css_cache = param.Dict(default={}, doc="""
         Cache for CSS files - Set on the Class Level
         Structure: payload_name: {}""")
-
+    name = param.String(doc="Unique name for this element instance")
+    _instance_counters = {}  # class‐level dict to track counts per subclass
 
     def __init__(self, **params):
+        cls = type(self)
+        count = cls._instance_counters.get(cls, 0) + 1
+        cls._instance_counters[cls] = count
+
+        # if developer passed a name, respect it; otherwise build one
+        if 'name' not in params or not params['name']:
+            params['name'] = f"{cls.__name__}{count}"
         super().__init__(**params)
+
+        # bind logger so every message carries this name
+        self.logger = logger.bind(element=self.name)
+
         self.ports = Ports(containing_element=self)
 
     def inject_payload_css(self, create_view_method: Callable, name=None, **kwargs):

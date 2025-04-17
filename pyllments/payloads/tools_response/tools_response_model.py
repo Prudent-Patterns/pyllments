@@ -1,5 +1,6 @@
 import param
 import jinja2
+import asyncio
 from pyllments.base.model_base import Model
 
 
@@ -103,14 +104,19 @@ class ToolsResponseModel(Model):
 {%- endfor %}
 {%- endfor %}""")
     
-    def call_tools(self):
-        """Call all tools and update responses. Cleans up any watchers when done."""
+    async def call_tools(self):
+        """Call all tools asynchronously and update responses. Cleans up any watchers when done."""
         self.calling = True
-        for tool, tool_spec in self.tool_responses.items():
-            tool_spec['response'] = tool_spec['call']().model_dump()
-        
+        # Run all tool calls concurrently
+        tasks = []
+        tool_keys = list(self.tool_responses.keys())
+        for tool in tool_keys:
+            tool_spec = self.tool_responses[tool]
+            tasks.append(tool_spec['call']())
+        responses = await asyncio.gather(*tasks)
+        for tool, response in zip(tool_keys, responses):
+            self.tool_responses[tool]['response'] = response.model_dump()
         self.called = True  # Set called first to trigger watchers
-        
         # Clean up any watchers on 'called' if they exist
         if (called_watchers := self.param.watchers.get('called')) is not None:
             for watcher in called_watchers['value']:

@@ -49,7 +49,7 @@ class LLMChatElement(Element):
                 if isinstance(item, MessagePayload):
                     valid_payloads.append(item)
                 else:
-                    logger.warning(f"Ignoring invalid payload type in messages_emit_input: {type(item)}")
+                    logger.warning(f"Ignoring invalid payload type in input: {type(item)}")
             
             # Generate response from valid payloads
             if valid_payloads:

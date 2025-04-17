@@ -179,7 +179,7 @@ class Component(param.Parameterized):
             css_kwargs = [param for param in inspect.signature(func).parameters 
                          if param.endswith('_css')]
             
-            logger.debug(f"CSS kwargs found in {func.__name__}: {css_kwargs}")
+            logger.trace(f"CSS kwargs found in {func.__name__}: {css_kwargs}")
             
             # First load all potential CSS files for this view
             for key in css_kwargs:
@@ -188,13 +188,13 @@ class Component(param.Parameterized):
                     # Get the css folder path
                     css_folder = self._get_module_path() / 'css'
                     css_file_path = css_folder / f"{view_name}_{css_name}.css"
-                    logger.debug(f"Looking for component CSS file: {css_file_path}")
+                    logger.trace(f"Looking for component CSS file: {css_file_path}")
                     try:
                         with open(css_file_path, 'r') as f:
                             self.css_cache[view_name][css_name] = f.read()
-                            logger.debug(f"Loaded component CSS from {css_file_path}")
+                            logger.trace(f"Loaded component CSS from {css_file_path}")
                     except FileNotFoundError:
-                        logger.debug(f"Component CSS file not found: {css_file_path}")
+                        logger.trace(f"Component CSS file not found: {css_file_path}")
                         self.css_cache[view_name][css_name] = ''
                     except Exception as e:
                         logger.warning(f"Error loading CSS: {str(e)}")
@@ -219,7 +219,7 @@ class Component(param.Parameterized):
                 # Update the custom_attrs with the combined CSS
                 custom_attrs[key] = css_list
 
-            logger.debug(f"Final CSS kwargs: {[(k,v) for k,v in custom_attrs.items() if k.endswith('_css')]}")
+            logger.trace(f"Final CSS kwargs: {[(k,v) for k,v in custom_attrs.items() if k.endswith('_css')]}")
 
             # Handle sizing mode
             has_height = 'height' in panel_kwargs
@@ -283,7 +283,7 @@ class Component(param.Parameterized):
         caller = inspect.currentframe().f_back.f_code.co_name
         # Create a unique key combining the method name and parameter
         key = f"{caller}_{parameter_name}"
-        # Only set up the watcher if it doesn’t already exist
+        # Only set up the watcher if it doesn't already exist
         if key not in self._watchers:
             watcher = parameterized_class.param.watch(callback, parameter_name, **kwargs)
             self._watchers[key] = watcher

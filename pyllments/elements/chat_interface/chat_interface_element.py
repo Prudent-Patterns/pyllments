@@ -26,9 +26,10 @@ class ChatInterfaceElement(Element):
     - input:
         - message_input: MessagePayload
         - message_emit_input: MessagePayload
-        - tool_response_input: ToolResponsePayloadf
-    - output port
+        - tools_response_input: ToolsResponsePayload
+    - output:
         - message_output: MessagePayload
+        - tool_response_output: ToolsResponsePayload
     """
 
     chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
@@ -39,10 +40,12 @@ class ChatInterfaceElement(Element):
         super().__init__(**params)
         self.model = ChatInterfaceModel(**params)
         
+        # Set up ports for messages and tool responses
         self._message_output_setup()
         self._message_input_setup()
         self._message_emit_input_setup()
         self._tools_response_input_setup()
+        self._tools_response_output_setup()
 
     def _message_output_setup(self):
         """Sets up the output message port"""
@@ -74,12 +77,30 @@ class ChatInterfaceElement(Element):
     
     def _tools_response_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
+            # Receive the incoming tools response payload and update the model
             self.model.new_message = payload
+            # Set up a watcher to emit the payload once tool calls are complete
+            def emit_on_called(event):
+                if event.new:  # If called is True
+                    asyncio.create_task(self.ports.output['tool_response_output'].stage_emit(payload=payload))
+            payload.model.param.watch(emit_on_called, 'called')
+            # If already called, emit immediately
+            if payload.model.called:
+                await self.ports.output['tool_response_output'].stage_emit(payload=payload)
 
         self.ports.add_input(
             name='tools_response_input',
             unpack_payload_callback=unpack)
         
+    def _tools_response_output_setup(self):
+        """Sets up the output port for tool responses"""
+        async def pack(payload: ToolsResponsePayload) -> ToolsResponsePayload:
+            return payload
+
+        self.ports.add_output(
+            name='tool_response_output',
+            pack_payload_callback=pack)
+
     @Component.view
     def create_chatfeed_view(self) -> pn.Column:
         """
@@ -132,10 +153,26 @@ class ChatInterfaceElement(Element):
                     new_item.model.content = loaded_content
 
             elif isinstance(new_item, ToolsResponsePayload):
-                # Let the model handle the tool calls asynchronously
-                # The view will be updated once tools have been processed
-                tool_view = new_item.create_tool_response_view()
-                self.chatfeed_view.append(tool_view)
+                # Add a placeholder to the chat feed while processing
+                placeholder = pn.pane.Str('Processing tool response...')
+                self.chatfeed_view.append(placeholder)
+                # Set up a watcher on the 'called' parameter to update the view once tools are processed
+                def update_tool_response_view(event):
+                    if event.new:  # If called is True
+                        # Find the index of the placeholder in the chat feed
+                        for i, item in enumerate(self.chatfeed_view):
+                            if item is placeholder:
+                                # Replace placeholder with the actual tool response view
+                                self.chatfeed_view[i] = new_item.create_tool_response_view()
+                                break
+
+                new_item.model.param.watch(update_tool_response_view, 'called')
+                # If already called, update immediately (for pre-populated responses)
+                if new_item.model.called:
+                    for i, item in enumerate(self.chatfeed_view):
+                        if item is placeholder:
+                            self.chatfeed_view[i] = new_item.create_tool_response_view()
+                            break
 
         # This watcher should be called before the payload starts streaming.
         self.watch_once(_update_chatfeed, 'new_message', precedence=0)

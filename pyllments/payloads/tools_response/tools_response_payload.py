@@ -32,47 +32,66 @@ class ToolsResponsePayload(Payload):
         parameters_css: list = [],
         response_md_css: list = []
     ):
-        tool_cards = []
-        for tool_name, tool_data in self.model.tool_responses.items():
-            logger.debug(f"Tool data for {tool_name}: {tool_data}")
-            if 'response' in tool_data:
-                logger.debug(f"Response object: {tool_data['response']}")
-            tool_card_kwargs = {'collapsed': False}
-            tool_card_kwargs['objects'] = []
-            if tool_data.get('parameters', None):
-                parameters_str = self.parameters_template.render(parameters=tool_data['parameters'])
-                tool_card_kwargs['objects'].append(pn.pane.Markdown(
-                    parameters_str,
-                    # styles={'margin': '-9px 0px'},
-                    stylesheets=parameters_css
+        # Create a placeholder column that will be updated dynamically
+        placeholder = pn.Column(pn.pane.Str('Loading tool responses...'), styles={'flex': '0 0 auto', 'height': 'fit-content'})
+        
+        # Define an async function to update the view once tools are called
+        async def update_view():
+            if not self.model.called and not self.model.calling:
+                await self.model.call_tools()
+            # Clear the placeholder and append the actual content
+            placeholder.clear()
+            tool_cards = []
+            for tool_name, tool_data in self.model.tool_responses.items():
+                logger.debug(f"Tool data for {tool_name}: {tool_data}")
+                if 'response' in tool_data:
+                    logger.debug(f"Response object: {tool_data['response']}")
+                tool_card_kwargs = {'collapsed': False}
+                tool_card_kwargs['objects'] = []
+                if tool_data.get('parameters', None):
+                    parameters_str = self.parameters_template.render(parameters=tool_data['parameters'])
+                    tool_card_kwargs['objects'].append(pn.pane.Markdown(
+                        parameters_str,
+                        # styles={'margin': '-9px 0px'},
+                        stylesheets=parameters_css
+                        )
                     )
+                else:
+                    tool_card_kwargs['objects'].append(pn.pane.Markdown(
+                        'No parameters provided.',
+                        # styles={'margin': '-9px 0px'},
+                        stylesheets=parameters_css
+                        )
+                    )
+                card_header_row = pn.Row(
+                    pn.pane.Str(tool_data['mcp_name'], stylesheets=str_css),
+                    pn.pane.Str('is running', styles={'font-size': '14px'}),
+                    pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
                 )
-            card_header_row = pn.Row(
-                pn.pane.Str(tool_data['mcp_name'], stylesheets=str_css),
-                pn.pane.Str('is running', styles={'font-size': '14px'}),
-                pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
-            )
-            response_indicator = pn.pane.Str('Response:', stylesheets=str_css, styles={'margin-left': '0px'})
-            
-            response_str = pn.pane.Str(tool_data['response']['content'][0]['text'],
-                                       stylesheets=response_md_css)
+                response_indicator = pn.pane.Str('Response:', stylesheets=str_css, styles={'margin-left': '0px'})
+                
+                if 'response' in tool_data and tool_data['response'].get('content'):
+                    response_str = pn.pane.Str(tool_data['response']['content'][0]['text'],
+                                            stylesheets=response_md_css)
+                else:
+                    response_str = pn.pane.Str('Processing...', stylesheets=response_md_css)
 
-            response_col = pn.Column(response_indicator, response_str)
-            tool_card_kwargs['objects'].append(response_col)
-            
-            tool_card = pn.layout.Card(
-                header=card_header_row,
-                **tool_card_kwargs,
-                stylesheets=card_css
-                )
-            tool_cards.append(tool_card)
-
-        return pn.Column(*tool_cards, styles={
-            'flex': '0 0 auto',
-            'height': 'fit-content',
-            'max-height': 'none',
-            'overflow': 'auto'
-            })
+                response_col = pn.Column(response_indicator, response_str)
+                tool_card_kwargs['objects'].append(response_col)
+                
+                tool_card = pn.layout.Card(
+                    header=card_header_row,
+                    **tool_card_kwargs,
+                    stylesheets=card_css
+                    )
+                tool_cards.append(tool_card)
+            placeholder.extend(tool_cards)
+        
+        # Trigger the async update
+        import asyncio
+        asyncio.create_task(update_view())
+        
+        return placeholder
     
     @Component.view
     def create_collapsible_view(

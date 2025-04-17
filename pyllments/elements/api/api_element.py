@@ -202,15 +202,13 @@ class APIElement(Element):
                     else:  # Function or lambda
                         # Call the function/lambda with the payload
                         result = attr_name(payload)
-                        
                         # If it returned a coroutine, await it
                         if asyncio.iscoroutine(result):
                             try:
                                 result = await result
                             except Exception as e:
-                                logger.error(f"Error awaiting coroutine for '{alias}': {e}")
+                                self.logger.error(f"Error awaiting coroutine for '{alias}': {e}")
                                 result = f"Error: {str(e)}"
-                            
                         return_dict[alias] = result
             
             return self._set_response(return_dict)
@@ -234,7 +232,7 @@ class APIElement(Element):
                     result = await callback_fn(**callback_kwargs)
                     return self._set_response(result)
                 except Exception as e:
-                    logger.error(f"Error in async callback: {e}")
+                    self.logger.error(f"Error in async callback: {e}")
                     raise
             
             # Schedule the async task
@@ -245,7 +243,7 @@ class APIElement(Element):
                 result = callback_fn(**callback_kwargs)
                 return self._set_response(result)
             except Exception as e:
-                logger.error(f"Error in sync callback: {e}")
+                self.logger.error(f"Error in sync callback: {e}")
                 raise
 
     def _process_build_fn(self, active_input_port, c, port_kwargs):
@@ -302,7 +300,7 @@ class APIElement(Element):
                 
                 # Ensure we have a way to determine payload_type
                 if 'payload_type' not in port_config and ('ports' not in port_config or not port_config['ports']):
-                    logger.warning(f"Skipping input port '{key}': no payload_type or ports specified")
+                    self.logger.warning(f"Skipping input port '{key}': no payload_type or ports specified")
                     continue
             
             if port_config:
@@ -330,10 +328,9 @@ class APIElement(Element):
         
         @self.app.post(f"/{self.endpoint}")
         async def post_return(item: self.request_pydantic_model):
-        # async def post_return(item: dict):
             item = item.dict()
             # Check if there's already a request being processed
-            logger.info(f"[APIElement] Request received: {item}")
+            self.logger.info(f"Request received: {item}")
             if self.response_future and not self.response_future.done():
                 raise HTTPException(
                     status_code=429,
@@ -351,7 +348,7 @@ class APIElement(Element):
                 )
                 return response
             except asyncio.TimeoutError:
-                logger.error(f"[APIElement] Request timed out after {self.timeout} seconds")
+                self.logger.error(f"Request timed out after {self.timeout} seconds")
                 raise HTTPException(
                     status_code=408,
                     detail=f"Request timed out after {self.timeout} seconds"

@@ -35,22 +35,27 @@ class PipeElement(Element):
         self._setup_ports()
 
     def _setup_ports(self):
-        def unpack(payload: Any):
-            """Store the received payload"""
+        async def unpack(payload: Any):
+            """Store the received payload and handle async/sync receive_callback."""
             if self.store_received_payloads:
                 self.received_payloads.append(payload)
             if self.receive_callback:
-                logger.info(f"Unpacking in PipeElement: {self.receive_callback(payload)}")
-    
+                result = self.receive_callback(payload)
+                if asyncio.iscoroutine(result) or asyncio.isfuture(result):
+                    awaited_result = await result
+                    logger.info(f"Unpacking: {awaited_result}")
+                else:
+                    logger.info(f"Unpacking: {result}")
+
         self.ports.add_input(
             name='pipe_input',
             unpack_payload_callback=unpack
         )
 
-        def pack(payload: Any) -> Any:
-            """Return the stored output payload"""
+        async def pack(payload: Any) -> Any:
+            """Return the stored output payload (async for consistency)."""
             return payload
-        # Setup output port
+        # Setup output port@
         self.ports.add_output(
             name='pipe_output',
             pack_payload_callback=pack

@@ -23,19 +23,20 @@ class LoopRegistry:
             logger.debug(f"LoopRegistry: Using cached loop {id(cls._loop)}")
             return cls._loop
             
-        # Try to get the existing loop
+        # Try to get the existing loop or create a new one
         policy = asyncio.get_event_loop_policy()
-        
-        # Check if a loop exists for this thread already
         try:
             cls._loop = policy.get_event_loop()
-            logger.debug(f"LoopRegistry: Using existing loop {id(cls._loop)}")
+            if cls._loop is None or cls._loop.is_closed():
+                cls._loop = policy.new_event_loop()
+                policy.set_event_loop(cls._loop)
+                logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
+            else:
+                logger.debug(f"LoopRegistry: Using existing loop {id(cls._loop)}")
         except RuntimeError:
-            # No loop exists yet, create a new one
             cls._loop = policy.new_event_loop()
             policy.set_event_loop(cls._loop)
             logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
-            
         return cls._loop
     
     @classmethod

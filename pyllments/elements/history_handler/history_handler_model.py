@@ -93,7 +93,7 @@ class HistoryHandlerModel(Model):
                     )
                 entries.append(entry)
             except Exception as e:
-                logger.warning(f"Failed to load entry from database: {e}")
+                self.logger.warning(f"Failed to load entry from database: {e}")
                 continue
         
         # Load entries into history (which will also handle context population)
@@ -177,7 +177,7 @@ class HistoryHandlerModel(Model):
                 deletes
             )
         except Exception as e:
-            logger.error(f"Error syncing database: {e}")
+            self.logger.error(f"Error syncing database: {e}")
 
     def _execute_db_operations(self, inserts: List[dict], deletes: List[float]):
         """Executes database operations in a single transaction."""
