@@ -30,7 +30,7 @@ class MCPElement(Element):
         async def pack(tools_schema: type(BaseModel)) -> SchemaPayload:
             return SchemaPayload(schema=tools_schema)
 
-        async def on_connect(port):
+        async def on_connect(port, input_port):
             await self.model.await_ready()
             self.logger.info(f"tools_schema_output connected, emitting schema: {self.tools_schema}")
             await port.stage_emit(tools_schema=self.tools_schema)

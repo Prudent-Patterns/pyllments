@@ -10,7 +10,7 @@ from pyllments.elements import (
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.serve import flow
 
-initial_context_pipe_el = PipeElement(receive_callback=lambda ps: [p for p in ps])
+initial_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Initial context pipe received: {ps}")
 
 reply_pipe_el = PipeElement(receive_callback=lambda p: f"Reply pipe received: {p}")
 tools_pipe_el = PipeElement(receive_callback=lambda p: f"Tools pipe received: {p}")
@@ -130,7 +130,7 @@ final_context_builder_el = ContextBuilderElement(
             'payload_type': list[MessagePayload],
         },
         'tools': {
-            'ports': [chat_interface_el.ports.tool_response_output]
+            'ports': [chat_interface_el.ports.tools_response_output]
         },
         'tools_template': {
             'role': 'system',
@@ -157,7 +157,7 @@ final_context_builder_el = ContextBuilderElement(
     },
 )
 
-final_context_pipe_el = PipeElement(receive_callback=lambda ps: [p for p in ps])
+final_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Final context pipe received: {ps}")
 final_context_builder_el.ports.messages_output > final_context_pipe_el.ports.pipe_input
 
 

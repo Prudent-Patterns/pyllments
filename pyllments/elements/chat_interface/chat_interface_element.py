@@ -29,7 +29,7 @@ class ChatInterfaceElement(Element):
         - tools_response_input: ToolsResponsePayload
     - output:
         - message_output: MessagePayload
-        - tool_response_output: ToolsResponsePayload
+        - tools_response_output: ToolsResponsePayload
     """
 
     chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
@@ -80,13 +80,14 @@ class ChatInterfaceElement(Element):
             # Receive the incoming tools response payload and update the model
             self.model.new_message = payload
             # Set up a watcher to emit the payload once tool calls are complete
-            def emit_on_called(event):
-                if event.new:  # If called is True
-                    asyncio.create_task(self.ports.output['tool_response_output'].stage_emit(payload=payload))
-            payload.model.param.watch(emit_on_called, 'called')
+            if not payload.model.called:
+                def emit_on_called(event):
+                    if event.new:  # If called is True
+                        asyncio.create_task(self.ports.output['tools_response_output'].stage_emit(payload=payload))
+                payload.model.param.watch(emit_on_called, 'called')
             # If already called, emit immediately
-            if payload.model.called:
-                await self.ports.output['tool_response_output'].stage_emit(payload=payload)
+            elif payload.model.called:
+                await self.ports.output['tools_response_output'].stage_emit(payload=payload)
 
         self.ports.add_input(
             name='tools_response_input',
@@ -98,7 +99,7 @@ class ChatInterfaceElement(Element):
             return payload
 
         self.ports.add_output(
-            name='tool_response_output',
+            name='tools_response_output',
             pack_payload_callback=pack)
 
     @Component.view

@@ -132,12 +132,16 @@ class StructuredRouterTransformer(Element):
     def setup_schema_output(self):
         async def pack(pydantic_model: type(RootModel)) -> SchemaPayload:
             return SchemaPayload(schema=pydantic_model)
-
+        async def on_connect(output_port, new_input_port):
+            return await output_port.stage_emit_to(
+                new_input_port,
+                pydantic_model=self.pydantic_model
+            )
         self.ports.add_output(
             name='schema_output',
             pack_payload_callback=pack,
-            on_connect_callback=lambda port: port.stage_emit(pydantic_model=self.pydantic_model)
-            )
+            on_connect_callback=on_connect
+        )
         # Emits the schema payload when the pydantic model changes
         async def emit_on_change(event):
             self.logger.info(f"pydantic_model changed, emitting updated schema")

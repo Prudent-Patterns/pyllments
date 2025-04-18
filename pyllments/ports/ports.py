@@ -407,7 +407,7 @@ class OutputPort(Port):
         try:
             loop = LoopRegistry.get_loop()
             self._emission_task = loop.create_task(self._process_emission_queue())
-            logger.debug(f"Started emission processor for port {self.name}")
+            logger.trace(f"Started emission processor for port {self.name}")
         except Exception as e:
             logger.error(f"Failed to start emission processor: {e}")
     
@@ -419,6 +419,7 @@ class OutputPort(Port):
                 
                 try:
                     payload = emission['payload']
+                    logger.trace(f"Emitting payload from port {self.name} to {len(self.input_ports)} input ports.")
                     # Process each input port in the order they were connected
                     for port in self.input_ports:
                         await port.receive(payload, self)
@@ -428,8 +429,7 @@ class OutputPort(Port):
                 finally:
                     self._emission_queue.task_done()
         except asyncio.CancelledError:
-            logger.debug(f"Emission processor for {self.name} cancelled")
-    
+            logger.trace(f"Emission processor for {self.name} cancelled")
     async def connect(self, input_ports):
         """
         Connect this output port to one or more input ports.
@@ -463,9 +463,10 @@ class OutputPort(Port):
             # Log the connection
             log_connect(self, port)
             
-            # Execute connect callback if provided
+            # Execute connect callback if provided,
+            # passing both this OutputPort and the newly connected InputPort
             if self.on_connect_callback:
-                result = self.on_connect_callback(self)
+                result = self.on_connect_callback(self, port)
                 if asyncio.iscoroutine(result):
                     await result
         
@@ -673,7 +674,7 @@ class OutputPort(Port):
 
     async def close(self):
         """Perform graceful shutdown of the port, ensuring background task stops."""
-        logger.debug(f"Attempting to close port {self.name} ({self.id}).")
+        logger.trace(f"Attempting to close port {self.name} ({self.id}).")
 
         # Cancel the emission processor task and wait for it if possible
         if self._emission_task and not self._emission_task.done():
@@ -685,19 +686,19 @@ class OutputPort(Port):
                 
                 # Only await if the task is on the currently running loop and that loop isn't closed
                 if task_loop is current_loop and not current_loop.is_closed():
-                    logger.debug(f"Waiting for emission task cancellation for port {self.name} on current loop...")
+                    logger.trace(f"Waiting for emission task cancellation for port {self.name} on current loop...")
                     # Wait for the task to acknowledge cancellation
                     await asyncio.gather(self._emission_task, return_exceptions=True)
-                    logger.debug(f"Emission task for port {self.name} finished cancellation.")
+                    logger.trace(f"Emission task for port {self.name} finished cancellation.")
                 else:
-                    logger.warning(f"Emission task for port {self.name} is on a different or closed loop. Cannot confirm cancellation (expected during atexit). Task Loop ID: {id(task_loop)}, Current Loop ID: {id(current_loop)}")
+                    logger.trace(f"Emission task for port {self.name} is on a different or closed loop. Cannot confirm cancellation (expected during atexit). Task Loop ID: {id(task_loop)}, Current Loop ID: {id(current_loop)}")
                     
             except asyncio.CancelledError:
                 # This is expected when the task is successfully cancelled on the current loop
-                logger.debug(f"Emission task for port {self.name} confirmed cancelled.")
+                logger.trace(f"Emission task for port {self.name} confirmed cancelled.")
             except Exception as e:
                 # Log any other unexpected errors during cancellation
-                logger.error(f"Error processing emission task cancellation for port {self.name}: {e}")
+                logger.trace(f"Error processing emission task cancellation for port {self.name}: {e}")
         
         self._emission_task = None # Clear the reference
 
@@ -710,7 +711,36 @@ class OutputPort(Port):
         for item in self.required_items.values():
             item['value'] = None
         
-        logger.info(f"Port {self.name} ({self.id}) closed successfully.")
+        logger.trace(f"Port {self.name} ({self.id}) closed successfully.")
+
+    async def stage_emit_to(self, input_port, **kwargs):
+        """
+        Like stage_emit, but pack+deliver only to `input_port`.
+        """
+        # temporarily disable auto‑broadcast
+        orig = self.emit_when_ready
+        self.emit_when_ready = False
+
+        # stage values (this will _not_ auto‑emit because we've turned it off)
+        await self.stage(**kwargs)
+
+        # pack the payload
+        if self.readiness_check:
+            await self.readiness_check()
+        payload = await self._pack_payload()
+
+        # log and send only to the target
+        log_emit(self, payload)
+        await input_port.receive(payload, self)
+
+        # reset our staging state
+        self.emit_ready = False
+        for item in self.required_items.values():
+            item['value'] = None
+
+        # restore original behavior
+        self.emit_when_ready = orig
+        return payload
 
 
 class Ports(param.Parameterized):

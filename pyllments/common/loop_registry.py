@@ -20,7 +20,7 @@ class LoopRegistry:
         """
         # Return cached loop if we have one
         if cls._loop is not None:
-            logger.debug(f"LoopRegistry: Using cached loop {id(cls._loop)}")
+            # logger.debug(f"LoopRegistry: Using cached loop {id(cls._loop)}")
             return cls._loop
             
         # Try to get the existing loop or create a new one
@@ -30,9 +30,9 @@ class LoopRegistry:
             if cls._loop is None or cls._loop.is_closed():
                 cls._loop = policy.new_event_loop()
                 policy.set_event_loop(cls._loop)
-                logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
-            else:
-                logger.debug(f"LoopRegistry: Using existing loop {id(cls._loop)}")
+                # logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
+            # else:
+                # logger.debug(f"LoopRegistry: Using existing loop {id(cls._loop)}")
         except RuntimeError:
             cls._loop = policy.new_event_loop()
             policy.set_event_loop(cls._loop)

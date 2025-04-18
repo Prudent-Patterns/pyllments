@@ -292,8 +292,8 @@ class ContextBuilderElement(Element):
                 if ('payload_type' not in port_config) and ('ports' not in port_config):
                     raise ValueError(f"Payload type or ports not specified for port {name}")
                 
-                # Ensure persist flag is properly set
-                port_config['persist'] = config.get('persist', False)
+                # Always persist ports in the flow; we will clear non-persistent ports manually after emit
+                port_config['persist'] = True
                 
                 flow_map['input'][name] = port_config
         
@@ -343,10 +343,18 @@ class ContextBuilderElement(Element):
             else:
                 self.logger.debug(f"Received dependency {active_name} for trigger {self._pending_trigger}")
 
-            # Process messages for the pending trigger
+            # Determine order and process messages for the pending trigger
+            order = self._get_message_order(kwargs, self._pending_trigger)
             emitted = await self._process_messages(kwargs, messages_output, self._pending_trigger)
-            # Release lock if we fulfilled and emitted
+            # Release lock and clear consumed payloads if we fulfilled and emitted
             if emitted:
+                # Clear only regular ports that are not marked persist in the input_map
+                for name in order:
+                    real_name = self._get_real_name(name)
+                    if self.port_types.get(real_name) == 'regular':
+                        cfg = self.input_map.get(real_name, {})
+                        if not cfg.get('persist', False):
+                            self.flow_controller.flow_port_map[real_name].payload = None
                 self.logger.debug(f"Emitted and releasing lock for trigger {self._pending_trigger}")
                 self._is_processing = False
                 self._pending_trigger = None
