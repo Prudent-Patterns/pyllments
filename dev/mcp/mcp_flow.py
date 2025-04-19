@@ -132,7 +132,7 @@ final_context_builder_el = ContextBuilderElement(
         'tools': {
             'ports': [chat_interface_el.ports.tools_response_output]
         },
-        'tools_template': {
+        'tools_template': { 
             'role': 'system',
             'template': "The following are the tool calls and their responses that you previously identified "
                         "as relevant to the user's query: \n {{ tools }}"

@@ -59,7 +59,7 @@ class ChatInterfaceElement(Element):
     def _message_input_setup(self):
         """Sets up the input message port - does not emit from the message_output port"""
         async def unpack(payload: MessagePayload):
-            self.model.new_message = payload
+            await self.model.add_message(payload)
         
         self.ports.add_input(
             name='message_input',
@@ -68,7 +68,7 @@ class ChatInterfaceElement(Element):
     def _message_emit_input_setup(self):
         """Sets up the message_emit_input port - emits from the message_output port"""
         async def unpack(payload: MessagePayload):
-            self.model.new_message = payload
+            await self.model.add_message(payload)
             await self.ports.output['message_output'].stage_emit(new_message=payload)
 
         self.ports.add_input(
@@ -77,17 +77,9 @@ class ChatInterfaceElement(Element):
     
     def _tools_response_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
-            # Receive the incoming tools response payload and update the model
-            self.model.new_message = payload
-            # Set up a watcher to emit the payload once tool calls are complete
-            if not payload.model.called:
-                def emit_on_called(event):
-                    if event.new:  # If called is True
-                        asyncio.create_task(self.ports.output['tools_response_output'].stage_emit(payload=payload))
-                payload.model.param.watch(emit_on_called, 'called')
-            # If already called, emit immediately
-            elif payload.model.called:
-                await self.ports.output['tools_response_output'].stage_emit(payload=payload)
+            # Process via centralized handler then emit on tools_response_output
+            await self.model.add_message(payload)
+            await self.ports.output['tools_response_output'].stage_emit(payload=payload)
 
         self.ports.add_input(
             name='tools_response_input',
@@ -131,7 +123,11 @@ class ChatInterfaceElement(Element):
 
         self.chatfeed_view.extend(message_and_tool_response_views)
         async def _update_chatfeed(event):
-            new_item = event.new
+            # event.new is the updated message_list; extract the last appended payload
+            updated_list = event.new
+            if not isinstance(updated_list, list) or not updated_list:
+                return
+            new_item = updated_list[-1]
             if isinstance(new_item, MessagePayload):
                 fake_it = (
                     new_item.model.role == 'assistant' and 
@@ -143,7 +139,7 @@ class ChatInterfaceElement(Element):
 
                 self.chatfeed_view.append(
                     self.inject_payload_css(
-                        event.new.create_static_view,
+                        new_item.create_static_view,
                         show_role=True
                     )
                 )
@@ -176,7 +172,7 @@ class ChatInterfaceElement(Element):
                             break
 
         # This watcher should be called before the payload starts streaming.
-        self.watch_once(_update_chatfeed, 'new_message', precedence=0)
+        self.watch_once(_update_chatfeed, 'message_list', precedence=0)
         return self.chatfeed_view
 
     @Component.view
@@ -250,12 +246,12 @@ class ChatInterfaceElement(Element):
         if not input_text or input_text.strip() == '':
             return
             
-        # Create and send the message
+        # Create and send the message via centralized handler
         new_message = MessagePayload(
             role='user',
             content=input_text,
             mode='atomic')
-        self.model.new_message = new_message
+        await self.model.add_message(new_message)
         
         # Explicitly stage and emit
         await self.ports.output['message_output'].stage_emit(new_message=new_message)

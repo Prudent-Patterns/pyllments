@@ -11,6 +11,7 @@ def create_gui():
     
     # Create an instance of ToolResponsePayload with an example tool response
     tool_response_payload = ToolsResponsePayload(
+        called=True,
         tool_responses={
             'weather_mcp': {
                 'mcp_name': 'weather_mcp',
@@ -90,11 +91,11 @@ def create_gui():
         }
     )
 
-    # message_payload = MessagePayload(
-    #     role='user',
-    #     content='What is the weather in San Francisco?',
-    #     mode='atomic'
-    # )
+    message_payload = MessagePayload(
+        role='user',
+        content='What is the weather in San Francisco?',
+        mode='atomic'
+    )
 
     # # pipe_el.ports.pipe_output > chat_el.ports.tools_response_input
     # pipe_el.ports.pipe_output > chat_el.ports.message_input

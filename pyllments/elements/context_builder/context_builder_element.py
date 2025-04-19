@@ -3,6 +3,7 @@ from jinja2 import meta
 import jinja2
 import asyncio
 from loguru import logger
+import time
 
 from pyllments.elements.flow_control import FlowController
 from pyllments.payloads.message import MessagePayload
@@ -345,7 +346,11 @@ class ContextBuilderElement(Element):
 
             # Determine order and process messages for the pending trigger
             order = self._get_message_order(kwargs, self._pending_trigger)
+            # Instrumentation: measure message processing time
+            start_time = time.perf_counter()
             emitted = await self._process_messages(kwargs, messages_output, self._pending_trigger)
+            elapsed = time.perf_counter() - start_time
+            self.logger.debug(f"ContextBuilderElement: message processing for trigger '{self._pending_trigger}' took {elapsed:.4f} seconds")
             # Release lock and clear consumed payloads if we fulfilled and emitted
             if emitted:
                 # Clear only regular ports that are not marked persist in the input_map

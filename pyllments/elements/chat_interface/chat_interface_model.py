@@ -9,31 +9,22 @@ class ChatInterfaceModel(Model):
     # TODO: Implement batch interface for messages - populating message_list > iterating
     message_list = param.List(instantiate=True, item_type=(MessagePayload, ToolsResponsePayload))
     persist = param.Boolean(default=False, instantiate=True) # TODO: Implement persisting messages to disk
-    new_message = param.ClassSelector(class_=(MessagePayload, ToolsResponsePayload))
     
     def __init__(self, **params):
         super().__init__(**params)
 
-        self._create_new_message_watcher()
-
-    def _create_new_message_watcher(self):
-        async def _new_message_updated(event):
-            if not event.new or (event.old is event.new):  # Skip if no message or same message
-                return
-                
-            if isinstance(event.new, MessagePayload):
-                if (event.new.model.mode == 'stream' 
-                    and not event.new.model.streamed):  # Handle streaming AI messages
-                    await event.new.model.stream()
-            elif isinstance(event.new, ToolsResponsePayload):
-                # Process tool responses if not already called or in progress
-                if not event.new.model.called and not event.new.model.calling:
-                    await event.new.model.call_tools()
-            self.message_list.append(event.new)  # Add message regardless of type
-
-        self.param.watch(
-            _new_message_updated, 
-            'new_message', 
-            precedence=10,
-            onlychanged=True
-        )
+    async def add_message(self, payload: MessagePayload | ToolsResponsePayload):
+        """
+        Centralized handler for new messages and tool responses:
+          - Streams AI messages when in streaming mode.
+          - Calls tools for tool response payloads.
+          - Appends the processed payload to the message_list.
+        """
+        if isinstance(payload, MessagePayload):
+            if payload.model.mode == 'stream' and not payload.model.streamed:
+                await payload.model.stream()
+        elif isinstance(payload, ToolsResponsePayload):
+            if not payload.model.called and not payload.model.calling:
+                await payload.model.call_tools()
+        self.message_list.append(payload)
+        self.param.trigger('message_list')

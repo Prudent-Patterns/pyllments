@@ -292,15 +292,15 @@ def serve(
                 
                 # ---- Register Panel unload hook ----
                 try:
-                    async def panel_shutdown_hook():
+                    async def panel_shutdown_hook(session_context):
                         logger.info("Panel unload hook triggered. Cleaning up resources...")
                         await lifecycle_manager.shutdown()
                         logger.info("Panel unload hook: Resource cleanup complete.")
                         
                     # Only register if we are actually serving a GUI via Panel
                     pn.state.onload(lambda: logger.info("Pyllments Lifecycle Manager active with Panel."))
-                    pn.state.on_unload(panel_shutdown_hook)
-                    logger.info("Registered Panel unload hook for resource cleanup.")
+                    pn.state.on_session_destroyed(panel_shutdown_hook)
+                    logger.info("Registered Panel session destroyed hook for resource cleanup.")
                 except Exception as e:
                     logger.error(f"Failed to register Panel unload hook: {e}")
                 # ---- End Panel hook registration ----

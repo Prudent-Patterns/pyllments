@@ -10,6 +10,7 @@ from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from .history_handler_model import HistoryHandlerModel
+from pyllments.common.loop_registry import LoopRegistry  # use our loop registry for event loop
 
 
 # TODO: Allow support of other payload types
@@ -53,35 +54,18 @@ class HistoryHandlerElement(Element):
         # Output ports
         self._message_history_output_setup()
         self._tool_response_history_output_setup()
+        # Watch for context changes to emit history asynchronously
+        self.model.param.watch(self._emit_all_history, 'context')
 
     def _message_emit_input_setup(self):
         async def unpack(payload: MessagePayload):
-            # If message hasn't streamed:
-            # Wait for stream to complete before adding to context
-            if payload.model.mode == 'stream' and not payload.model.streamed:
-                # Create a future to resolve when streaming is complete
-                streaming_done = asyncio.Future()
-                
-                def stream_callback(event):
+            # Load into history/context; emission is triggered by context watcher
+            self.model.load_entries([payload])
+            # For streaming payloads, load entries again when stream completes
+            if getattr(payload.model, 'mode', None) == 'stream':
+                def on_streamed(event):
                     self.model.load_entries([payload])
-                    if not streaming_done.done():
-                        streaming_done.set_result(True)
-
-                payload.model.param.watch(stream_callback, 'streamed')
-                
-                # If streaming doesn't complete in a reasonable time, continue anyway
-                try:
-                    await asyncio.wait_for(streaming_done, timeout=10.0)
-                except asyncio.TimeoutError:
-                    # Proceed even if streaming hasn't completed
-                    self.model.load_entries([payload])
-            else:
-                self.model.load_entries([payload])
-            
-            # Only stage_emit if message context isn't an empty list
-            message_context = self.model.get_context_message_payloads()
-            if message_context:
-                await self.ports.output['message_history_output'].stage_emit(context=message_context)
+                payload.model.param.watch(on_streamed, 'streamed')
 
         self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
@@ -94,40 +78,14 @@ class HistoryHandlerElement(Element):
 
     def _tool_response_emit_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
-            # Only process tool responses that have been called or wait for them to be called
+            # Load tool response; emission is triggered by context watcher
+            self.model.load_entries([payload])
+            # For tool calls still pending, load entries when call completes
             if not payload.model.called:
-                # Create a future to resolve when the tool is called
-                tool_called = asyncio.Future()
-                
-                def called_callback(event):
-                    if payload.model.tool_responses:  # Only process if there are responses
+                def on_called(event):
+                    if payload.model.tool_responses:
                         self.model.load_entries([payload])
-                        tool_context = self.model.get_context_tool_response_payloads()
-                        # Only stage_emit if tool response context isn't an empty list
-                        if tool_context:
-                            # Create async task since we can't await directly in callback
-                            asyncio.create_task(
-                                self.ports.output['tool_response_history_output'].stage_emit(
-                                    context=tool_context
-                                )
-                            )
-                        if not tool_called.done():
-                            tool_called.set_result(True)
-
-                payload.model.param.watch(called_callback, 'called')
-                
-                # If tool isn't called in a reasonable time, continue anyway
-                try:
-                    await asyncio.wait_for(tool_called, timeout=10.0)
-                except asyncio.TimeoutError:
-                    # Proceed without waiting further
-                    pass
-            elif payload.model.tool_responses:  # If already called and has responses, process immediately
-                self.model.load_entries([payload])
-                tool_context = self.model.get_context_tool_response_payloads()
-                # Only stage_emit if tool response context isn't an empty list
-                if tool_context:
-                    await self.ports.output['tool_response_history_output'].stage_emit(context=tool_context)
+                payload.model.param.watch(on_called, 'called')
 
         self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
 
@@ -155,9 +113,9 @@ class HistoryHandlerElement(Element):
                     def called_callback(event):
                         if payload.model.tool_responses:  # Only process if there are responses
                             self.model.load_entries([payload])
-                            # We can't await directly in a callback, so use create_task
-                            asyncio.create_task(
-                                self._handle_tool_response_update() # This will emit tool response history
+                            # Schedule history update using our LoopRegistry
+                            LoopRegistry.get_loop().create_task(
+                                self._handle_tool_response_update()  # This will emit tool response history
                             )
                     return called_callback
 
@@ -167,11 +125,8 @@ class HistoryHandlerElement(Element):
     
     async def _handle_tool_response_update(self):
         """Helper method to handle tool response updates asynchronously"""
-        tool_context = self.model.get_context_tool_response_payloads()
-        if tool_context:
-            await self.ports.output['tool_response_history_output'].stage_emit(
-                context=tool_context
-            )
+        # no-op: context watcher handles emissions
+        return
 
     def _message_history_output_setup(self):
         async def pack(context: List[MessagePayload]) -> List[MessagePayload]:
@@ -193,6 +148,21 @@ class HistoryHandlerElement(Element):
             name='tool_response_history_output',
             pack_payload_callback=pack,
             payload_type=List[ToolsResponsePayload]
+        )
+
+    def _emit_all_history(self, event):
+        """Watch context changes and emit both message and tool response history."""
+        # Emit message history
+        LoopRegistry.get_loop().create_task(
+            self.ports.output['message_history_output'].stage_emit(
+                context=self.model.get_context_message_payloads()
+            )
+        )
+        # Emit tool response history
+        LoopRegistry.get_loop().create_task(
+            self.ports.output['tool_response_history_output'].stage_emit(
+                context=self.model.get_context_tool_response_payloads()
+            )
         )
 
     # TODO: Add a view for tool responses

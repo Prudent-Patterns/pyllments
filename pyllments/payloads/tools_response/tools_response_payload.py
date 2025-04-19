@@ -3,6 +3,7 @@ from jinja2 import Template
 from loguru import logger
 from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
+from pyllments.common.loop_registry import LoopRegistry
 
 from .tools_response_model import ToolsResponseModel
 
@@ -33,7 +34,8 @@ class ToolsResponsePayload(Payload):
         response_md_css: list = []
     ):
         # Create a placeholder column that will be updated dynamically
-        placeholder = pn.Column(pn.pane.Str('Loading tool responses...'), styles={'flex': '0 0 auto', 'height': 'fit-content'})
+        # max-height: none is NEEDED to avoid weird placement in columns
+        placeholder = pn.Column(pn.pane.Str('Loading tool responses...'), styles={'flex': '0 0 auto', 'height': 'fit-content', 'max-height': 'none'})
         
         # Define an async function to update the view once tools are called
         async def update_view():
@@ -88,8 +90,7 @@ class ToolsResponsePayload(Payload):
             placeholder.extend(tool_cards)
         
         # Trigger the async update
-        import asyncio
-        asyncio.create_task(update_view())
+        LoopRegistry.get_loop().create_task(update_view())
         
         return placeholder
     
