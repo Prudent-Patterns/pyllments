@@ -10,6 +10,7 @@ from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.common.loop_registry import LoopRegistry
 
 class ChatInterfaceElement(Element):
     """
@@ -77,7 +78,7 @@ class ChatInterfaceElement(Element):
     
     def _tools_response_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
-            # Process via centralized handler then emit on tools_response_output
+            # Add the payload to the chat model and immediately stage for emit
             await self.model.add_message(payload)
             await self.ports.output['tools_response_output'].stage_emit(payload=payload)
 
@@ -88,6 +89,8 @@ class ChatInterfaceElement(Element):
     def _tools_response_output_setup(self):
         """Sets up the output port for tool responses"""
         async def pack(payload: ToolsResponsePayload) -> ToolsResponsePayload:
+            # Defer actual emission until payload is fully ready
+            await payload.model.await_ready()
             return payload
 
         self.ports.add_output(
@@ -150,26 +153,8 @@ class ChatInterfaceElement(Element):
                     new_item.model.content = loaded_content
 
             elif isinstance(new_item, ToolsResponsePayload):
-                # Add a placeholder to the chat feed while processing
-                placeholder = pn.pane.Str('Processing tool response...')
-                self.chatfeed_view.append(placeholder)
-                # Set up a watcher on the 'called' parameter to update the view once tools are processed
-                def update_tool_response_view(event):
-                    if event.new:  # If called is True
-                        # Find the index of the placeholder in the chat feed
-                        for i, item in enumerate(self.chatfeed_view):
-                            if item is placeholder:
-                                # Replace placeholder with the actual tool response view
-                                self.chatfeed_view[i] = new_item.create_tool_response_view()
-                                break
-
-                new_item.model.param.watch(update_tool_response_view, 'called')
-                # If already called, update immediately (for pre-populated responses)
-                if new_item.model.called:
-                    for i, item in enumerate(self.chatfeed_view):
-                        if item is placeholder:
-                            self.chatfeed_view[i] = new_item.create_tool_response_view()
-                            break
+                # Append the dynamic tool response view, which has its own prompt logic
+                self.chatfeed_view.append(new_item.create_tool_response_view())
 
         # This watcher should be called before the payload starts streaming.
         self.watch_once(_update_chatfeed, 'message_list', precedence=0)

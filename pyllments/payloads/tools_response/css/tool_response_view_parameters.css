@@ -1,8 +1,9 @@
-/* .codehilite {
-    margin-top: .5rem !important;
-    margin-bottom: .5rem !important;
-} */
+.codehilite {
+    margin-top: 1.3rem !important;
+    margin-bottom: 0.8rem !important;
+    padding: 8px 10px;
+}
 
-/* :host {
-    margin: -9px 0px;
-} */
+:host {
+    margin: -9px 7px;
+}

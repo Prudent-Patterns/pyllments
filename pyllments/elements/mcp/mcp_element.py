@@ -70,11 +70,14 @@ class MCPElement(Element):
                     continue
                     
                 description = self.model.tools[hybrid_name]['description']
+                # Include permission requirement flag in the payload
+                permission_required = self.model.tools[hybrid_name].get('permission_required', False)
                 tool_responses[hybrid_name] = {
                     'mcp_name': self.model.hybrid_name_mcp_tool_map[hybrid_name]['mcp_name'],
                     'tool_name': self.model.hybrid_name_mcp_tool_map[hybrid_name]['tool_name'],
                     'description': description,
                     'parameters': parameters,
+                    'permission_required': permission_required,
                     'call': self.model.create_call(hybrid_name, parameters)
                 }
             return ToolsResponsePayload(tool_responses=tool_responses)

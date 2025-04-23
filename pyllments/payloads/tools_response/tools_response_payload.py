@@ -15,7 +15,7 @@ class ToolsResponsePayload(Payload):
 
     parameters_template = Template("""```
 {
-{% for key, value in parameters.items() -%}
+{%- for key, value in parameters.items() %}
 {{ key }}: {{ value }}{% if not loop.last %},{% endif %}
 {%- endfor %}
 }
@@ -37,59 +37,99 @@ class ToolsResponsePayload(Payload):
         # max-height: none is NEEDED to avoid weird placement in columns
         placeholder = pn.Column(pn.pane.Str('Loading tool responses...'), styles={'flex': '0 0 auto', 'height': 'fit-content', 'max-height': 'none'})
         
-        # Define an async function to update the view once tools are called
+        # Build permission states: 'pending' for tools that require approval, else 'auto'
+        states: dict[str, str] = {
+            name: 'pending' if data.get('permission_required', False) else 'auto'
+            for name, data in self.model.tool_responses.items()
+        }
+
+        # Async helper to call a single tool and re-render
+        async def _run_tool(tool_name: str):
+            tool_data = self.model.tool_responses[tool_name]
+            response = await tool_data['call']()
+            tool_data['response'] = response.model_dump()
+            LoopRegistry.get_loop().create_task(update_view())
+
+        # Main update logic: render prompts or results based on state
         async def update_view():
-            if not self.model.called and not self.model.calling:
-                await self.model.call_tools()
-            # Clear the placeholder and append the actual content
             placeholder.clear()
             tool_cards = []
             for tool_name, tool_data in self.model.tool_responses.items():
-                logger.debug(f"Tool data for {tool_name}: {tool_data}")
-                if 'response' in tool_data:
-                    logger.debug(f"Response object: {tool_data['response']}")
-                tool_card_kwargs = {'collapsed': False}
-                tool_card_kwargs['objects'] = []
-                if tool_data.get('parameters', None):
-                    parameters_str = self.parameters_template.render(parameters=tool_data['parameters'])
-                    tool_card_kwargs['objects'].append(pn.pane.Markdown(
-                        parameters_str,
-                        # styles={'margin': '-9px 0px'},
-                        stylesheets=parameters_css
+                state = states.get(tool_name, 'auto')
+                # Skip denied
+                if state == 'denied':
+                    continue
+
+                # Prompt for pending tools
+                if state == 'pending':
+                    approve = pn.widgets.Button(name='Approve', button_type='primary',
+                                                stylesheets=[":host(.solid) .bk-btn.bk-btn-primary {background-color: var(--tertiary-accent-color); font-size: 15px}",
+                                                             ".bk-btn, ::file-selector-button {padding: 0px 10px}"])
+                    deny = pn.widgets.Button(name='Deny', button_type='danger',
+                                             stylesheets=[":host(.solid) .bk-btn.bk-btn-danger {background-color: var(--primary-accent-color); font-size: 15px}",
+                                                          ".bk-btn, ::file-selector-button {padding: 0px 10px}"])
+
+                    def on_approve(evt, tool_name=tool_name):
+                        states[tool_name] = 'approved'
+                        LoopRegistry.get_loop().create_task(_run_tool(tool_name))
+
+                    def on_deny(evt, tool_name=tool_name):
+                        states[tool_name] = 'denied'
+                        LoopRegistry.get_loop().create_task(update_view())
+
+                    approve.on_click(on_approve)
+                    deny.on_click(on_deny)
+                    # Construct styled header for pending state
+                    header = pn.Row(
+                        pn.pane.Str(tool_data['mcp_name'], stylesheets=str_css),
+                        pn.pane.Str(' is requesting to run ', styles={'font-size': '14px'}),
+                        pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
+                    )
+                    tool_cards.append(
+                        pn.layout.Card(
+                            header=header,
+                            objects=[pn.Row(approve, deny)],
+                            stylesheets=card_css
                         )
                     )
+                    continue
+
+                # Auto or approved: parameters + response/processing
+                tool_card_kwargs = {'collapsed': False, 'objects': []}
+                if tool_data.get('parameters'):
+                    md = self.parameters_template.render(parameters=tool_data['parameters'])
+                    tool_card_kwargs['objects'].append(pn.pane.Markdown(md, stylesheets=parameters_css))
                 else:
-                    tool_card_kwargs['objects'].append(pn.pane.Markdown(
-                        'No parameters provided.',
-                        # styles={'margin': '-9px 0px'},
-                        stylesheets=parameters_css
-                        )
-                    )
-                card_header_row = pn.Row(
+                    tool_card_kwargs['objects'].append(pn.pane.Markdown('No parameters provided.', stylesheets=parameters_css))
+
+                # Construct styled header for completed state
+                header = pn.Row(
                     pn.pane.Str(tool_data['mcp_name'], stylesheets=str_css),
-                    pn.pane.Str('is running', styles={'font-size': '14px'}),
+                    pn.pane.Str(' has run ', styles={'font-size': '14px'}),
                     pn.pane.Str(tool_data['tool_name'], stylesheets=str_css)
                 )
-                response_indicator = pn.pane.Str('Response:', stylesheets=str_css, styles={'margin-left': '0px'})
-                
                 if 'response' in tool_data and tool_data['response'].get('content'):
-                    response_str = pn.pane.Str(tool_data['response']['content'][0]['text'],
-                                            stylesheets=response_md_css)
+                    text = tool_data['response']['content'][0]['text']
+                    pane = pn.pane.Str(text, stylesheets=response_md_css)
                 else:
-                    response_str = pn.pane.Str('Processing...', stylesheets=response_md_css)
+                    # Schedule call for tools that are either auto-run or user-approved
+                    if state in ('auto', 'approved') and 'response' not in tool_data:
+                        LoopRegistry.get_loop().create_task(_run_tool(tool_name))
+                    pane = pn.pane.Str('Processing...', stylesheets=response_md_css)
 
-                response_col = pn.Column(response_indicator, response_str)
-                tool_card_kwargs['objects'].append(response_col)
-                
-                tool_card = pn.layout.Card(
-                    header=card_header_row,
-                    **tool_card_kwargs,
-                    stylesheets=card_css
-                    )
-                tool_cards.append(tool_card)
+                tool_card_kwargs['objects'].append(pn.Column(pn.pane.Str('Response:',
+                                                                         stylesheets=[":host {margin-bottom: 0px}"]), pane))
+                tool_cards.append(
+                    pn.layout.Card(header=header, **tool_card_kwargs, stylesheets=card_css)
+                )
+
             placeholder.extend(tool_cards)
-        
-        # Trigger the async update
+            # Once no tools remain pending approval, signal that the payload is fully processed
+            if not any(state == 'pending' for state in states.values()):
+                # Mark model.called to trigger watchers
+                self.model.called = True
+
+        # Initial render
         LoopRegistry.get_loop().create_task(update_view())
         
         return placeholder

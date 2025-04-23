@@ -1,6 +1,7 @@
 import param
 import jinja2
 import asyncio
+import time
 from pyllments.base.model_base import Model
 
 
@@ -8,6 +9,7 @@ class ToolsResponseModel(Model):
     """
     Model representing a tool response.
     """
+    timestamp = param.Number(default=None, doc="Unix timestamp when the tool response was created")
     _content = param.String(default='', doc="""
         The string representation of the tool response.
         """)
@@ -17,6 +19,7 @@ class ToolsResponseModel(Model):
             'weather_temp_mcp': {
                 'mcp_name': 'weather_mcp',
                 'tool_name': 'temp',
+                'permission_required': False,
                 'description': 'Get the temperature in a location',
                 'parameters': {'location': 'San Francisco'}, # parameters of the tool call
                 'response': {
@@ -32,6 +35,7 @@ class ToolsResponseModel(Model):
             'todo_mcp': {
                 'mcp_name': 'todo_mcp',
                 'tool_name': 'add',
+                'permission_required': True,
                 'description': 'Add a todo item',
                 'parameters': None,
                 'response': {
@@ -71,6 +75,8 @@ class ToolsResponseModel(Model):
 
     def __init__(self, **params):
         super().__init__(**params)
+        if self.timestamp is None:
+            self.timestamp = time.time()
         self.set_template()
         # self.jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
         # self.template = self.get_template_str()
@@ -87,6 +93,7 @@ class ToolsResponseModel(Model):
         # Update the template to trim whitespace and reduce extra blank lines
         self.template = jinja2.Template("""The following are responses from the tools used:
 {%- for tool_name, tool_data in tool_responses.items() %}
+{%- if 'response' in tool_data %}
 ### Tool: {{ tool_name }}
 {%- if tool_data.description %}
 ### Description:
@@ -102,6 +109,7 @@ class ToolsResponseModel(Model):
 {%- for content_item in tool_data.response.content %}
 {{ content_item.text }}
 {%- endfor %}
+{%- endif %}
 {%- endfor %}""")
     
     async def call_tools(self):
@@ -123,6 +131,25 @@ class ToolsResponseModel(Model):
                 self.param.unwatch(watcher)
         self.calling = False
         return self.tool_responses
+    
+    async def await_ready(self):
+        """Await until all tool calls have completed (called=True)."""
+        # If already marked called, return immediately
+        if not self.called:
+            # Create a future that will be set when called becomes True
+            loop = asyncio.get_event_loop()
+            future = loop.create_future()
+            # Watch for the 'called' flag to change
+            def _on_called(event):
+                if event.new:
+                    # Resolve the future and unwatch
+                    future.set_result(self)
+                    self.param.unwatch(_watcher)
+            # Register the watcher
+            _watcher = self.param.watch(_on_called, 'called')
+            await future
+        return self
+
     # def get_template_str(self):
 
     #     if self.response_specificity == 'default':

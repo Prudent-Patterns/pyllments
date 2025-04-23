@@ -35,40 +35,45 @@ class StructuredRouterTransformer(Element):
   
     """
     routing_map = param.Dict(default={}, doc="""
-        A dictionary defining the routing logic. Each key represents a route name.
-        The value is a dictionary with the following keys:
-
-        - 'schema': (dict) Defines the expected structure for this route.
-            - Can contain 'pydantic_model': (type[BaseModel] | type) directly specifying the Pydantic model or basic type (e.g., str).
-            - OR 'ports': (list[InputPort]) List of input ports to listen on for schema updates (e.g., from an MCPElement).
-            - OR 'payload_type': (type[Payload]) Expected payload type carrying the schema on the input ports. Defaults to SchemaPayload if 'ports' is used.
-            - 'extract_callback': (callable, optional) A function that takes the schema payload and returns the Pydantic model. Defaults to `lambda payload: payload.model.schema`.
-            - 'name': (str, optional) A name used for this route in the combined Pydantic schema. Defaults to the route key.
-        - 'payload_type': (type[Payload]) The type of Payload to emit from the output port associated with this route.
-        - 'ports': (list[InputPort], optional) A list of input ports that the corresponding output port for this route should connect to.
-        - 'transform': (callable, optional) A function to transform the extracted data before emitting it.
-            - This function receives one argument: the data extracted from the input message that corresponds to this route's key.
-              If the schema for the route defines a Pydantic `BaseModel`, the argument passed here will be the result of calling `.model_dump()` on that model instance (a dict).
-              Otherwise, it's the raw extracted value (e.g., a string, list, etc.).
-            - The function MUST return a Payload instance (matching the 'payload_type' defined for this route).
-            - If omitted, the element defaults to creating a `StructuredPayload` where its `data` attribute is the extracted value.
-        - 'content_callback': (callable, optional) Currently unused placeholder.
-
+        A dictionary defining the routing logic. Each key is a route name.
+        The value is a dict with a single key 'outputs', whose value is an ordered mapping
+        from data_field names to spec dicts, each with:
+        
+        - 'schema': dict defining the Pydantic model for that field.
+            - 'pydantic_model': type[BaseModel] or basic type.
+            - OR 'ports': list of InputPorts for schema updates (with optional 'payload_type', 'extract_callback').
+        - 'ports': list[InputPort] that the output port should connect to.
+        - 'payload_type': (optional) the Payload class to emit; defaults to StructuredPayload.
+        - 'transform': (optional) function(value) -> Payload instance.
+        
         Example:
         routing_map = {
             'reply': {
-                'schema': {'pydantic_model': str},
-                'payload_type': MessagePayload,
-                'ports': [chat_interface_el.ports.message_input] # Output connects here
+                'outputs': {
+                    'message': {
+                        'schema': {'pydantic_model': str},
+                        'ports': [chat_interface_el.ports.message_input],
+                        'transform': lambda txt: MessagePayload(content=txt, role='assistant')
+                    },
+                    'reasoning': {
+                        'schema': {'pydantic_model': str},
+                        'ports': [some_other_port],
+                        'transform': lambda r: MessagePayload(content=f'Reason: {r}')
+                    }
+                }
             },
             'tools': {
-                'schema': {
-                    'ports': [mcp_el.ports.tools_schema_output], # Input schema from here
-                    'name': 'tools_request' # Route named 'tools_request' in schema
-                },
-                'transform': lambda data_dict: ToolCallPayload(tools=data_dict['tools']), # Custom transform
-                'payload_type': ToolCallPayload,
-                'ports': [mcp_el.ports.tool_call_input] # Output connects here
+                'outputs': {
+                    'tools': {
+                        'schema': {'payload_type': SchemaPayload},
+                        'payload_type': StructuredPayload
+                    },
+                    'reasoning': {
+                        'schema': {'pydantic_model': str},
+                        'ports': [some_other_port],
+                        'transform': lambda r: MessagePayload(content=f'Reason: {r}')
+                    }
+                }
             }
         }
         """)
@@ -99,30 +104,39 @@ class StructuredRouterTransformer(Element):
 
     def flow_map_setup(self):
         flow_map = {'input': {}, 'output': {}}
+        # Each route must define an 'outputs' mapping of data_field -> spec
         for route, route_params in self.routing_map.items():
-            if ports := route_params.get('ports', None):
-                flow_map['output'][route] = {'ports': ports}
-            elif payload_type := route_params.get('payload_type', None):
-                flow_map['output'][route] = {'payload_type': payload_type}
-            else:
-                raise ValueError(f"No ports or payload_type provided for route {route}")
-            
-            schema_params = route_params['schema']
-            input_key = route + '_schema_input'
-            if 'ports' in schema_params:
-                flow_map['input'][input_key] = {
-                    'ports': schema_params['ports'], 
-                    'persist': True,
-                }
-            elif 'payload_type' in schema_params:
-                flow_map['input'][input_key] = {
-                    'payload_type': schema_params['payload_type'], 
-                    'persist': True,
-                }
-            elif 'pydantic_model' in schema_params:
-                pass
-            else:
-                raise ValueError(f"No valid schema parameters provided for route {route}")
+            outputs = route_params.get('outputs')
+            if outputs is None:
+                raise ValueError(f"No 'outputs' defined for route {route}")
+            for data_field, spec in outputs.items():
+                alias = f"{route}_{data_field}"
+                # configure the output port for this field
+                if ports := spec.get('ports'):
+                    flow_map['output'][alias] = {'ports': ports}
+                elif payload_type := spec.get('payload_type'):
+                    flow_map['output'][alias] = {'payload_type': payload_type}
+                else:
+                    raise ValueError(f"No ports or payload_type provided for output '{data_field}' in route '{route}'")
+                # configure schema input port for this field
+                schema_spec = spec.get('schema', {})
+                input_key = f"{alias}_schema_input"
+                if 'ports' in schema_spec:
+                    flow_map['input'][input_key] = {
+                        'ports': schema_spec['ports'],
+                        'persist': True,
+                    }
+                elif 'payload_type' in schema_spec:
+                    flow_map['input'][input_key] = {
+                        'payload_type': schema_spec['payload_type'],
+                        'persist': True,
+                    }
+                elif 'pydantic_model' in schema_spec:
+                    # pydantic model provided directly—no schema input port needed
+                    pass
+                else:
+                    raise ValueError(f"No valid schema parameters for output '{data_field}' in route '{route}'")
+        # incoming message_input mapping (unchanged)
         if self.incoming_output_port and self.incoming_output_port.payload_type is MessagePayload:
             flow_map['input']['message_input'] = {'ports': [self.incoming_output_port]}
         else:
@@ -152,90 +166,97 @@ class StructuredRouterTransformer(Element):
             'pydantic_model'
             )
         
-    @property
-    def schemas(self):
-        """
-        Used to get the schema and schema name to use for each of the routes.
-        Only return the schemas that have pydantic models
-        """
-        schemas = {}
-        for route in self.routing_map:
-            if pydantic_model := self.routing_map[route]['schema'].get('pydantic_model', None):
-                if self.routing_map[route]['schema'].get('name', None):
-                    schema_name_str = self.routing_map[route]['schema']['name']
-                else:
-                    schema_name_str = route
-                schemas[route] = {
-                    'name': schema_name_str,
-                    'pydantic_model': pydantic_model
-                    }
-        return schemas
-    
     def set_pydantic_schema(self, pydantic_schema=None):
         """
-        Creates the overarching Root Union schema based on the schemas in the routes. Titles stripped.
-        One such route (reply can be a more complex nested object):
-        {
-            'route': 'reply',
-            'reply': 'some reply'
-        }
+        Builds a unified RootModel union from each route's sub-models.
+        Each sub-model is named '<route>_route' and includes:
+          - A Literal 'route' field enforcing the route key.
+          - One field per data_field from the route's outputs, with its Pydantic model.
+          - CleanModel base for consistent validation.
         """
         if pydantic_schema:
             self.pydantic_model = pydantic_schema
         else:
-            sub_pydantic_models = []
-            for schema in self.schemas.values():
-                sub_pydantic_model_kwargs = {
-                    'route': (Literal[schema['name']], ...), # Literal always required
-                    schema['name']: (schema['pydantic_model'], ...),
-                    '__base__': CleanModel
-                    }
-                sub_pydantic_model = create_model(f"{schema['name']}_route", **sub_pydantic_model_kwargs)
-                sub_pydantic_models.append(sub_pydantic_model)
+            sub_models = []
+            # Build one Pydantic model per route
+            for route, params in self.routing_map.items():
+                outputs = params.get('outputs', {})
+                if not outputs:
+                    raise ValueError(f"No outputs defined for route '{route}' when building schema")
+                # Begin fields with the 'route' discriminator
+                fields = {'route': (Literal[route], ...)}
+                added_fields = False
+                # Include only outputs that have an initial pydantic_model
+                for field_name, spec in outputs.items():
+                    schema_spec = spec.get('schema', {})
+                    if 'pydantic_model' in schema_spec:
+                        p_mod = schema_spec['pydantic_model']
+                        fields[field_name] = (p_mod, ...)
+                        added_fields = True
+                # Skip routes without any initial schema field
+                if not added_fields:
+                    continue
+                # Always use CleanModel as base
+                fields['__base__'] = CleanModel
+                sub_model = create_model(f"{route}_route", **fields)
+                sub_models.append(sub_model)
+            # Union all route sub-models into a RootModel for incoming validation
             self.pydantic_model = create_model(
                 '',
-                __base__=(RootModel[Union[*sub_pydantic_models]], CleanModel),
-                )
+                __base__=(RootModel[Union[*sub_models]], CleanModel),
+            )
 
     def flow_fn_setup(self):
 
         async def flow_fn(**kwargs):
-            if (active := kwargs['active_input_port']).name == 'message_input':
-                # route = active.name
+            active = kwargs['active_input_port']
+            # Handle incoming JSON messages
+            if active.name == 'message_input':
                 message_content = await active.payload.model.aget_message()
                 self.logger.debug(f"Incoming JSON: {message_content}")
-                
-                # Handle empty message content
                 if not message_content or message_content.strip() == "":
                     self.logger.error("Received empty message content")
                     return
                 try:
-                    model = self.pydantic_model.model_validate_json(message_content).root
-                    self.logger.debug(f"Root model: {model}")
-                    
-                    route = model.route
-                    if model.route not in self.routing_map:
-                        raise ValueError(f"Route {model.route} not found in routing_map keys: {self.routing_map.keys()}")
-                    output_model = getattr(model, route)
-                    output_value = output_model.model_dump() if isinstance(output_model, BaseModel) else output_model
-                    if transform := self.routing_map[route].get('transform', None):
-                        output_payload = transform(output_value)
-                    else: # Default to message payload
-                        # json_str = output_model.model_dump_json()
-                        output_payload = StructuredPayload(data=output_value)
-                    await kwargs[route].emit(output_payload)
+                    validated = self.pydantic_model.model_validate_json(message_content).root
+                    route = validated.route
+                    if route not in self.routing_map:
+                        raise ValueError(f"Unknown route '{route}'")
+                    # Emit each defined output field
+                    for field_name, spec in self.routing_map[route]['outputs'].items():
+                        value = getattr(validated, field_name)
+                        data = value.model_dump() if isinstance(value, BaseModel) else value
+                        # Apply transform or default to payload_type
+                        if transform := spec.get('transform'):
+                            payload = transform(data)
+                        else:
+                            PayloadClass = spec.get('payload_type', StructuredPayload)
+                            payload = PayloadClass(data=data)
+                        port_alias = f"{route}_{field_name}"
+                        await kwargs[port_alias].emit(payload)
                 except Exception as e:
                     self.logger.error(f"Error processing message: {e}")
                     self.logger.error(f"Schema expected: {self.pydantic_model.model_json_schema()}")
-                    # Optionally, you could add a default route or error handling here
-            # Set the pydantic schema based on the provided schema input
+                    return
+            # Handle schema updates for each output field
             elif active.name.endswith('_schema_input'):
-                route = active.name.removesuffix('_schema_input')
-                if extract_callback := self.routing_map[route]['schema'].get('extract_callback', None):
-                    pydantic_schema = extract_callback(active)
-                else: # Assume schema payload
-                    pydantic_schema = active.payload.model.schema
-                self.routing_map[route]['schema']['pydantic_model'] = pydantic_schema
-                self.set_pydantic_schema()
-                self.logger.debug(f"Updated schema: {self.pydantic_model.model_json_schema()}")
+                alias = active.name.removesuffix('_schema_input')
+                updated = False
+                for route, params in self.routing_map.items():
+                    for field_name, spec in params.get('outputs', {}).items():
+                        if alias == f"{route}_{field_name}":
+                            schema_spec = spec['schema']
+                            if extract := schema_spec.get('extract_callback'):
+                                new_model = extract(active)
+                            else:
+                                new_model = active.payload.model.schema
+                            schema_spec['pydantic_model'] = new_model
+                            self.set_pydantic_schema()
+                            self.logger.debug(
+                                f"Updated schema for {alias}: {self.pydantic_model.model_json_schema()}"
+                            )
+                            updated = True
+                            break
+                    if updated:
+                        break
         return flow_fn

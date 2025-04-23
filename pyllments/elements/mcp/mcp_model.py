@@ -43,16 +43,16 @@ class MCPModel(Model):
                 'env': {
                     'muh_api_key': 'verynice'
                 },
+                'tools_requiring_permission': ['remove_todo']
             },
             'weather': {
                 'type': 'sse',
                 'host': 'localhost',
                 'port': 1234
             },
-            'email': {
-                'type': 'mcp_class',
-                'class': 'GmailMCP',
-                'hitl_tools': ['send_email', 'block_sender']
+            'functions': {
+                'tools': ['custom_fn0', 'custom_fn1'],
+                'tools_requiring_permission': ['custom_fn1']
             }
         }
         """)
@@ -66,7 +66,8 @@ class MCPModel(Model):
                 'parameters': {
                     'type': 'object',
                     'properties': {'property': {'type': 'string'}},
-                }
+                },
+                'permission_required': True
             },
         }
     """)
@@ -165,6 +166,12 @@ class MCPModel(Model):
             tool_item['parameters'] = tool_item['inputSchema']
             del tool_item['inputSchema']
             vanilla_name = tool_item['name']
+            # Determine if this tool requires permission based on mcps config
+            permission_required = False
+            required_tools = self.mcps.get(mcp_name, {}).get('tools_requiring_permission', [])
+            if vanilla_name in required_tools:
+                permission_required = True
+            tool_item['permission_required'] = permission_required
             hybrid_name = f"{mcp_name}_{vanilla_name}"
             del tool_item['name']
             self.hybrid_name_mcp_tool_map[hybrid_name] = {

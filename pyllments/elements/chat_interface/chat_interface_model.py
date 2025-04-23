@@ -24,7 +24,12 @@ class ChatInterfaceModel(Model):
             if payload.model.mode == 'stream' and not payload.model.streamed:
                 await payload.model.stream()
         elif isinstance(payload, ToolsResponsePayload):
-            if not payload.model.called and not payload.model.calling:
+            # Only auto-call tools if none require permission; otherwise defer to the view prompting logic
+            requires_perm = any(
+                resp.get('permission_required', False)
+                for resp in (payload.model.tool_responses or {}).values()
+            )
+            if not payload.model.called and not payload.model.calling and not requires_perm:
                 await payload.model.call_tools()
         self.message_list.append(payload)
         self.param.trigger('message_list')

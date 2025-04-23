@@ -10,7 +10,7 @@ from pyllments.elements import (
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.serve import flow
 
-initial_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Initial context pipe received: {ps}")
+initial_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Initial context pipe received: {ps.model.content}")
 
 reply_pipe_el = PipeElement(receive_callback=lambda p: f"Reply pipe received: {p}")
 tools_pipe_el = PipeElement(receive_callback=lambda p: f"Tools pipe received: {p}")
@@ -75,19 +75,27 @@ initial_context_builder_el.ports.messages_output > initial_context_pipe_el.ports
 structured_router_el = StructuredRouterTransformer(
     routing_map={
         'reply': {
-            'schema': {'pydantic_model': str},
-            'ports': [chat_interface_el.ports.message_input],
-            'transform': lambda reply_content: MessagePayload(content=reply_content, role='assistant')
+            'outputs': {
+                'message': {
+                    'schema': {'pydantic_model': str},
+                    'ports': [chat_interface_el.ports.message_input],
+                    'transform': lambda txt: MessagePayload(content=txt, role='assistant')
+                }
+            }
         },
         'tools': {
-            'schema': {'payload_type': SchemaPayload},
-            'payload_type': StructuredPayload
+            'outputs': {
+                'tools': {
+                    'schema': {'payload_type': SchemaPayload},
+                    'payload_type': StructuredPayload
+                }
+            }
         }
     }
 )
 
-structured_router_el.ports.reply > reply_pipe_el.ports.pipe_input
-structured_router_el.ports.tools > tools_pipe_el.ports.pipe_input
+structured_router_el.ports.reply_message > reply_pipe_el.ports.pipe_input
+structured_router_el.ports.tools_tools > tools_pipe_el.ports.pipe_input
 
 initial_llm_chat_el.ports.message_output > structured_router_el.ports.message_input
 
@@ -95,14 +103,15 @@ mcp_el = MCPElement(mcps={
     'test_mcp': {
         'type': 'script',
         'script': 'test_mcp_server.py',
+        'tools_requiring_permission': ['generate_random_number']
     },
     'test_mcp2': {
         'type': 'script',
         'script': 'test_mcp_server2.py',
     }
 })
-mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_schema_input
-structured_router_el.ports.tools > mcp_el.ports.tool_request_structured_input
+mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
+structured_router_el.ports.tools_tools > mcp_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
 mcp_el.ports.tool_response_output > chat_interface_el.ports.tools_response_input
 
@@ -157,15 +166,15 @@ final_context_builder_el = ContextBuilderElement(
     },
 )
 
-final_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Final context pipe received: {ps}")
+final_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Final context pipe received: {[p.model.content for p in ps]}")
 final_context_builder_el.ports.messages_output > final_context_pipe_el.ports.pipe_input
-
 
 history_handler_el = HistoryHandlerElement()
 history_handler_el.ports.message_history_output > initial_context_builder_el.ports.history
 history_handler_el.ports.message_history_output > final_context_builder_el.ports.history
-chat_interface_el.ports.output['message_output'] > history_handler_el.ports.messages_input
-structured_router_el.ports.reply > history_handler_el.ports.messages_input
+chat_interface_el.ports.message_output > history_handler_el.ports.messages_input
+chat_interface_el.ports.tools_response_output > history_handler_el.ports.tool_responses_input
+structured_router_el.ports.reply_message > history_handler_el.ports.message_emit_input
 
 
 final_llm_chat_el = LLMChatElement(model_name='gpt-4o')
@@ -180,4 +189,3 @@ final_llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 def show_chat():
     # from pyllments.common.loop_registry import LoopRegistry
     return chat_interface_el.create_interface_view(height=800, width=600)
-

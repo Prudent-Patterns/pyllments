@@ -240,7 +240,20 @@ class HistoryHandlerModel(Model):
 
     def get_context_message_payloads(self) -> List[MessagePayload]:
         """Get all message payloads in the context window."""
-        return [entry for entry, _ in self.context if isinstance(entry, MessagePayload)]
+        result = []
+        for entry, _ in self.context:
+            if isinstance(entry, MessagePayload):
+                result.append(entry)
+            elif isinstance(entry, ToolsResponsePayload):
+                # Convert tool response into a MessagePayload for LLM context
+                wrapper = MessagePayload(
+                    role='assistant',
+                    content=entry.model.content,
+                    mode='atomic',
+                    timestamp=entry.model.timestamp
+                )
+                result.append(wrapper)
+        return result
 
     def get_context_tool_response_payloads(self) -> List[ToolsResponsePayload]:
         """Get all tool response payloads in the context window."""
@@ -248,7 +261,20 @@ class HistoryHandlerModel(Model):
 
     def get_history_message_payloads(self) -> List[MessagePayload]:
         """Get all message payloads in the history."""
-        return [entry for entry, _ in self.history if isinstance(entry, MessagePayload)]
+        result = []
+        for entry, _ in self.history:
+            if isinstance(entry, MessagePayload):
+                result.append(entry)
+            elif isinstance(entry, ToolsResponsePayload):
+                # Convert tool response into a MessagePayload for historical log
+                wrapper = MessagePayload(
+                    role='assistant',
+                    content=entry.model.content,
+                    mode='atomic',
+                    timestamp=entry.model.timestamp
+                )
+                result.append(wrapper)
+        return result
         
     def get_history_tool_response_payloads(self) -> List[ToolsResponsePayload]:
         """Get all tool response payloads in the history."""
