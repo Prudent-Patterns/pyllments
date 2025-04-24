@@ -230,6 +230,7 @@ def my_flow():
     return main_view
 ```
 
+**CLI:**
 ```bash
 pyllments serve my_flow.py --logging
 ```
