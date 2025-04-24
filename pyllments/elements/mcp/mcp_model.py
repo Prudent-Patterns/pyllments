@@ -6,6 +6,10 @@ from copy import deepcopy
 import signal
 import os
 import subprocess
+import inspect
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Any, Dict, List
+from pydantic import BaseModel, create_model
 
 from loguru import logger
 from mcp import ClientSession, StdioServerParameters
@@ -15,6 +19,11 @@ import param
 from pyllments.base.model_base import Model
 from pyllments.common.loop_registry import LoopRegistry
 
+# Wrapper to ensure our Python function calls return a Pydantic model with model_dump()
+class PythonToolResponse(BaseModel):
+    meta: Any
+    content: List[Dict[str, Any]]
+    isError: bool
 
 class MCPModel(Model):
     """
@@ -37,12 +46,10 @@ class MCPModel(Model):
         mcps = {
             'todo': {
                 'type': 'script',
-                'command': 'python', # Optional, defaults to sys.executable. Can also be 'npx' for JS
+                'command': 'python',  # defaults to sys.executable
                 'script': 'todo_server.py',
                 'args': ['--logging'],
-                'env': {
-                    'muh_api_key': 'verynice'
-                },
+                'env': {'muh_api_key': 'verynice'},
                 'tools_requiring_permission': ['remove_todo']
             },
             'weather': {
@@ -50,9 +57,13 @@ class MCPModel(Model):
                 'host': 'localhost',
                 'port': 1234
             },
-            'functions': {
-                'tools': ['custom_fn0', 'custom_fn1'],
-                'tools_requiring_permission': ['custom_fn1']
+            'my_functions': {
+                'type': 'functions',
+                'tools': {
+                    'calculate': calculate,           # function reference
+                    'get_current_time': get_current_time
+                },
+                'tools_requiring_permission': ['calculate']
             }
         }
         """)
@@ -156,6 +167,44 @@ class MCPModel(Model):
     async def _mcp_class_setup(self, mcp_name, mcp_spec):
         pass
 
+    async def create_tools_from_functions(self, mcp_name: str) -> dict[str, dict]:
+        """Dynamically build Pydantic arg models and schemas for Python functions."""
+        spec = self.mcps[mcp_name]
+        callables = spec.get('tools', {})
+        perms = spec.get('tools_requiring_permission', [])
+        tool_dict: dict[str, dict] = {}
+        for fname, func in callables.items():
+            hybrid = f"{mcp_name}_{fname}"
+            # Build dynamic Pydantic model for arguments
+            sig = inspect.signature(func)
+            fields: dict[str, tuple[Any, Any]] = {}
+            for arg_name, p in sig.parameters.items():
+                ann = p.annotation if p.annotation is not inspect._empty else Any
+                default = p.default if p.default is not inspect._empty else ...
+                fields[arg_name] = (ann, default)
+            arg_model = create_model(
+                f"{func.__name__}Arguments", __base__=BaseModel, **fields
+            )
+            schema = arg_model.model_json_schema()
+            params = {
+                'properties': schema.get('properties', {}),
+                'required': schema.get('required', []),
+                'title': schema.get('title', f"{fname}Arguments"),
+                'type': 'object'
+            }
+            self.hybrid_name_mcp_tool_map[hybrid] = {
+                'mcp_name': mcp_name,
+                'tool_name': fname
+            }
+            tool_dict[hybrid] = {
+                'description': func.__doc__ or '',
+                'parameters': params,
+                'permission_required': fname in perms,
+                'func': func,
+                'arg_model': arg_model
+            }
+        return tool_dict
+
     async def create_tools_from_mcp(self, mcp_name):
         """Create a tool dictionary from an MCP session."""
         session = self.mcps[mcp_name]['session']
@@ -182,12 +231,15 @@ class MCPModel(Model):
         return tool_dict
 
     async def tools_setup(self):
-        """Set up the tool dictionary from all MCP sessions."""
-        tool_dict = {}
-        for mcp_name in self.mcps:
-            mcp_tool_dict = await self.create_tools_from_mcp(mcp_name)
-            tool_dict.update(mcp_tool_dict)
-        self.tools = tool_dict
+        """Aggregate tools from MCP sessions and Pydantic-validated Python functions."""
+        combined: dict[str, dict] = {}
+        for name, spec in self.mcps.items():
+            if spec.get('type') == 'functions':
+                part = await self.create_tools_from_functions(name)
+            else:
+                part = await self.create_tools_from_mcp(name)
+            combined.update(part)
+        self.tools = combined
         logger.debug(f"MCPModel: Tools ready: {list(self.tools.keys())}")
 
     def create_calls(self, tool_calls: list[dict]):
@@ -205,6 +257,36 @@ class MCPModel(Model):
         mcp_tool = self.hybrid_name_mcp_tool_map[name]
         mcp_name = mcp_tool['mcp_name']
         tool_name = mcp_tool['tool_name']
+        tool_data = self.tools[name]
+        # Inline Pydantic argument validation for Python function tools
+        if 'arg_model' in tool_data:
+            func = tool_data['func']
+            arg_model = tool_data['arg_model']
+            async def call():
+                try:
+                    # Validate and coerce inputs via Pydantic
+                    validated = arg_model(**(parameters or {}))
+                    kwargs = validated.dict()
+                    # Execute the function (sync or async)
+                    if asyncio.iscoroutinefunction(func):
+                        result = await func(**kwargs)
+                    else:
+                        result = func(**kwargs)
+                    text = str(result)
+                    # Wrap in a Pydantic model so .model_dump() works
+                    return PythonToolResponse(
+                        meta=None,
+                        content=[{'type': 'text', 'text': text, 'annotations': None}],
+                        isError=False
+                    )
+                except Exception as e:
+                    return PythonToolResponse(
+                        meta=None,
+                        content=[{'type': 'text', 'text': repr(e), 'annotations': None}],
+                        isError=True
+                    )
+            return call
+        # Existing MCP session tool
         session = self.mcps[mcp_name]['session']
         async def call():
             return await session.call_tool(tool_name, arguments=parameters)

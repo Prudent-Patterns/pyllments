@@ -10,7 +10,7 @@ from pyllments.elements import (
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.serve import flow
 
-initial_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Initial context pipe received: {ps.model.content}")
+initial_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Initial context pipe received: {[p.model.content for p in ps]}")
 
 reply_pipe_el = PipeElement(receive_callback=lambda p: f"Reply pipe received: {p}")
 tools_pipe_el = PipeElement(receive_callback=lambda p: f"Tools pipe received: {p}")
@@ -99,6 +99,28 @@ structured_router_el.ports.tools_tools > tools_pipe_el.ports.pipe_input
 
 initial_llm_chat_el.ports.message_output > structured_router_el.ports.message_input
 
+def check_prime(n: int) -> bool:
+    """Check if a number is prime."""
+    if n <= 1:
+        return False
+    if n <= 3:
+        return True
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    
+    # Check remaining potential divisors of the form 6k ± 1
+    i = 5
+    while i * i <= n:
+        if n % i == 0 or n % (i + 2) == 0:
+            return False
+        i += 6
+    return True
+from typing import Optional
+def get_recent_emails(n: int, filter: Optional[str] = None) -> dict[str, dict]:
+    """Get the most recent emails from the user's inbox."""
+    return {'email_1' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'},
+            'email_2' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'}}
+
 mcp_el = MCPElement(mcps={
     'test_mcp': {
         'type': 'script',
@@ -108,6 +130,13 @@ mcp_el = MCPElement(mcps={
     'test_mcp2': {
         'type': 'script',
         'script': 'test_mcp_server2.py',
+    },
+    'custom_functions': {
+        'type': 'functions',
+        'tools': {
+            'check_prime': check_prime,
+            'get_recent_emails': get_recent_emails
+        }
     }
 })
 mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
