@@ -1,0 +1,31 @@
+---
+title: "ChatInterfaceElement"
+lightbox: true
+---
+This element is the backbone of flows involving user interaction through the browser by offering multiple Views you are able to compose to create your chat interface, including an input area, chat feed, and send button.
+It provides the essential component of user interaction through receiving `MessagePayloads` and `ToolsResponsePayloads`, generating `MessagePayloads` as responses, as well as granting tool call permission to received `ToolsResponsePayloads`.
+
+### Input Ports
+| Port Name | Payload Type | Behavior |
+|-----------|--------------|----------|
+| message_input | MessagePayload | Receives a `MessagePayload` from the previous element. |
+| message_emit_input | MessagePayload | Receives a `MessagePayload` from the previous element. |
+| tools_response_input | ToolsResponsePayload | Receives a `ToolsResponsePayload` from the previous element. |
+| tools_response_output | ToolsResponsePayload | Receives a `ToolsResponsePayload` from the previous element. |
+: {.hover}
+
+### Output Ports
+| Port Name | Payload Type | Behavior |
+|-----------|--------------|----------|
+| message_output | MessagePayload | Emits a `MessagePayload` to the next element. |
+| tools_response_output | ToolsResponsePayload | Emits a `ToolsResponsePayload` to the next element. |
+: {.hover}
+
+### Views
+| View Name | Description | Image |
+|-----------|-------------|-------|
+| chatfeed_view | Displays the chat history. | ![ChatFeedView](chatfeed_view.jpg){.lightbox} |
+| chat_input_view | Displays the chat input area. | ![ChatInputView](chat_input_view.jpg){.lightbox} |
+| send_button_view | Displays the send button. | ![SendButtonView](send_button_view.jpg){.lightbox} |
+| interface_view | Displays the chat interface. | ![InterfaceView](interface_view.jpg){.lightbox} |
+

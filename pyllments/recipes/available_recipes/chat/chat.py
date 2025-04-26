@@ -69,13 +69,13 @@ if config.system_prompt: # type: ignore
                 'role': 'system',
                 'message': config.system_prompt
             }, # type: ignore
-            'history_messages_input': {'ports': [history_handler_el.ports.history_output]}
+            'history_messages_input': {'ports': [history_handler_el.ports.message_history_output]}
         }
         
     )
     context_builder.ports.messages_output > llm_chat_el.ports.messages_emit_input
 else:
-    history_handler_el.ports.history_output > llm_chat_el.ports.messages_emit_input
+    history_handler_el.ports.message_history_output > llm_chat_el.ports.messages_emit_input
 
 chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
 # history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input

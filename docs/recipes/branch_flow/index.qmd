@@ -5,12 +5,12 @@ format:
         code-links:
             - text: Recipe Code
               icon: github
-              href: https://github.com/Prudent-Patterns/pyllments/blob/main/pyllments/recipes/branch_flow.py
+              href: https://github.com/Prudent-Patterns/pyllments/blob/main/pyllments/recipes/available_recipes/branch_chat.py
 description: "Create a multi-tabbed chat interface that allows users to branch conversations and create new ones." 
 ---
 
 ```bash
-pyllments recipe run branch_flow
+pyllments recipe run branch_chat
 ```
 ### Configuration
 

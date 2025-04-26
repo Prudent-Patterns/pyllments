@@ -33,7 +33,9 @@ website:
       - section: "📋 How To"
         contents: how_to/*.qmd
       - section: "🧩 Elements"
-        contents: elements/*
+        contents:
+          - auto: elements/*.qmd
+          - auto: elements/*/*.qmd
       - section: "💡 Explanation"
         contents: explanation/*
       - section: "👨‍🍳 Recipes"

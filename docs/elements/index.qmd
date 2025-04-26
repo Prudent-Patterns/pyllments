@@ -1,3 +1,28 @@
 ---
 title: "🧩 Elements"
 ---
+
+An Element is the eponymous unit of Pyllments that is behind its modularity, composability, and extensibility.
+
+Each Element is self-contained, and offers a straightfoward and predictable interface for connecting to other Elements. At its core, it is composed of a Model which handles its business logic, and a set of Ports which handle its connectivity. Some elements also contain optional Views, which you are free to compose to generate a GUI. 
+
+Generally speaking, a Payload arrives at one of the Element's input ports, and in reaction to this, the Element does **something** depending on its intended functionality. It could absorb the Payload, and change its state while not proceeding any further, or it can emit another payload after some processing.
+
+As an example, lets consider the interaction between a `ChatInterfaceElement` and a `LLMChatElement` where a message is sent to a large language model to receive a response.
+
+```python
+chat_interface_el.ports.message_output > llm_chat_el.ports.messages_emit_input
+llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
+```
+
+The ChatInterfaceElement doesn't need to receive any Payloads, as the `MessagePayload` is created when you type a message into its chat input field and hit send.
+When you send the message, it shows up in the chat feed, and a MessagePayload is emitted from the `message_output` port.
+
+The `LLMChatElement` receives the MessagePayload, and uses it to create and emit a `MessagePayload` in return. This is indicated by the `_emit_input` suffix. It tells us that when this port received a Payload, it will also be reactively emitting something.
+This naming convention helps us grok the flow of data throughout the program.
+
+And as we can see, the `LLMChatElement` is emitting a `MessagePayload` in return, which is captured by the `message_input` port of the `ChatInterfaceElement`, which is meant to receive a `MessagePayload` and stream it into the chat feed. 
+
+The Model of the `ChatInterfaceElement` is handling the storage of the received payloads, and the outer Element class is handling the integration of the Model, Ports, and Views.
+
+
