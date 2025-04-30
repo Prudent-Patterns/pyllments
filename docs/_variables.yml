@@ -1,0 +1,6 @@
+version: 1.2
+
+views: 
+  styling: ([See here for styling options](/explanation/Views))
+  
+tab: <span style="margin-left:1em;"></span>

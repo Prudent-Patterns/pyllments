@@ -1,0 +1,72 @@
+---
+title: "MCPElement"
+lightbox: true
+---
+
+The purpose of this Element is to enable agentic capabilities when coupled with LLMs. It facilitates tool invocation via the Model Context Protocol (MCP). It can start and manage MCP servers (e.g., script-based or SSE servers), wrap Python functions as tools, and expose Pydantic schemas for tool arguments. When receiving a `StructuredPayload` containing the tool names and arguments, it emits a `ToolResponsePayload` containing the callbacks for the chosen tools to run, as well other metadata related to the tool call. Because it expects structured input, it also has the capacity to send out a pydantic schema containing the exact format it expects, along with the tool names and expected arguments.
+
+## Instantiation
+
+**Arguments:**
+
+`mcps: dict`<br>
+  <span class="tab">A mapping of server names to MCP configurations. Each configuration dict may include the following keys:</span>
+  <span class="tab">`type: str`<br><span class="tab">Protocol type; one of 'script', 'sse', 'mcp_class', or 'functions'.</span></span>
+  <span class="tab">`script`: str (optional)<br><span class="tab">Path to the script for 'script' type servers.</span></span>
+  <span class="tab">`command`: str (optional)<br><span class="tab">Executable to run the script (defaults to the Python interpreter).</span></span>
+  <span class="tab">`args`: list[str] (optional)<br><span class="tab">Command-line arguments for the script.</span></span>
+  <span class="tab">`env`: dict (optional)<br><span class="tab">Environment variables for the subprocess.</span></span>
+  <span class="tab">`host`: str (optional)<br><span class="tab">Host address for 'sse' type servers.</span></span>
+  <span class="tab">`port`: int (optional)<br><span class="tab">Port number for 'sse' type servers.</span></span>
+  <span class="tab">`tools`: dict[str, Callable] (optional)<br><span class="tab">Mapping of function names to Python callables for 'functions' type.</span></span>
+  <span class="tab">`tools_requiring_permission`: list[str] (optional)<br><span class="tab">List of tool names that require user permission.</span></span>
+
+  **Example:**  
+  
+```python
+mcps = {
+    'todo': {
+        'type': 'script',
+        'script': 'todo_server.py',
+        'command': 'python',
+        'args': ['--logging'],
+        'env': {'API_KEY': 'xyz'},
+        'tools_requiring_permission': ['remove_todo']
+    },
+    'weather': {
+        'type': 'sse',
+        'host': 'localhost',
+        'port': 1234
+    },
+    'custom_funcs': {
+        'type': 'functions',
+        'tools': {
+            'calculate': calculate,
+            'get_current_time': get_current_time
+        },
+        'tools_requiring_permission': ['calculate']
+    }
+}
+```
+
+`loop: Any, optional`<br>
+<span class="tab">The asyncio event loop to use for setup. Defaults to the main loop from LoopRegistry.</span>
+
+### Input Ports
+
+| Port Name                         | Payload Type        | Behavior                                                                                  |
+|-----------------------------------|---------------------|-------------------------------------------------------------------------------------------|
+| tool_request_structured_input     | StructuredPayload   | Receives a Payload whose `model.data` is a list of dicts, each containing:<br><span class="tab">`name`: str — hybrid tool name.</span><br><span class="tab">`parameters`: dict — tool arguments (optional).</span><br>Example:<br><code>[<br>{'name': 'todo_add', 'parameters': {'task': 'Buy milk'}}, {'name': 'weather_get', 'parameters': {'city': 'SF'}}<br>]</code><br>Unpacks and forwards these entries to `tool_response_output`. |
+
+: {.hover}
+
+### Output Ports
+
+| Port Name              | Payload Type         | Behavior                                                                        |
+|------------------------|----------------------|---------------------------------------------------------------------------------|
+| tools_schema_output    | SchemaPayload        | Emits a `SchemaPayload` containing the Pydantic schema for available tools.|
+| tool_response_output   | ToolsResponsePayload | Emits a `ToolsResponsePayload` containing tool results mapping tool names to their responses.<br>Example:<br><code>{<br>  'weather_temp_mcp': {<br>   'mcp_name': 'weather_mcp',<br>    'tool_name': 'temp',<br>    'permission_required': False,<br>    'description': 'Get the temperature in a location',<br>    'parameters': {'location': 'San Francisco'},<br>    'response': {<br>      'meta': None,<br>      'content': [{<br>        'type': 'text',<br>        'text': 'The temperature is 54F.',<br>        'annotations': None<br>      }],<br>      'isError': False<br>    }<br>  }<br>}<</code> |
+
+: {.hover}
+
+<!-- TODO: Add usage examples -->

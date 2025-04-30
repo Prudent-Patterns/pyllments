@@ -205,3 +205,16 @@ h1, h2 {
     }
   }
 }
+
+// Custom
+.tab {
+  display: block; // Automatic linebreak when using spans!!
+  margin-left: 17px;
+
+  td & {
+    margin-bottom: -1.2em; // Apply margin-bottom only when .tab is inside a td element
+    &:last-child {
+      margin-bottom: 0; // Remove margin-bottom if it's the last item in the last cell row
+    }
+  }
+}

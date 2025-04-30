@@ -41,32 +41,43 @@ class MCPModel(Model):
     Note: The model is now fully async and runs in the main event loop.
     """
     mcps = param.Dict(default={}, doc="""
-        A dictionary mapping server names to their corresponding MCP server specs.
-        e.g.
-        mcps = {
-            'todo': {
-                'type': 'script',
-                'command': 'python',  # defaults to sys.executable
-                'script': 'todo_server.py',
-                'args': ['--logging'],
-                'env': {'muh_api_key': 'verynice'},
-                'tools_requiring_permission': ['remove_todo']
+    A dictionary mapping server names to their MCP configurations. Each configuration dict may include the following keys:
+
+    - type (str): Protocol type; one of 'script', 'sse', 'mcp_class', or 'functions'.
+    - script (str, optional): Path to the script to execute for 'script' type.
+    - command (str, optional): Executable to run the script (defaults to the Python interpreter).
+    - args (list[str], optional): Command-line arguments for the script.
+    - env (dict, optional): Environment variables for the subprocess.
+    - host (str, optional): Host address for 'sse' type servers.
+    - port (int, optional): Port number for 'sse' type servers.
+    - tools (dict[str, Callable], optional): Mapping of function names to Python callables for 'functions' type.
+    - tools_requiring_permission (list[str], optional): List of tool names that require user permission.
+
+    Example:
+    mcps = {
+        'todo': {
+            'type': 'script',
+            'script': 'todo_server.py',
+            'command': 'python',
+            'args': ['--logging'],
+            'env': {'API_KEY': 'xyz'},
+            'tools_requiring_permission': ['remove_todo']
+        },
+        'weather': {
+            'type': 'sse',
+            'host': 'localhost',
+            'port': 1234
+        },
+        'custom_funcs': {
+            'type': 'functions',
+            'tools': {
+                'calculate': calculate,
+                'get_current_time': get_current_time
             },
-            'weather': {
-                'type': 'sse',
-                'host': 'localhost',
-                'port': 1234
-            },
-            'my_functions': {
-                'type': 'functions',
-                'tools': {
-                    'calculate': calculate,           # function reference
-                    'get_current_time': get_current_time
-                },
-                'tools_requiring_permission': ['calculate']
-            }
+            'tools_requiring_permission': ['calculate']
         }
-        """)
+    }
+    """)
 
     tools = param.Dict(default={}, instantiate=True, doc="""
         Derived from the MCPs and their tools. 

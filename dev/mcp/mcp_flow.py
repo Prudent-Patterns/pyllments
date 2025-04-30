@@ -142,7 +142,7 @@ mcp_el = MCPElement(mcps={
 mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
 structured_router_el.ports.tools_tools > mcp_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
-mcp_el.ports.tool_response_output > chat_interface_el.ports.tools_response_input
+mcp_el.ports.tool_response_output > chat_interface_el.ports.tools_response_emit_input
 
 #########
 mcp_schema_pipe_el = PipeElement(receive_callback=lambda p: f"Schema from MCP received in pipe: {p.model.schema.model_json_schema()}")
@@ -217,4 +217,4 @@ final_llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 @flow
 def show_chat():
     # from pyllments.common.loop_registry import LoopRegistry
-    return chat_interface_el.create_interface_view(height=800, width=600)
+    return chat_interface_el.create_interface_view(height=500, width=700)

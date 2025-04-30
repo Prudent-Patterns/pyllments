@@ -43,8 +43,13 @@ class ToolsResponsePayload(Payload):
             for name, data in self.model.tool_responses.items()
         }
 
+        # track which names we've already kicked off
+        scheduled: set[str] = set()
+
         # Async helper to call a single tool and re-render
         async def _run_tool(tool_name: str):
+            # remember we already ran it
+            scheduled.add(tool_name)
             tool_data = self.model.tool_responses[tool_name]
             response = await tool_data['call']()
             tool_data['response'] = response.model_dump()
@@ -112,8 +117,12 @@ class ToolsResponsePayload(Payload):
                     text = tool_data['response']['content'][0]['text']
                     pane = pn.pane.Str(text, stylesheets=response_md_css)
                 else:
-                    # Schedule call for tools that are either auto-run or user-approved
-                    if state in ('auto', 'approved') and 'response' not in tool_data:
+                    # only schedule if:
+                    #  1) we haven't already run it, and
+                    #  2) it has no 'response' yet
+                    if state in ('auto','approved') \
+                            and tool_name not in scheduled \
+                            and 'response' not in tool_data:
                         LoopRegistry.get_loop().create_task(_run_tool(tool_name))
                     pane = pn.pane.Str('Processing...', stylesheets=response_md_css)
 

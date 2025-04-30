@@ -1,6 +1,5 @@
 project:
   type: website
-
 website:
   favicon: /assets/logo/pyllments_logo_32.png
   search:
@@ -37,7 +36,9 @@ website:
           - auto: elements/*.qmd
           - auto: elements/*/*.qmd
       - section: "💡 Explanation"
-        contents: explanation/*
+        contents: 
+          - auto: explanation/*.qmd
+          - auto: explanation/*/*.qmd
       - section: "👨‍🍳 Recipes"
         href: recipes/index.qmd
         contents: 

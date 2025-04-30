@@ -26,7 +26,9 @@
     "search.exclude": {
         "**/assets/**": true,
         "dev/**": true,
-        "docs/**": true
+        "docs/_site/**": true,
+        "docs/.quarto/**": true,
+        "docs/assets/**": true
     },
     "remote.localPortHost": "allInterfaces",
     "remote.autoForwardPorts": true,

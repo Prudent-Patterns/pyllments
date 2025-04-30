@@ -2,44 +2,53 @@
 title: "ContextBuilder"
 ---
 
-## Overview
-
-The `ContextBuilder` helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order. For example, a resulting message sequence might look like:
+The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order. For example, a resulting message sequence might look like:
 
 ```
-SYSTEM_CONSTANT_MESSAGE,
-user_port_payload,
-assistant_port_payload,
-TEMPLATE_SYSTEM_MESSAGE
+1. main_system_prompt_constant,
+2. user_query,
+3. secondary_system_prompt_template,
+4. additional_query
 ```
 
 ## Instantiation
 
-When initializing a `ContextBuilder`, you must provide either an `input_map` or a `connected_input_map` (or both), as well as optional settings like `emit_order`, `trigger_map`, `build_fn`, and `outgoing_input_port`.
+When initializing a `ContextBuilder`, you must provide an `input_map`, which defines the necessary components such as inputs, constants, and templates with optional keys such as `ports`, `payload_type`, `persist`, `callback`, and `depends_on` to be converted to messages and emitted. In conjunction, you may provide optional arguments like `emit_order`, `trigger_map`, `build_fn`, and `outgoing_input_port` as described below.
 
----
+### Inputs Setup
 
-### 1. `input_map`
+Absent `emit_order`, `trigger_map`, and `build_fn`, the `ContextBuilder` will wait until all regular ports have received payloads and then emit messages in the order defined by the `input_map`.
+
+#### 1. input_map
 
 This is a dictionary used to create input ports, constants, and templates. Each key maps to a configuration dictionary with specific properties based on the entry type:
+
+Keys:
 
 - **Regular ports**: Keys without special suffixes create input ports
 - **Constants**: Keys ending with `_constant` create preset messages
 - **Templates**: Keys ending with `_template` create dynamic messages using Jinja2 templates
-
+ 
 **Port Configuration Options:**
+
 - `role`: The role to assign to the message (e.g., 'user', 'assistant', 'system')
 - `payload_type`: The expected payload type (e.g., `MessagePayload`, `list[MessagePayload]`)
-- `persist`: Boolean flag indicating whether the payload should persist after being used (defaults to `False`)
-- `callback`: Optional function to transform the payload when received (e.g., `lambda payload: do_something(payload.model.content)`)
+- `ports`: Optional list of output ports to connect this input port to. (**Automatic** inference of `payload_type` so it's not necessary to specify when ports are provided -  the type is inferred from the first port connection)
+- `persist`: Boolean flag indicating whether the payload should persist after being emitted (defaults to `False`)
+- `depends_on`: Optional port name or list of port names that must have payloads before this entry is included.
+- `callback`: Optional function to transform the payload when received<br>(e.g., `lambda payload: MessagePayload(content=payload.model.content.strip())`)
 
 **Constant Configuration Options:**
-- `role`: The role to assign to the message
+
+- `role`: The role to assign to the message (e.g., 'system', 'user', 'assistant')
 - `message`: The content of the constant message
+- `depends_on`: Optional port name or list of port names that must have payloads before this constant is included.
 
 **Template Configuration Options:**
+
 - `role`: The role to assign to the message
 - `template`: Jinja2 template string that can reference other port contents
+- `depends_on`: Optional port name or list of port names that must have payloads before this template is included.
 
 **Example:**
 
@@ -57,41 +66,16 @@ input_map = {
 }
 ```
 
-*Comment:* This creates two input ports (with a callback for port_a), a constant user message, and a template that combines content from both ports.
+This creates two input ports (with a callback for port_a), a constant user message, and a template that combines content from both ports.
+
+**Emission Condition:**
+
+For the case where `emit_order`, `trigger_map`, and `build_fn` parameters are absent -- 
+When all ports receive payloads, all of the Payloads from the ports will be coerced into MessagePayloads and emitted in their key order. If persist is False, the payloads on the ports will be cleared, otherwise they will be retained for future emissions.
 
 ---
 
-### 2. `connected_input_map`
-
-This mapping works similarly to `input_map`, but it automatically connects the created ports to existing output ports from other elements. The structure is similar to `input_map` but uses a `ports` key to specify connections.
-
-**Port Configuration Options:**
-
-- `role`: The role to assign to the message
-- `ports`: List of output ports to connect to this input port
-- `persist`: Boolean flag indicating whether the payload should persist after being used (defaults to `False`)
-- `callback`: Optional function to transform the payload when received
-
-**Example:**
-
-```python
-connected_input_map = {
-    'port_a': {
-        'role': 'user', 
-        'ports': [el1.ports.some_output],
-        'callback': lambda payload: f"Processed: {payload.model.content}"
-    },
-    'port_b': {'role': 'assistant', 'persist': True, 'ports': [el2.ports.some_output]},
-    'system_constant': {'role': 'system', 'message': "This text will be a system message"},
-    'system_template': {'role': 'system', 'template': "{{ port_a }}  --  {{ port_b }}"}
-}
-```
-
-*Comment:* Here, `port_a` and `port_b` are connected to the outputs of other elements (with a callback for port_a), while `system_constant` is a constant message and `system_template` is a dynamic template.
-
----
-
-### 3. `emit_order`
+#### 2. `emit_order`
 
 The `emit_order` parameter provides a simple way to specify the order in which messages should be emitted. The ContextBuilder will wait until all required payloads are available before emitting.
 
@@ -101,13 +85,24 @@ The `emit_order` parameter provides a simple way to specify the order in which m
 emit_order = ['port_a', 'port_b', 'system_constant', 'system_template']
 ```
 
-*Comment:* This specifies that messages should be emitted in the order listed, once all required payloads are available.
+This specifies that messages should be emitted in the order listed, once all required payloads are available.
+
+**Optional Ports:**
+
+To mark a port as optional, use square brackets around the port name:
+
+```python
+emit_order = ['port_a', '[port_b]', 'system_constant', 'system_template']
+```
+
+In this case, if `port_b` is not provided, the `ContextBuilder` will still emit the other messages without it, so make sure that you are aware of the order in which payloads arrive at the `ContextBuilder`.
+
 
 ---
 
-### 4. `trigger_map`
+#### 3. `trigger_map`
 
-The `trigger_map` establishes rules for when the `ContextBuilder` should emit messages. Each key corresponds to a triggering port and points to an ordered list of ports, constants, or templates that should be included in the emission when that port receives a payload.
+The `trigger_map` establishes rules for when the `ContextBuilder` should emit messages. Each key corresponds to a triggering port and points to an ordered list of ports, constants, or templates that should be included in the emission after all of the ports in the list have received payloads.(as long as they are not marked optional with square brackets e.g. '[port_b]')
 
 **Example:**
 
@@ -118,11 +113,11 @@ trigger_map = {
 }
 ```
 
-*Comment:* In this example, if `port_a` receives a payload, the builder will emit messages from `port_a`, `port_b`, and the system constant (if all are available). If `port_b` receives a payload, only `port_b` and the system constant will be included.
+In this example, if `port_a` receives a payload, the builder will stay in that trigger's mode until all of the ports in the list have received payloads(port_a and port_b), after which the list of messages will be emitted and the trigger mechanism reset, awaiting a new trigger to go off to determine the next list of messages to emit. Keep in mind that the incoming payloads are stored regardless of what trigger mode we're in, however, the payloads within the trigger's list will be cleared after emission. 
 
 ---
 
-### 5. `build_fn`
+#### 4. `build_fn`
 
 For more complex control over the message building process, you can define a custom build function. This function is called every time any port receives a payload and receives:
 
@@ -130,7 +125,7 @@ For more complex control over the message building process, you can define a cus
 - The `active_input_port` parameter indicating which port just received a payload
 - A persistent dictionary `c` for storing state between calls
 
-Your function should return a list of port/message names that should be processed and emitted.
+Your function should return a list of port/message names that should be processed and emitted. Remember that persist flags and the provided callback still apply.
 
 **Example:**
 
@@ -146,7 +141,9 @@ def build_fn(port_a, port_b, system_constant, active_input_port, c):
 
 ---
 
-### 6. `outgoing_input_port`
+### Output setup
+
+`outgoing_input_port`
 
 This parameter identifies the port to which the `ContextBuilder`'s output will be sent. You can assign it either during instantiation or manually connect it afterwards.
 
@@ -163,8 +160,8 @@ cb = ContextBuilder(...)
 cb.ports.messages_output > some_element.ports.some_input_port
 ```
 
-*Comment:* This ensures that the accumulated messages are correctly routed to the intended downstream component.
-
+This ensures that the accumulated messages are correctly routed to the intended downstream component.
+<!--  TODO: Add more implementation and use details
 ---
 
 ## Processing Strategies
@@ -222,4 +219,4 @@ This behavior allows you to control which inputs should be reused across multipl
 
 The `ContextBuilder` is a powerful tool for managing and sequencing message payloads. By configuring the input maps, emission rules, and optionally a custom build function, you can effectively control how messages are accumulated and emitted within your system.
 
-Happy building!
+Happy building! -->

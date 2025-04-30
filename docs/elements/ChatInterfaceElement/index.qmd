@@ -2,30 +2,37 @@
 title: "ChatInterfaceElement"
 lightbox: true
 ---
+
+![](interface_overview.jpg){.lightbox fig-align="center" width="50%"}
+
 This element is the backbone of flows involving user interaction through the browser by offering multiple Views you are able to compose to create your chat interface, including an input area, chat feed, and send button.
+
 It provides the essential component of user interaction through receiving `MessagePayloads` and `ToolsResponsePayloads`, generating `MessagePayloads` as responses, as well as granting tool call permission to received `ToolsResponsePayloads`.
 
 ### Input Ports
+
 | Port Name | Payload Type | Behavior |
-|-----------|--------------|----------|
-| message_input | MessagePayload | Receives a `MessagePayload` from the previous element. |
-| message_emit_input | MessagePayload | Receives a `MessagePayload` from the previous element. |
-| tools_response_input | ToolsResponsePayload | Receives a `ToolsResponsePayload` from the previous element. |
-| tools_response_output | ToolsResponsePayload | Receives a `ToolsResponsePayload` from the previous element. |
+|-----------------------|----------------------------|---------------------|
+| message_input | MessagePayload | Adds view of the message to the chatfeed |
+| message_emit_input | MessagePayload | Adds view of the message to the chatfeed and emits the message from its `message_output` port |
+| tools_response_input | ToolsResponsePayload | Adds view of the `ToolsResponsePayload` to the chatfeed and emits the payload from the `tools_response_output` port after the tools are called. Optionally requires user confirmation before calling the tools based on the requirements of the `ToolsResponsePayload` |
+
 : {.hover}
 
 ### Output Ports
-| Port Name | Payload Type | Behavior |
-|-----------|--------------|----------|
-| message_output | MessagePayload | Emits a `MessagePayload` to the next element. |
-| tools_response_output | ToolsResponsePayload | Emits a `ToolsResponsePayload` to the next element. |
+
+| Port Name              | Payload Type        | Behavior                                                        |
+|------------------------|---------------------|-----------------------------------------------------------------|
+| message_output         | MessagePayload      | Emitted when either a message is sent through the views or a message comes in through the `message_emit_input` port. |
+| tools_response_emit_output   | ToolsResponsePayload | Emitted when a `ToolsResponsePayload` is received through the `tools_response_input` port after the tools are called. |
+
 : {.hover}
 
 ### Views
-| View Name | Description | Image |
-|-----------|-------------|-------|
-| chatfeed_view | Displays the chat history. | ![ChatFeedView](chatfeed_view.jpg){.lightbox} |
-| chat_input_view | Displays the chat input area. | ![ChatInputView](chat_input_view.jpg){.lightbox} |
-| send_button_view | Displays the send button. | ![SendButtonView](send_button_view.jpg){.lightbox} |
-| interface_view | Displays the chat interface. | ![InterfaceView](interface_view.jpg){.lightbox} |
 
+| View Name         | Description                                                                 | Image                                      |
+|-------------------|-----------------------------------------------------------------------------|--------------------------------------------|
+| chatfeed_view     | Displays the chat history.                                                 | ![ChatFeedView](chatfeed_view.jpg){.lightbox} |
+| chat_input_view   | Displays the chat input area.<br>**Args:**<br>`placeholder: str = 'Yap Here'`<br><span class="tab">Text to display as placeholder in the chat input area.</span> | ![ChatInputView](chat_input_view.jpg){.lightbox} |
+| send_button_view  | Displays the send button.<br>**Args:**<br>`width: Optional[int] = 38`<br><span class="tab">Width of the send button in pixels.</span> | ![SendButtonView](send_button_view.jpg){.lightbox} |
+| interface_view    | Displays the chat interface.<br>**Args:**<br>`height: int = 800`<br><span class="tab">Total height of the interface (feed + input).</span><br>`input_height: Optional[int] = 120`<br><span class="tab">Height allocated to the chat input area.</span> | ![InterfaceView](interface_view.jpg){.lightbox} |

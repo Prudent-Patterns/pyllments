@@ -1,0 +1,51 @@
+---
+title: "HistoryHandlerElement"
+lightbox: true
+---
+
+This element is responsible for assembling and managing the chat history and context for downstream elements. It handles incoming messages and tool responses, optionally persists them to a SQLite database, and emits the current context for use by other elements in the flow. The token limits are set upon instantiation, and will determine the size of the context window as well as the amount of messages kept in the history from which that context history is assembled from.
+
+## Instantiation
+
+**Arguments:**
+
+`show_tool_responses: bool = False`<br>
+<span class="tab">Whether to include tool response payload views in the context view.</span>
+`persist: bool = False`<br>
+<span class="tab">Whether to persist messages and tool responses to a SQLite database.</span>
+`db_path: str = None`<br>
+<span class="tab">Custom path for the history database file (optional when `persist=True`). Should be higher than the `history_token_limit`.</span>
+`history_token_limit: int = 32000`<br>
+<span class="tab">The max number of tokens to keep in the history.</span>
+`context_token_limit: int = 16000`<br>
+<span class="tab">The max number of tokens to include in the context window.</span>
+`tokenizer_model: str = 'gpt-4o'`<br>
+<span class="tab">The tokenizer model to use for token length estimation. (Using tiktoken)</span>
+
+### Input Ports
+
+| Port Name                 | Payload Type                                                 | Behavior                                                                      |
+|---------------------------|--------------------------------------------------------------|-------------------------------------------------------------------------------|
+| message_emit_input        | MessagePayload                                               | Loads the message into history and emits the current context payload.        |
+| messages_input            | MessagePayload \| list[MessagePayload]                       | Loads one or more messages into history without emitting.                     |
+| tool_response_emit_input  | ToolsResponsePayload                                         | Loads the tool response into history and emits the current context payload.   |
+| tool_responses_input      | ToolsResponsePayload \| list[ToolsResponsePayload]           | Loads one or more tool responses into history without emitting.               |
+
+: {.hover}
+
+### Output Ports
+
+| Port Name               | Payload Type            | Behavior                                                      |
+|-------------------------|-------------------------|---------------------------------------------------------------|
+| message_history_output  | List[MessagePayload]    | Emits a list of `MessagePayload` representing the current context. |
+
+: {.hover}
+
+### Views
+
+{{< var views.styling >}}
+
+| View Name     | Description                                                                                                                    | Image                                     |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| context_view  | Displays a column of message and optional tool response history entries.<br>**Args:**<br>`title: str = 'Current History'`<br><span class="tab">The header text shown above the history container.</span><br>`column_css: list = []`<br><span class="tab">CSS stylesheets for the main column layout.</span><br>`container_css: list = []`<br><span class="tab">CSS stylesheets for the scrollable context container.</span><br>`title_css: list = []`<br><span class="tab">CSS stylesheets for the title Markdown pane.</span><br>`title_visible: bool = True`<br><span class="tab">Whether the title header is visible.</span> | ![ContextView](context_view.jpg){.lightbox} |
+

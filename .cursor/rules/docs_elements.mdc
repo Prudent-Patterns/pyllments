@@ -1,0 +1,8 @@
+---
+description: 
+globs: docs/elements/*.qmd
+alwaysApply: false
+---
+This rule is useful for creating and augmenting documentation of Elements.
+A good template for this is the LLMChatElement index.qmd where the documentation comes from the Element and Model files. [llm_chat_element.py](mdc:pyllments/elements/llm_chat/llm_chat_element.py) [llm_chat_model.py](mdc:pyllments/elements/llm_chat/llm_chat_model.py) [index.qmd](mdc:docs/elements/LLMChatElement/index.qmd)
+Make sure to use the proper notation and styling for the arguments involved in instantiation as well as view creation.

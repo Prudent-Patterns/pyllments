@@ -45,7 +45,7 @@ class ChatInterfaceElement(Element):
         self._message_output_setup()
         self._message_input_setup()
         self._message_emit_input_setup()
-        self._tools_response_input_setup()
+        self._tools_response_emit_input_setup()
         self._tools_response_output_setup()
 
     def _message_output_setup(self):
@@ -76,14 +76,14 @@ class ChatInterfaceElement(Element):
             name='message_emit_input',
             unpack_payload_callback=unpack)
     
-    def _tools_response_input_setup(self):
+    def _tools_response_emit_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
             # Add the payload to the chat model and immediately stage for emit
             await self.model.add_message(payload)
             await self.ports.output['tools_response_output'].stage_emit(payload=payload)
 
         self.ports.add_input(
-            name='tools_response_input',
+            name='tools_response_emit_input',
             unpack_payload_callback=unpack)
         
     def _tools_response_output_setup(self):

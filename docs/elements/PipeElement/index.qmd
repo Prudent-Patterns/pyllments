@@ -1,0 +1,53 @@
+---
+title: "PipeElement"
+lightbox: true
+---
+
+The `PipeElement` is a utility Element for testing and debugging pyllments flows by capturing and emitting arbitrary payloads. It can function as:
+
+- An **input sink**: stores and inspects all payloads received on its `pipe_input` port.
+- An **output source**: emits provided payloads into the flow via its `pipe_output` port.
+
+## Instantiation
+
+**Arguments:**
+
+`receive_callback: callable = lambda x: x`  
+<span class="tab">Function invoked on each received payload for inspection or transformation. Should return a printable object for logging.</span>  
+
+`store_received_payloads: bool = True`  
+<span class="tab">Whether to append incoming payloads to the `received_payloads` list for later inspection.</span>
+
+## Input Ports
+
+| Port Name   | Payload Type | Behavior                                                                                   |
+|-------------|--------------|--------------------------------------------------------------------------------------------|
+| `pipe_input`| Any          | Receives any payload. If `store_received_payloads` is True, appends to `received_payloads`. Invokes `receive_callback` and fulfills `send_and_receive` futures. |
+
+: {.hover}
+
+## Output Ports
+
+| Port Name     | Payload Type | Behavior                                                                                              |
+|---------------|--------------|-------------------------------------------------------------------------------------------------------|
+| `pipe_output` | Any          | Emits payloads scheduled via `send_payload` or `send_and_receive` into the flow.                      |
+
+: {.hover}
+
+## Methods
+
+```python
+clear_received_payloads()
+```
+
+Clears all entries from the `received_payloads` list.
+
+```python
+send_payload(payload: Any):
+```
+
+
+```python
+send_and_receive(payload: Any, timeout: float = None) -> Any:
+```
+

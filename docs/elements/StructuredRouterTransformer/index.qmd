@@ -1,0 +1,84 @@
+---
+title: StructuredRouterTransformer
+---
+
+## Overview
+
+The `StructuredRouterTransformer` element routes and transforms structured JSON payloads based on a configurable `routing_map`. It:
+
+1. Constructs a unified Pydantic `RootModel` from sub-schemas for each route.
+2. Parses incoming JSON messages (`MessagePayload`) against this schema.
+3. Dispatches each output field to its connected ports based on the `route` field.
+4. Applies optional `transform` functions or default payload types (`StructuredPayload`).
+5. Supports dynamic schema updates via `<route>_<field>_schema_input` ports.
+
+It leverages the `FlowController` for port management and routing logic.
+
+## Instantiation
+
+**Arguments:**
+
+`routing_map: dict`<br>
+  <span class="tab">Mapping of route names to configuration dicts. Each dict may include the following keys:</span>
+  <span class="tab">`outputs: dict`<br><span class="tab">Mapping of field names to spec dicts.</span></span>
+  <span class="tab">`schema: dict`<br><span class="tab">Either `{'pydantic_model': type}` for static schemas or `{'ports': [InputPort]}` for dynamic updates.</span></span>
+  <span class="tab">`ports: list[InputPort]`<br><span class="tab">InputPort instances to emit each field value.</span></span>
+  <span class="tab">`payload_type: type, optional`<br><span class="tab">Payload class for emission (defaults to `StructuredPayload`).</span></span>
+  <span class="tab">`transform: callable, optional`<br><span class="tab">Accepts raw field value and returns a Payload.</span></span>
+
+**Example:**  
+```python
+{
+    'reply': {
+        'outputs': {
+            'content': {
+                'schema': {'pydantic_model': str},
+                'ports': [chat_interface_el.ports.message_input],
+                'transform': lambda text: MessagePayload(content=text, role='assistant')
+            },
+            'metadata': {
+                'schema': {'pydantic_model': dict},
+                'ports': [metadata_el.ports.data_input],
+                'payload_type': StructuredPayload
+            }
+        }
+    },
+    'error': {
+        'outputs': {
+            'error_message': {
+                'schema': {'pydantic_model': str},
+                'ports': [error_el.ports.error_input]
+            }
+        }
+    }
+}
+```
+
+`incoming_output_port: OutputPort, optional`<br>
+<span class="tab">Port to receive upstream `MessagePayload` JSON input (defaults to `message_input`).</span>
+
+`flow_controller: FlowController, optional`<br>
+<span class="tab">Custom flow controller for routing and port management.</span>
+
+`pydantic_model: BaseModel`<br>
+<span class="tab">Generated unified model for JSON input validation.</span>
+
+### Input Ports
+
+| Port Name                         | Payload Type    | Behavior                                                                                  |
+|-----------------------------------|-----------------|-------------------------------------------------------------------------------------------|
+| message_input                     | MessagePayload  | Receives a JSON payload containing a `route` and data fields to parse and dispatch.       |
+| \<route>_\<field>_schema_input    | SchemaPayload   | Receives `SchemaPayload` updates for the specified field; rebuilds the internal schema.    |
+
+: {.hover}
+
+### Output Ports
+
+| Port Name                         | Payload Type                   | Behavior                                                                                                 |
+|-----------------------------------|--------------------------------|----------------------------------------------------------------------------------------------------------|
+| \<route>_\<field>                 | StructuredPayload or custom    | Emits each field as a Payload; applies `transform` or defaults to `StructuredPayload`.                   |
+| schema_output                   | SchemaPayload                  | Emits the unified Pydantic schema when it changes. Can use in context of an LLM call where this element is the receiving end.                                                       |
+
+: {.hover}
+
+<!-- Need Examples - schemas and use -->
