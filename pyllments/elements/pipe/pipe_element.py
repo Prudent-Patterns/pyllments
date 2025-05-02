@@ -1,5 +1,6 @@
 from typing import Any
 import asyncio
+import concurrent.futures
 
 import param
 
@@ -91,13 +92,8 @@ class PipeElement(Element):
 
         Returns
         -------
-        Any
-            The first payload received by this pipe's input port.
-
-        Raises
-        ------
-        concurrent.futures.TimeoutError
-            If the response does not arrive within the given timeout.
+        Any or None
+            The first payload received by this pipe's input port, or None if the timeout is reached without a response.
         """
         loop = LoopRegistry.get_loop()
         # optionally clear history
@@ -112,9 +108,11 @@ class PipeElement(Element):
         async def _await_future():
             return await self._receive_future
         # schedule and block until the future is set or timeout expires
-        concurrent = asyncio.run_coroutine_threadsafe(_await_future(), loop)
+        future = asyncio.run_coroutine_threadsafe(_await_future(), loop)
         try:
-            return concurrent.result(timeout)
+            return future.result(timeout)
+        except concurrent.futures.TimeoutError:
+            return None
         finally:
             # clean up the internal future reference
             self._receive_future = None

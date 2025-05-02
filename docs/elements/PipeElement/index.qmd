@@ -40,14 +40,16 @@ The `PipeElement` is a utility Element for testing and debugging pyllments flows
 clear_received_payloads()
 ```
 
-Clears all entries from the `received_payloads` list.
+<span class="tab">Clears all entries from the `received_payloads` list.</span>
 
 ```python
 send_payload(payload: Any):
 ```
 
+<span class="tab">Emits a payload into the flow.</span>
 
 ```python
 send_and_receive(payload: Any, timeout: float = None) -> Any:
 ```
 
+<span class="tab">Sends a payload and blocks until a response arrives on this pipe if the timeout is `None`, otherwise </span>

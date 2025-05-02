@@ -41,7 +41,7 @@ class StructuredRouterTransformer(Element):
         
         - 'schema': dict defining the Pydantic model for that field.
             - 'pydantic_model': type[BaseModel] or basic type.
-            - OR 'ports': list of InputPorts for schema updates (with optional 'payload_type', 'extract_callback').
+            - OR 'ports': list of InputPorts for schema updates.
         - 'ports': list[InputPort] that the output port should connect to.
         - 'payload_type': (optional) the Payload class to emit; defaults to StructuredPayload.
         - 'transform': (optional) function(value) -> Payload instance.
@@ -65,7 +65,7 @@ class StructuredRouterTransformer(Element):
             'tools': {
                 'outputs': {
                     'tools': {
-                        'schema': {'payload_type': SchemaPayload},
+                        'schema': {'ports': [some_schema_port]},
                         'payload_type': StructuredPayload
                     },
                     'reasoning': {
@@ -119,16 +119,12 @@ class StructuredRouterTransformer(Element):
                 else:
                     raise ValueError(f"No ports or payload_type provided for output '{data_field}' in route '{route}'")
                 # configure schema input port for this field
+                # only ports list is supported; payload_type always defaults to SchemaPayload
                 schema_spec = spec.get('schema', {})
                 input_key = f"{alias}_schema_input"
                 if 'ports' in schema_spec:
                     flow_map['input'][input_key] = {
                         'ports': schema_spec['ports'],
-                        'persist': True,
-                    }
-                elif 'payload_type' in schema_spec:
-                    flow_map['input'][input_key] = {
-                        'payload_type': schema_spec['payload_type'],
                         'persist': True,
                     }
                 elif 'pydantic_model' in schema_spec:

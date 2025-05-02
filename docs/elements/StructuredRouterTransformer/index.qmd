@@ -2,9 +2,9 @@
 title: StructuredRouterTransformer
 ---
 
-## Overview
+At a high level, the purpose of this element is twofold. Firstly, it dynamically generates a JSON schema for an LLM to follow, and secondly, it handles the resulting structured data by routing it(and optionally transforming it) out of the desired ports.
 
-The `StructuredRouterTransformer` element routes and transforms structured JSON payloads based on a configurable `routing_map`. It:
+By using a `routing_map`, it:
 
 1. Constructs a unified Pydantic `RootModel` from sub-schemas for each route.
 2. Parses incoming JSON messages (`MessagePayload`) against this schema.
@@ -28,31 +28,54 @@ It leverages the `FlowController` for port management and routing logic.
 
 **Example:**  
 ```python
-{
-    'reply': {
-        'outputs': {
-            'content': {
-                'schema': {'pydantic_model': str},
-                'ports': [chat_interface_el.ports.message_input],
-                'transform': lambda text: MessagePayload(content=text, role='assistant')
-            },
-            'metadata': {
-                'schema': {'pydantic_model': dict},
-                'ports': [metadata_el.ports.data_input],
-                'payload_type': StructuredPayload
+from typing import Literal
+from pydantic import BaseModel
+from pyllments.elements import StructuredRouterTransformer
+from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
+
+# Optional override of the generated schema
+class OverrideSchema(BaseModel):
+    route: Literal['override']
+    override_data: str
+
+srt = StructuredRouterTransformer(
+    routing_map={
+        'reply': {
+            'outputs': {
+                'content': {
+                    'schema': {'pydantic_model': str},  # static schema without schema input port
+                    'ports': [chat_interface_el.ports.message_input],
+                    'transform': lambda text: MessagePayload(content=text, role='assistant')
+                }
+            }
+        },
+        'dynamic': {
+            'outputs': {
+                'value': {
+                    'schema': {'ports': [schema_provider_el.ports.schema_output]},  # dynamic schema via SchemaPayload
+                    'ports': [consumer_el.ports.value_input],
+                    'payload_type': StructuredPayload
+                }
+            }
+        },
+        'simple': {
+            'outputs': {
+                'number': {
+                    'schema': {'pydantic_model': int},    # direct Pydantic type
+                    'ports': [number_consumer_el.ports.number_input]
+                }
             }
         }
     },
-    'error': {
-        'outputs': {
-            'error_message': {
-                'schema': {'pydantic_model': str},
-                'ports': [error_el.ports.error_input]
-            }
-        }
-    }
-}
+    incoming_output_port=llm_el.ports.output['message_output'],
+    pydantic_model=OverrideSchema
+)
 ```
+
+**Note on schema spec:**  
+- You can supply `schema` as a direct `pydantic_model` (no schema input port created).  
+- Or specify `schema` with `ports: [InputPort]` to receive schema updates at runtime.  
+- The schema input port always accepts `SchemaPayload` by default.
 
 `incoming_output_port: OutputPort, optional`<br>
 <span class="tab">Port to receive upstream `MessagePayload` JSON input (defaults to `message_input`).</span>
@@ -72,13 +95,75 @@ It leverages the `FlowController` for port management and routing logic.
 
 : {.hover}
 
+### Generated Output Ports
+
+For each route defined in the `routing_map` and for each field under that route's `outputs`, the element automatically creates an output port named `<route>_<field>`. When a JSON message arrives on the `message_input` port:
+
+1. The transformer parses the message and validates it against its `pydantic_model`.
+2. It reads the `route` discriminator and looks up the corresponding outputs spec.
+3. For each field in that outputs spec:
+   - It extracts the field value from the validated object.
+   - If a `transform` function is provided, applies it to the value to produce a payload.
+   - Otherwise, wraps the raw value in `StructuredPayload`.
+   - Emits the resulting payload on the `<route>_<field>` port.
+
+You can connect multiple downstream input ports to each of these output ports, and all will receive the payload when it is emitted.
+
 ### Output Ports
 
-| Port Name                         | Payload Type                   | Behavior                                                                                                 |
-|-----------------------------------|--------------------------------|----------------------------------------------------------------------------------------------------------|
-| \<route>_\<field>                 | StructuredPayload or custom    | Emits each field as a Payload; applies `transform` or defaults to `StructuredPayload`.                   |
-| schema_output                   | SchemaPayload                  | Emits the unified Pydantic schema when it changes. Can use in context of an LLM call where this element is the receiving end.                                                       |
+| Port Name                         | Payload Type                                           | Behavior                                                                                                                                    |
+|-----------------------------------|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| `<route>_<field>`                 | `StructuredPayload` (default) or `Payload` via `transform` | Emits the field value packaged as a payload; you can connect multiple input ports to this output, and all will receive the payload. For `StructuredPayload`, access raw data via `.model.data`. |
+| `schema_output`                   | `SchemaPayload`                                        | Emits the unified Pydantic schema when it changes; consumers can connect to receive updated schemas.                                        |
 
 : {.hover}
 
 <!-- Need Examples - schemas and use -->
+
+## Data and Schema Structures
+
+### Message Structure
+
+The element receives a `MessagePayload` whose `model.content` is a JSON string matching the generated Pydantic schema. The expected JSON format is:
+```json
+{
+  "route": "<route_name>",
+  "<field1>": <value1>,
+  "<field2>": <value2>,
+  ...
+}
+```
+- `<route_name>` must be one of the keys in `routing_map`.
+- Subsequent fields correspond to the names defined under `routing_map[route]['outputs']` and will be validated by Pydantic.
+
+### Schema Input Payload (`<route>_<field>_schema_input`)
+
+To update a field's schema at runtime, send a `SchemaPayload` with a Pydantic model:
+```python
+from pyllments.payloads.schema import SchemaPayload
+
+new_schema = SchemaPayload(schema=CustomFieldModel)
+srt.ports.reply_content_schema_input > schema_provider_el.ports.schema_output
+```
+- `CustomFieldModel` must inherit from `pydantic.BaseModel` or `RootModel`.
+- Upon receipt, the element rebuilds the unified `pydantic_model` including this update.
+
+### Schema Output Payload (`schema_output`)
+
+The element emits its unified `pydantic_model` whenever it changes via a `SchemaPayload` on `schema_output`:
+
+- `payload.model.schema` is the Pydantic `RootModel` class representing the union of all routes.
+- You can call `.model_json_schema()` on this class to get the JSON Schema dictionary.
+
+### StructuredPayload Data
+
+For output ports without a custom `transform`, the element wraps field values in `StructuredPayload`:
+```python
+from pyllments.payloads.structured import StructuredPayload
+
+payload = StructuredPayload(data={"tools": ["a","b"]})
+print(payload.model.data)  # {'tools': ['a', 'b']}
+```
+- `.model.data` holds the raw Python object validated by Pydantic.
+
+## Routing Map Configuration

@@ -23,7 +23,7 @@ class DiscordModel(Model):
     bot_token : str
         Discord bot token for authentication.
     on_message_criteria : Callable, optional
-        A function that receives a discord.Message and returns a boolean indicating
+        A function that receives a discord. Message and returns a boolean indicating
         if the message meets the criteria (default: checks if channel is DM).
     """
     # Configuration parameters

@@ -1,8 +1,10 @@
 ---
 description: Used when creating a recipe
-globs: **/recipes/**
+globs: */recipes/**
+alwaysApply: false
 ---
-A recipe is a prebuilt application with pyllments that is meant to be run by the end user. It tends to be parameterized with a Config dataclass so that it an be run as such `pyllments recipe run some_recipe --arg {some_value}` where the config dataclass is created based on the Config definition and is injected when the recipe is run either from the defaults defined in Config, or by user defined option on the CLI.
+A recipe is a prebuilt application with pyllments that is meant to be run by the end user. It tends to be parameterized with a Config dataclass so that it an be run as such `pyllments recipe run some_recipe --arg {some_value}` where the Config dataclass is created based on the Config definition and is injected when the recipe is run either from the defaults defined in Config, or by user defined option on the CLI.
 A recipe ends up in the recipes folder, from which, the CLI is automatically generated.
 [chat.py](mdc:pyllments/recipes/chat/chat.py) is a good recipe template you can use as an example.
+config is passed into the running code so, it's safe to ignore the fact that it isn't created explicitly in the code.
 

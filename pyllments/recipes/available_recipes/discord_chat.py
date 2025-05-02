@@ -31,9 +31,20 @@ history_handler_el = HistoryHandlerElement(context_token_limit=12000)
 if config.system_prompt:
     from pyllments.elements import ContextBuilderElement
     context_builder = ContextBuilderElement(
-        connected_input_map={
-            'system_prompt': ('developer', config.system_prompt),
-            'history_messages_input': (None, history_handler_el.ports.messages_output)
+        input_map={
+            'system_prompt_constant': {
+                'role': 'system',
+                'message': config.system_prompt
+            },
+            'history': {
+                'role': 'user',
+                'payload_type': list[MessagePayload],
+                'ports': [history_handler_el.ports.message_history_output],
+                'persist': True
+            }
+        },
+        trigger_map={
+            'history': ['system_prompt_constant', 'history']
         }
     )
     context_builder.ports.messages_output > llm_chat_el.ports.messages_emit_input

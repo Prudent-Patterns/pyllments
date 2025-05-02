@@ -5,7 +5,12 @@ from dataclasses import dataclass, field
 
 import panel as pn
 from pyllments import flow
-from pyllments.elements import ChatInterfaceElement, LLMChatElement, HistoryHandlerElement
+from pyllments.elements import (
+    ChatInterfaceElement,
+    LLMChatElement,
+    HistoryHandlerElement,
+    ContextBuilderElement
+)
 
 
 @dataclass
@@ -60,26 +65,39 @@ history_handler_el = HistoryHandlerElement(
     history_token_limit=config.history_token_limit,  # type: ignore
     tokenizer_model='gpt-4o'
 )
-# If a system prompt is provided, we use a ContextBuilder to inject the system prompt.
-if config.system_prompt: # type: ignore
-    from pyllments.elements import ContextBuilderElement
-    context_builder = ContextBuilderElement(
-        input_map={
-            'system_prompt_constant': {
-                'role': 'system',
-                'message': config.system_prompt
-            }, # type: ignore
-            'history_messages_input': {'ports': [history_handler_el.ports.message_history_output]}
-        }
-        
+
+input_map = {
+    'history': {'ports': [history_handler_el.ports.message_history_output]},
+    'user_query': {'ports': [chat_interface_el.ports.message_output]},
+}
+emit_order = ['[history]', 'user_query']
+
+if config.system_prompt:
+    sys_prompt_mapping = {
+        'system_prompt_constant': {
+            'role': 'system',
+            'message': config.system_prompt
+            }
+    } 
+    input_map = {**sys_prompt_mapping, **input_map}
+    emit_order.insert(0, 'system_prompt_constant')
+
+
+context_builder = ContextBuilderElement(
+    input_map={
+        'system_prompt_constant': {
+            'role': 'system',
+            'message': config.system_prompt
+        }, # type: ignore
+        'history_messages_input': {'ports': [history_handler_el.ports.message_history_output]}
+    }
+    
     )
-    context_builder.ports.messages_output > llm_chat_el.ports.messages_emit_input
-else:
-    history_handler_el.ports.message_history_output > llm_chat_el.ports.messages_emit_input
+
+
 
 chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
-# history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
-llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
+llm_chat_el.ports.message_output > history_handler_el.ports.messages_emit_input
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 
 @flow

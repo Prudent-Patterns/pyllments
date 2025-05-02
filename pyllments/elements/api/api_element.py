@@ -114,6 +114,8 @@ class APIElement(Element):
 
     timeout = param.Number(default=30.0, doc="Timeout for API requests in seconds.")
 
+    _is_processing = param.Boolean(default=False, doc="Internal flag to serialize trigger processing and HTTP requests.")
+
     loop = param.Parameter(default=LoopRegistry.get_loop(), doc="The event loop to use for the API.")
 
     def __init__(self, **params):
@@ -136,35 +138,50 @@ class APIElement(Element):
         if not self.input_map:
             raise ValueError("input_map must be provided.")
 
-        # 1. Setup flow map with persist=True for all input ports
+        # 1. Setup flow map with persist flags for all input ports
         flow_map = self._flow_map_setup(self.input_map)
         
         # 2. Create a simplified flow_fn 
         def api_flow_fn(**kwargs):
-            active_input_port = kwargs['active_input_port']
-            c = kwargs.get('c', {})
-            port_name = active_input_port.name
-            
-            # Handle response_dict logic
-            if self.response_dict and self._check_required_ports(self.response_dict.keys()):
-                self._process_response_dict()
+            # Serialize triggers: ignore if already processing
+            if self._is_processing:
                 return None
-            
-            # Handle trigger_map logic
-            if self.trigger_map and port_name in self.trigger_map:
-                callback_fn, required_ports = self.trigger_map[port_name]
-                if self._check_required_ports(required_ports):
-                    return self._process_trigger_callback(callback_fn, required_ports)
+            self._is_processing = True
+            result = None
+            try:
+                active_input_port = kwargs['active_input_port']
+                c = kwargs.get('c', {})
+                port_name = active_input_port.name
                 
-            # Handle build_fn logic
-            if self.build_fn:
-                return self._process_build_fn(
-                    active_input_port=active_input_port, 
-                    c=c, 
-                    port_kwargs={k: v for k, v in kwargs.items() if k not in ['active_input_port', 'c']}
-                )
-            
-            return None
+                # Handle response_dict logic
+                if self.response_dict and self._check_required_ports(self.response_dict.keys()):
+                    result = self._process_response_dict()
+                    return result
+                
+                # Handle trigger_map logic
+                if self.trigger_map and port_name in self.trigger_map:
+                    callback_fn, required_ports = self.trigger_map[port_name]
+                    if self._check_required_ports(required_ports):
+                        result = self._process_trigger_callback(callback_fn, required_ports)
+                        return result
+                    
+                # Handle build_fn logic
+                if self.build_fn:
+                    return self._process_build_fn(
+                        active_input_port=active_input_port, 
+                        c=c, 
+                        **{k: v for k, v in kwargs.items() if k not in ['active_input_port', 'c']}
+                    )
+            finally:
+                # Clear non-persistent ports after a successful response or None
+                # Remove payloads for ports that are not persistent
+                for name, cfg in self.input_map.items():
+                    if isinstance(cfg, dict) and not cfg.get('persist', True):
+                        port = self.flow_controller.flow_port_map.get(name)
+                        if port:
+                            port.payload = None
+                self._is_processing = False
+            return result
         
         self.flow_controller = FlowController(
             containing_element=self, 
@@ -278,10 +295,10 @@ class APIElement(Element):
 
     def _flow_map_setup(self, input_map):
         """
-        Create a flow map from the input_map, ensuring persist=True for all input ports.
+        Create a flow map from the input_map, ensuring persist flag honors config.
         """
         flow_map = {'input': {}}
-        
+
         for key, config in input_map.items():
             port_config = None
             
@@ -296,7 +313,8 @@ class APIElement(Element):
             # Case 2: Dictionary configuration
             elif isinstance(config, dict):
                 port_config = config.copy()
-                port_config['persist'] = True
+                # Allow per-port persistence: default True unless specified False
+                port_config['persist'] = config.get('persist', True)
                 
                 # Ensure we have a way to determine payload_type
                 if 'payload_type' not in port_config and ('ports' not in port_config or not port_config['ports']):

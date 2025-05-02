@@ -56,6 +56,8 @@ class HistoryHandlerElement(Element):
 
     def _message_emit_input_setup(self):
         async def unpack(payload: MessagePayload):
+            # Ensure the message is fully processed before loading without triggering the process
+            await payload.model.await_ready()
             # Load a fully-materialized message into history/context
             self.model.load_entries([payload])
             # Emit updated history only for emit port
@@ -68,12 +70,17 @@ class HistoryHandlerElement(Element):
     def _messages_input_setup(self):
         async def unpack(payload: Union[List[MessagePayload], MessagePayload]):
             payloads = [payload] if not isinstance(payload, list) else payload
+            # Ensure each message is fully processed before loading without triggering the process
+            for p in payloads:
+                await p.model.await_ready()
             self.model.load_entries(payloads)
 
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
     def _tool_response_emit_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
+            # Ensure all tool calls are complete before loading without triggering the process
+            await payload.model.await_ready()
             # Load a fully-materialized tool response into history/context
             self.model.load_entries([payload])
             # Emit updated history only for emit port
@@ -86,6 +93,9 @@ class HistoryHandlerElement(Element):
     def _tool_responses_input_setup(self):
         async def unpack(payload: Union[List[ToolsResponsePayload], ToolsResponsePayload]):
             items = payload if isinstance(payload, list) else [payload]
+            # Ensure all tool calls are complete before loading without triggering the process
+            for item in items:
+                await item.model.await_ready()
             # Load all fully-materialized tool responses into history/context
             self.model.load_entries(items)
 

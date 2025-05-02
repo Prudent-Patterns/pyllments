@@ -38,7 +38,7 @@ class DiscordElement(Element):
         
     def _message_output_setup(self):
         """Sets up the output port to forward messages received from Discord."""
-        def pack(new_message: MessagePayload) -> MessagePayload:
+        async def pack(new_message: MessagePayload) -> MessagePayload:
             return new_message
             
         self.ports.add_output(
@@ -49,14 +49,17 @@ class DiscordElement(Element):
         # Watch for new messages from Discord (incoming DM).
         def _on_new_message(event):
             if event.new and event.new.model.role == "user":
-                self.ports.output['message_output'].stage_emit(new_message=event.new)
+                # Schedule async emission of new message payload
+                self.model.loop.create_task(
+                    self.ports.output['message_output'].stage_emit(new_message=event.new)
+                )
                 
         self.model.param.watch(_on_new_message, 'new_message', precedence=0)
         
     def _message_input_setup(self):
         """Sets up the input port for sending messages to Discord."""
-        def unpack(payload: MessagePayload):
-            # Invoke the model's send_message method.
+        async def unpack(payload: MessagePayload):
+            # Invoke the model's send_message method asynchronously.
             self.model.send_message(payload)
             
         self.ports.add_input(

@@ -1,6 +1,61 @@
 ---
-title: TelegramElement
+title: "TelegramElement"
+lightbox: true
 ---
+
+The `TelegramElement` enables real-time chat interactions between a Telegram bot and users using Telethon. It handles authentication, incoming messages based on configurable criteria, and outgoing message sending.
+
+## Instantiation
+
+**Arguments:**
+
+`app_id: str`<br>
+<span class="tab">Telegram application ID. If not provided, loads from `TELEGRAM_APP_ID` env var.</span>
+
+`api_hash: str`<br>
+<span class="tab">Telegram API hash. If not provided, loads from `TELEGRAM_API_HASH` env var.</span>
+
+`bot_token: str`<br>
+<span class="tab">Telegram bot token for authentication. If not provided, loads from `TELEGRAM_BOT_TOKEN` env var.</span>
+
+`start_message_with: Union[int, str], optional`<br>
+<span class="tab">Chat ID or username to message upon startup.</span>
+
+`on_message_criteria: callable, optional`<br>
+<span class="tab">Function to filter incoming messages (default: only private chats). Receives a Telethon `Message`.</span>
+
+**Example:**
+```python
+from pyllments.elements import TelegramElement
+from pyllments.payloads import MessagePayload
+
+# Initialize the Telegram element
+tele_el = TelegramElement(
+    app_id="123456",
+    api_hash="abcdef",
+    bot_token="YOUR_BOT_TOKEN"
+)
+
+# Connect ports to your flow:
+tele_el.ports.message_output > some_el.ports.input
+some_el.ports.output > tele_el.ports.message_input
+```
+
+## Input Ports
+
+| Port Name     | Payload Type    | Behavior                                                        |
+|---------------|-----------------|-----------------------------------------------------------------|
+| `message_input` | MessagePayload | Sends `MessagePayload` content to Telegram users via the bot.  |
+
+: {.hover}
+
+## Output Ports
+
+| Port Name       | Payload Type    | Behavior                                                             |
+|-----------------|-----------------|----------------------------------------------------------------------|
+| `message_output`| MessagePayload  | Emits messages received from Telegram users as `MessagePayload`.      |
+
+: {.hover}
 
 
 
