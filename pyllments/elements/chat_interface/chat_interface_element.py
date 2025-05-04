@@ -14,22 +14,26 @@ from pyllments.common.loop_registry import LoopRegistry
 
 class ChatInterfaceElement(Element):
     """
-    Handles the chat GUI, including the message history, chat input, and send button.
-    *****
+    Handles the chat GUI, including message history, chat input, and send button.
+    
     Model:
     - messages in the chat
-    - message input
+    
     Views:
-    - chat feed: 
+    - chat feed
     - chat input
-    - send button:
+    - send button
+    
     Ports:
     - input:
-        - message_input: MessagePayload
-        - message_emit_input: MessagePayload
-        - tools_response_input: ToolsResponsePayload
+        - user_message_input: MessagePayload      # display only (no emit)
+        - assistant_message_input: MessagePayload # display only (no emit)
+        - user_message_emit_input: MessagePayload
+        - assistant_message_emit_input: MessagePayload
+        - tools_response_emit_input: ToolsResponsePayload
     - output:
-        - message_output: MessagePayload
+        - user_message_output: MessagePayload   # context building
+        - assistant_message_output: MessagePayload  # (unused in context builder)
         - tools_response_output: ToolsResponsePayload
     """
 
@@ -42,38 +46,69 @@ class ChatInterfaceElement(Element):
         self.model = ChatInterfaceModel(**params)
         
         # Set up ports for messages and tool responses
-        self._message_output_setup()
-        self._message_input_setup()
-        self._message_emit_input_setup()
+        self._user_message_output_setup()
+        self._assistant_message_output_setup()
+        # Input-only ports (no emit)
+        self._user_message_input_setup()
+        self._assistant_message_input_setup()
+        # Emit ports (store + emit)
+        self._user_message_emit_input_setup()
+        self._assistant_message_emit_input_setup()
         self._tools_response_emit_input_setup()
         self._tools_response_output_setup()
 
-    def _message_output_setup(self):
-        """Sets up the output message port"""
-        async def pack(new_message: MessagePayload) -> MessagePayload:
-            return new_message
-
+    def _user_message_output_setup(self):
+        """Sets up an output port for user-originated MessagePayloads."""
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
         self.ports.add_output(
-            name='message_output',
+            name='user_message_output',
+            pack_payload_callback=pack)
+
+    def _assistant_message_output_setup(self):
+        """Sets up an output port for assistant-originated MessagePayloads."""
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
+        self.ports.add_output(
+            name='assistant_message_output',
             pack_payload_callback=pack)
     
-    def _message_input_setup(self):
-        """Sets up the input message port - does not emit from the message_output port"""
+    def _user_message_input_setup(self):
+        """Sets up an input port for user-originated MessagePayloads (no emit)."""
         async def unpack(payload: MessagePayload):
             await self.model.add_message(payload)
-        
         self.ports.add_input(
-            name='message_input',
+            name='user_message_input',
             unpack_payload_callback=unpack)
-        
-    def _message_emit_input_setup(self):
-        """Sets up the message_emit_input port - emits from the message_output port"""
+
+    def _assistant_message_input_setup(self):
+        """Sets up an input port for assistant-originated MessagePayloads (no emit)."""
         async def unpack(payload: MessagePayload):
             await self.model.add_message(payload)
-            await self.ports.output['message_output'].stage_emit(new_message=payload)
-
         self.ports.add_input(
-            name='message_emit_input',
+            name='assistant_message_input',
+            unpack_payload_callback=unpack)
+
+    def _user_message_emit_input_setup(self):
+        """Sets up an input port for user-originated MessagePayloads."""
+        async def unpack(payload: MessagePayload):
+            # Process and store the user message (stream or atomic)
+            await self.model.add_message(payload)
+            # Emit after model processing
+            await self.ports.output['user_message_output'].stage_emit(payload=payload)
+        self.ports.add_input(
+            name='user_message_emit_input',
+            unpack_payload_callback=unpack)
+
+    def _assistant_message_emit_input_setup(self):
+        """Sets up an input port for assistant-originated MessagePayloads."""
+        async def unpack(payload: MessagePayload):
+            # Process and store the assistant message (stream or atomic)
+            await self.model.add_message(payload)
+            # Emit after model processing
+            await self.ports.output['assistant_message_output'].stage_emit(payload=payload)
+        self.ports.add_input(
+            name='assistant_message_emit_input',
             unpack_payload_callback=unpack)
     
     def _tools_response_emit_input_setup(self):
@@ -89,8 +124,6 @@ class ChatInterfaceElement(Element):
     def _tools_response_output_setup(self):
         """Sets up the output port for tool responses"""
         async def pack(payload: ToolsResponsePayload) -> ToolsResponsePayload:
-            # Defer actual emission until payload is fully ready
-            await payload.model.await_ready()
             return payload
 
         self.ports.add_output(
@@ -238,5 +271,5 @@ class ChatInterfaceElement(Element):
             mode='atomic')
         await self.model.add_message(new_message)
         
-        # Explicitly stage and emit
-        await self.ports.output['message_output'].stage_emit(new_message=new_message)
+        # Explicitly stage and emit: history and user stream
+        await self.ports.output['user_message_output'].stage_emit(payload=new_message)

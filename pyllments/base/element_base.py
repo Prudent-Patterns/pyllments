@@ -9,6 +9,7 @@ from loguru import logger
 
 from pyllments.ports.ports import Ports
 from pyllments.base.component_base import Component
+from pyllments.base.model_base import Model
 
 class Element(Component):
     """Base class for all elements in the framework"""
@@ -184,3 +185,11 @@ class Element(Component):
             )
         
         return view
+
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value)
+        # Automatically propagate the element's logger to its model
+        if name == 'model' and isinstance(value, Model):
+            model_logger = getattr(self, 'logger', None)
+            if model_logger:
+                value.logger = model_logger

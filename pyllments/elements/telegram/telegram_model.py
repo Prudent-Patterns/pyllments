@@ -39,20 +39,17 @@ class TelegramModel(Model):
             self.loop = LoopRegistry.get_loop()
         
         # Load environment variables if not provided
-        if not self.app_id:
-            self.app_id = os.getenv('TELEGRAM_APP_ID')
-        if not self.api_hash:
-            self.api_hash = os.getenv('TELEGRAM_API_HASH')
-        if not self.bot_token:
-            self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        self.app_id = self.app_id or os.getenv('TELEGRAM_APP_ID')
+        self.api_hash = self.api_hash or os.getenv('TELEGRAM_API_HASH')
+        self.bot_token = self.bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
             
-        # Initialize Telegram client
+        # Initialize Telegram client (do not start yet)
         self.client = TelegramClient(
             'bot_session',
             int(self.app_id),
             self.api_hash,
             loop=self.loop
-        ).start(bot_token=self.bot_token)
+        )
         
         self._last_chat = None  # Stores the chat of the last valid message
         self._setup_telegram_events()
@@ -164,8 +161,8 @@ class TelegramModel(Model):
             raise ValueError("Missing required Telegram credentials")
             
         try:
-            # Connect and sign in
-            await self.client.connect()
+            # Connect and sign in using bot token
+            await self.client.start(bot_token=self.bot_token)
             self.is_ready = True
             self.logger.info("Bot is ready")
             

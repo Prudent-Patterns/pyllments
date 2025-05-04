@@ -313,9 +313,10 @@ class InputPort(Port):
     
     def __gt__(self, other):
         """Support for the '>' operator to connect ports in reverse."""
-        if isinstance(other, OutputPort):
-            other.connect(self)
-        return self
+        # Always disallow reverse connections; guide to use OutputPort > InputPort
+        raise ValueError(
+            f"Cannot use '>' on InputPort '{self.name}'; please connect using an OutputPort: `output_port > {self.name}`"
+        )
 
 
 class OutputPort(Port):
@@ -819,7 +820,7 @@ class Ports(param.Parameterized):
             return self.output[name]
         
         available_ports = list(self.input.keys()) + list(self.output.keys())
-        raise AttributeError(f"Port '{name}' not found. Available ports: {available_ports}")
+        raise AttributeError(f"{self.containing_element.__class__.__name__}: Port '{name}' not found. Available ports: {available_ports}")
     
     def __setattr__(self, name: str, value):
         """Handle attribute setting with port awareness."""

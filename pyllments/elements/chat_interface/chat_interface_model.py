@@ -21,8 +21,15 @@ class ChatInterfaceModel(Model):
           - Appends the processed payload to the message_list.
         """
         if isinstance(payload, MessagePayload):
+            # Handle streaming messages
             if payload.model.mode == 'stream' and not payload.model.streamed:
                 await payload.model.stream()
+            # Handle atomic messages: await the coroutine so content is populated
+            elif payload.model.mode == 'atomic':
+                try:
+                    await payload.model.aget_message()
+                except AttributeError:
+                    pass
         elif isinstance(payload, ToolsResponsePayload):
             # Only auto-call tools if none require permission; otherwise defer to the view prompting logic
             requires_perm = any(

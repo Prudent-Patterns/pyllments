@@ -13,7 +13,10 @@ from loguru import logger
 class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
     model_selector_view = param.ClassSelector(class_=(pn.widgets.Select, pn.Column, pn.Row))
+    generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
     
+    
+
     def __init__(self, **params):
         super().__init__(**params)
 
@@ -42,21 +45,13 @@ class LLMChatElement(Element):
             else:
                 # It's already a list
                 payloads = payload
-                
-            # Filter list to only include valid message payloads
-            valid_payloads = []
-            for item in payloads:
-                if isinstance(item, MessagePayload):
-                    valid_payloads.append(item)
-                else:
-                    logger.warning(f"Ignoring invalid payload type in input: {type(item)}")
             
-            # Generate response from valid payloads
-            if valid_payloads:
-                response = self.model.generate_response(valid_payloads)
-                await self.ports.output['message_output'].stage_emit(message_payload=response)
-            else:
-                logger.warning("No valid message payloads found to generate a response")
+            # Directly generate and emit response from all incoming payloads
+            response = self.model.generate_response(payloads)
+            if self.generate_content_on_emit:
+                # Populate the message content before emitting
+                await response.model.aget_message()
+            await self.ports.output['message_output'].stage_emit(message_payload=response)
 
         self.ports.add_input(
             name='messages_emit_input',

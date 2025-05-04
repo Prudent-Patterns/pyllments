@@ -10,6 +10,7 @@ from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from .history_handler_model import HistoryHandlerModel
+from pyllments.common.loop_registry import LoopRegistry
 
 
 # TODO: Allow support of other payload types
@@ -56,60 +57,63 @@ class HistoryHandlerElement(Element):
 
     def _message_emit_input_setup(self):
         async def unpack(payload: MessagePayload):
-            # Ensure the message is fully processed before loading without triggering the process
-            await payload.model.await_ready()
-            # Load a fully-materialized message into history/context
-            self.model.load_entries([payload])
-            # Emit updated history only for emit port
-            await self.ports.output['message_history_output'].stage_emit(
-                context=self.model.get_context_message_payloads()
-            )
+            # schedule background task to update history without blocking other ports
+            async def _handle():
+                await payload.model.await_ready()
+                self.model.load_entries([payload])
+                await self.ports.output['message_history_output'].stage_emit(
+                    context=self.model.get_context_message_payloads()
+                )
+            LoopRegistry.get_loop().create_task(_handle())
 
         self.ports.add_input(name='message_emit_input', unpack_payload_callback=unpack)
 
     def _messages_input_setup(self):
         async def unpack(payload: Union[List[MessagePayload], MessagePayload]):
             payloads = [payload] if not isinstance(payload, list) else payload
-            # Ensure each message is fully processed before loading without triggering the process
-            for p in payloads:
-                await p.model.await_ready()
-            self.model.load_entries(payloads)
+            # schedule background task to update history without blocking other ports
+            async def _handle():
+                for p in payloads:
+                    await p.model.await_ready()
+                self.model.load_entries(payloads)
+            LoopRegistry.get_loop().create_task(_handle())
 
         self.ports.add_input(name='messages_input', unpack_payload_callback=unpack)
 
     def _tool_response_emit_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
-            # Ensure all tool calls are complete before loading without triggering the process
-            await payload.model.await_ready()
-            # Load a fully-materialized tool response into history/context
-            self.model.load_entries([payload])
-            # Emit updated history only for emit port
-            await self.ports.output['message_history_output'].stage_emit(
-                context=self.model.get_context_message_payloads()
-            )
+            # schedule background task to update history without blocking other ports
+            async def _handle():
+                await payload.model.await_ready()
+                self.model.load_entries([payload])
+                await self.ports.output['message_history_output'].stage_emit(
+                    context=self.model.get_context_message_payloads()
+                )
+            LoopRegistry.get_loop().create_task(_handle())
 
         self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
 
     def _tool_responses_input_setup(self):
         async def unpack(payload: Union[List[ToolsResponsePayload], ToolsResponsePayload]):
             items = payload if isinstance(payload, list) else [payload]
-            # Ensure all tool calls are complete before loading without triggering the process
-            for item in items:
-                await item.model.await_ready()
-            # Load all fully-materialized tool responses into history/context
-            self.model.load_entries(items)
+            # schedule background task to update history without blocking other ports
+            async def _handle():
+                for item in items:
+                    await item.model.await_ready()
+                self.model.load_entries(items)
+            LoopRegistry.get_loop().create_task(_handle())
 
         self.ports.add_input(name='tool_responses_input', unpack_payload_callback=unpack)
     
     def _message_history_output_setup(self):
-        async def pack(context: List[MessagePayload]) -> List[MessagePayload]:
+        async def pack(context: list[MessagePayload]) -> list[MessagePayload]:
             """Pack the message context into a list"""
             return context
         
+        # Use built-in list generic to align with conversion mapping
         self.ports.add_output(
             name='message_history_output',
             pack_payload_callback=pack,
-            payload_type=List[MessagePayload]
         )
 
     # TODO: Add a view for tool responses

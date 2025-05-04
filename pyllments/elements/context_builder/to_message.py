@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, get_origin, get_args
 
 from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, ToolsResponsePayload
 
@@ -80,8 +80,17 @@ def to_message_payload(payload, payload_message_mapping=payload_message_mapping,
       expected_type: Optional type to use for determining the conversion function. If not provided, the payload's type is used.
       role (str, optional): If provided, override the role in the resulting MessagePayload(s) regardless of the default.
     """
+    # Determine the payload type, preferring the expected_type if provided
     payload_type = (expected_type or type(payload)) if expected_type is not Any else type(payload)
+    # Normalize typing.List[...] to built-in list[...] for mapping lookup
+    origin = get_origin(payload_type)
+    if origin is list:
+        args = get_args(payload_type)
+        if args:
+            # Convert typing.List[T] to built-in list[T]
+            payload_type = list[args[0]]
     try:
+        # Lookup conversion function for the normalized payload type
         conversion_function = payload_message_mapping[payload_type]
         return_val = conversion_function(payload)
         if role is not None:

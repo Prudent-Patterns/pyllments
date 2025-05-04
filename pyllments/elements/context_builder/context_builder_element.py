@@ -150,8 +150,8 @@ class ContextBuilderElement(Element):
     flow_controller = param.ClassSelector(class_=FlowController, doc="""
         The underlying FlowController managing the routing logic.""")
 
-    outgoing_input_port = param.ClassSelector(class_=InputPort, doc="""
-        An input port to connect to the flow controller's messages_output port.""")
+    outgoing_input_ports = param.List(default=[], item_type=InputPort, doc="""
+        A list of input ports to connect to the flow controller's messages_output port.""")
     
     payload_message_mapping = param.Dict(default=payload_message_mapping, doc="""
         Mapping between payload types and message conversion functions.""")
@@ -177,8 +177,9 @@ class ContextBuilderElement(Element):
         # Set up flow controller and connect ports
         self._setup_flow_controller()
         
-        if self.outgoing_input_port:
-            self.ports.messages_output > self.outgoing_input_port
+        if self.outgoing_input_ports:
+            for port in self.outgoing_input_ports:
+                self.ports.messages_output > port
             
         # Pre-compute dependencies after all items are registered
         self._precompute_all_dependencies()
