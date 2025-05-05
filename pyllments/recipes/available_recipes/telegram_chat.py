@@ -30,7 +30,7 @@ history_handler_el = HistoryHandlerElement(context_token_limit=12000)
 # Set up ContextBuilder to aggregate history and new Telegram messages
 input_map = {
     'history': {'ports': [history_handler_el.ports.message_history_output], 'persist': True},
-    'user_query': {'ports': [telegram_el.ports.message_output]}
+    'user_query': {'ports': [telegram_el.ports.user_message_output]}
 }
 emit_order = ['[history]', 'user_query']
 
@@ -47,9 +47,9 @@ context_builder = ContextBuilderElement(
     outgoing_input_ports=[llm_chat_el.ports.messages_emit_input]
 )
 
-# Mirror chat recipe: route Telegram messages silently into history, and LLM responses to emit history
-telegram_el.ports.message_output > history_handler_el.ports.messages_input
-llm_chat_el.ports.message_output > history_handler_el.ports.message_emit_input
-
-# Finally send the LLM's reply back to Telegram
-llm_chat_el.ports.message_output > telegram_el.ports.message_input
+# Hook user and assistant flows like the chat recipe
+# Route incoming user messages into history
+telegram_el.ports.user_message_output > history_handler_el.ports.message_emit_input
+# Send LLM responses to Telegram then record them in history
+llm_chat_el.ports.message_output > telegram_el.ports.assistant_message_emit_input
+telegram_el.ports.assistant_message_output > history_handler_el.ports.message_emit_input

@@ -89,30 +89,18 @@ class DiscordModel(Model):
                     mode="atomic"
                 )
                 
-    def send_message(self, payload: MessagePayload):
+    async def send_message(self, payload: MessagePayload):
         """
-        Schedules sending a message via the last DM channel using the cached event loop.
-        
-        This method is intended to be called by the Discord Element when it wants to
-        dispatch an outgoing message from the bot.
+        Sends a message via the last DM channel; awaits payload resolution then dispatches.
         """
         if not self.is_ready or not self._last_dm_channel:
             self.logger.warning("Client not ready or no DM channel available")
             return
-        
-        # Ensure that only messages from valid roles are sent.
         if payload.model.role not in ["assistant", "system"]:
             self.logger.info("Message role not valid for sending: ignoring")
             return
-        
-        # Schedule the asynchronous send operation using the cached event loop.
-        self.loop.create_task(self._async_send_message(payload))
-        
-    async def _async_send_message(self, payload: MessagePayload):
-        """
-        Internal asynchronous method that sends the message via the last DM channel.
-        """
         try:
+            # Ensure the payload content is ready
             message = await payload.model.aget_message()
             await self._last_dm_channel.send(message)
         except Exception as e:

@@ -106,44 +106,21 @@ class TelegramModel(Model):
                 self.logger.error(f"Error resolving username {target}: {str(e)}")
         return None
                 
-    def send_message(self, payload: MessagePayload):
+    async def send_message(self, payload: MessagePayload, target: Optional[Union[int, str]] = None):
         """
-        Schedules sending a message via the last chat using the cached event loop.
-        
-        This method is intended to be called by the Telegram Element when it wants to
-        dispatch an outgoing message from the bot.
+        Sends a message via the last chat or specified target; awaits payload resolution then dispatches.
         """
         if not self.is_ready:
             self.logger.warning("Client not ready")
             return
-            
-        if not self._last_chat and not isinstance(payload, tuple):
+        if not target and not self._last_chat:
             self.logger.warning("No chat available and no target specified")
             return
-        
-        # Ensure that only messages from valid roles are sent
         if payload.model.role not in ["assistant", "system"]:
             self.logger.info("Message role not valid for sending: ignoring")
             return
-        
-        # Schedule the asynchronous send operation using the cached event loop
-        self.loop.create_task(self._async_send_message(payload))
-        
-    async def _async_send_message(self, payload: MessagePayload, target: Optional[Union[int, str]] = None):
-        """
-        Internal asynchronous method that sends the message via the last chat or specified target.
-        
-        Parameters
-        ----------
-        payload : MessagePayload
-            The message payload to send
-        target : Optional[Union[int, str]]
-            Optional target to send message to. Can be a chat ID (int) or username (str).
-            If None, uses the last chat.
-        """
         try:
             message = await payload.model.aget_message()
-            
             if target:
                 chat_id = await self._resolve_chat_id(target)
                 if chat_id:
@@ -176,7 +153,7 @@ class TelegramModel(Model):
                             content="Hello! I'm your bot assistant. How can I help you today?",
                             mode="atomic"
                         )
-                        await self._async_send_message(initial_message, chat_id)
+                        await self.send_message(initial_message, chat_id)
                         self.logger.info(f"Sent initial message to chat ID {chat_id}")
                     else:
                         self.logger.warning(

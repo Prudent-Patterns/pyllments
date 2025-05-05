@@ -22,27 +22,27 @@ class DiscordElement(Element):
     
     Ports:
     - input:
-        - message_input: MessagePayload (messages to be sent to Discord)
+        - assistant_message_emit_input: MessagePayload (messages to be sent to Discord)
     - output:
-        - message_output: MessagePayload (messages received from Discord)
+        - user_message_output: MessagePayload (messages received from Discord)
+        - assistant_message_output: MessagePayload (messages received from Discord)
     """
     
     def __init__(self, **params):
         super().__init__(**params)
         self.model = DiscordModel(**params)
         
-        self._message_output_setup()
-        self._message_input_setup()
+        self._user_message_output_setup()
+        self._assistant_message_output_setup()
+        self._assistant_message_emit_input_setup()
         
-
-        
-    def _message_output_setup(self):
-        """Sets up the output port to forward messages received from Discord."""
+    def _user_message_output_setup(self):
+        """Sets up the output port to forward user messages received from Discord."""
         async def pack(new_message: MessagePayload) -> MessagePayload:
             return new_message
             
         self.ports.add_output(
-            name='message_output',
+            name='user_message_output',
             pack_payload_callback=pack
         )
         
@@ -51,19 +51,30 @@ class DiscordElement(Element):
             if event.new and event.new.model.role == "user":
                 # Schedule async emission of new message payload
                 self.model.loop.create_task(
-                    self.ports.output['message_output'].stage_emit(new_message=event.new)
+                    self.ports.output['user_message_output'].stage_emit(new_message=event.new)
                 )
                 
         self.model.param.watch(_on_new_message, 'new_message', precedence=0)
         
-    def _message_input_setup(self):
-        """Sets up the input port for sending messages to Discord."""
+    def _assistant_message_output_setup(self):
+        """Sets up an output port for assistant-originated MessagePayloads."""
+        async def pack(assistant_message: MessagePayload) -> MessagePayload:
+            return assistant_message
+        self.ports.add_output(
+            name='assistant_message_output',
+            pack_payload_callback=pack
+        )
+
+    def _assistant_message_emit_input_setup(self):
+        """Sets up an input port for assistant-originated MessagePayloads to send via Discord."""
         async def unpack(payload: MessagePayload):
-            # Invoke the model's send_message method asynchronously.
-            self.model.send_message(payload)
-            
+            # Send the assistant message (awaits content resolution internally)
+            await self.model.send_message(payload)
+            # Emit after sending
+            await self.ports.output['assistant_message_output'].stage_emit(assistant_message=payload)
+
         self.ports.add_input(
-            name='message_input',
+            name='assistant_message_emit_input',
             unpack_payload_callback=unpack
         )
         

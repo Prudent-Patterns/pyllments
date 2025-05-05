@@ -18,46 +18,57 @@ class TelegramElement(Element):
     
     Ports:
     - input:
-        - message_input: MessagePayload (messages to be sent to Telegram)
+        - assistant_message_emit_input: MessagePayload (messages to be sent to Telegram)
     - output:
-        - message_output: MessagePayload (messages received from Telegram)
+        - user_message_output: MessagePayload (messages received from Telegram)
+        - assistant_message_output: MessagePayload (messages sent by the assistant)
     """
     
     def __init__(self, **params):
         super().__init__(**params)
         self.model = TelegramModel(**params)
         
-        self._message_output_setup()
-        self._message_input_setup()
+        self._user_message_output_setup()
+        self._assistant_message_output_setup()
+        self._assistant_message_emit_input_setup()
         
-    def _message_output_setup(self):
-        """Sets up the output port to forward messages received from Telegram."""
+    def _user_message_output_setup(self):
+        """Sets up the output port to forward user messages received from Telegram."""
         async def pack(new_message: MessagePayload) -> MessagePayload:
             return new_message
             
         self.ports.add_output(
-            name='message_output',
+            name='user_message_output',
             pack_payload_callback=pack
         )
         
-        # Watch for new messages from Telegram (incoming messages)
+        # Watch for incoming user messages
         def _on_new_message(event):
             if event.new and event.new.model.role == "user":
-                # Schedule async emission of the new Telegram message payload
                 self.model.loop.create_task(
-                    self.ports.output['message_output'].stage_emit(new_message=event.new)
+                    self.ports.output['user_message_output'].stage_emit(new_message=event.new)
                 )
                 
         self.model.param.watch(_on_new_message, 'new_message', precedence=0)
         
-    def _message_input_setup(self):
-        """Sets up the input port for sending messages to Telegram."""
+    def _assistant_message_output_setup(self):
+        """Sets up an output port for assistant-originated MessagePayloads."""
+        async def pack(assistant_message: MessagePayload) -> MessagePayload:
+            return assistant_message
+        self.ports.add_output(
+            name='assistant_message_output',
+            pack_payload_callback=pack
+        )
+
+    def _assistant_message_emit_input_setup(self):
+        """Sets up an input port for assistant-originated MessagePayloads to send via Telegram."""
         async def unpack(payload: MessagePayload):
-            # Invoke the model's send_message method asynchronously
-            self.model.send_message(payload)
-            
+            # this call now drives both payload-resolution and the actual send
+            await self.model.send_message(payload)
+            # then emit downstream
+            await self.ports.output['assistant_message_output'].stage_emit(assistant_message=payload)
         self.ports.add_input(
-            name='message_input',
+            name='assistant_message_emit_input',
             unpack_payload_callback=unpack
         )
         
