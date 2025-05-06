@@ -15,7 +15,7 @@ The `DiscordElement` enables real-time direct-message interactions between a Dis
 `on_message_criteria: callable, optional`<br>
 <span class="tab">Function to filter incoming Discord messages (default: only direct messages). Receives a `discord.Message` and returns `bool`.</span>
 
-**Example:**
+<!-- **Example:**
 ```python
 from pyllments.elements import DiscordElement, LLMChatElement
 
@@ -25,21 +25,21 @@ discord_el = DiscordElement(bot_token="YOUR_DISCORD_TOKEN")
 # Wire up to an LLM chat element
 discord_el.ports.message_output > llm_el.ports.messages_input
 llm_el.ports.message_output > discord_el.ports.message_input
-```
+``` -->
 
 ## Input Ports
 
-| Port Name     | Payload Type    | Behavior                                  |
-|---------------|-----------------|-------------------------------------------|
-| `message_input` | MessagePayload | Sends outgoing messages from the flow to Discord users via DM. |
-
-: {.hover}
+| Port Name                    | Payload Type   | Behavior                                               |
+|------------------------------|----------------|--------------------------------------------------------|
+| `assistant_message_emit_input` | MessagePayload | Sends assistant-originated `MessagePayload`s to Discord via DM. |
 
 ## Output Ports
 
-| Port Name       | Payload Type    | Behavior                                      |
-|-----------------|-----------------|-----------------------------------------------|
-| `message_output`| MessagePayload  | Emits messages received from Discord users as `MessagePayload`. |
+| Port Name               | Payload Type   | Behavior                                                           |
+|-------------------------|----------------|--------------------------------------------------------------------|
+| `user_message_output`   | MessagePayload | Emits messages received from Discord users.                        |
+| `assistant_message_output` | MessagePayload | Emits messages forwarded after assistant-originated payloads are sent. |
+| `message_output`         | MessagePayload | Unified port emitting both user and assistant messages.            |
 
 : {.hover}
 

@@ -26,6 +26,7 @@ class DiscordElement(Element):
     - output:
         - user_message_output: MessagePayload (messages received from Discord)
         - assistant_message_output: MessagePayload (messages received from Discord)
+        - message_output: MessagePayload        # unified port for both user and assistant messages
     """
     
     def __init__(self, **params):
@@ -34,6 +35,7 @@ class DiscordElement(Element):
         
         self._user_message_output_setup()
         self._assistant_message_output_setup()
+        self._message_output_setup()
         self._assistant_message_emit_input_setup()
         
     def _user_message_output_setup(self):
@@ -46,12 +48,21 @@ class DiscordElement(Element):
             pack_payload_callback=pack
         )
         
+        # Also add unified message output
+        self.ports.add_output(
+            name='message_output',
+            pack_payload_callback=pack
+        )
+        
         # Watch for new messages from Discord (incoming DM).
         def _on_new_message(event):
             if event.new and event.new.model.role == "user":
-                # Schedule async emission of new message payload
+                # Emit to both user_message_output and unified message_output
                 self.model.loop.create_task(
                     self.ports.output['user_message_output'].stage_emit(new_message=event.new)
+                )
+                self.model.loop.create_task(
+                    self.ports.output['message_output'].stage_emit(new_message=event.new)
                 )
                 
         self.model.param.watch(_on_new_message, 'new_message', precedence=0)
@@ -72,10 +83,21 @@ class DiscordElement(Element):
             await self.model.send_message(payload)
             # Emit after sending
             await self.ports.output['assistant_message_output'].stage_emit(assistant_message=payload)
+            # Also emit on unified message_output
+            await self.ports.output['message_output'].stage_emit(assistant_message=payload)
 
         self.ports.add_input(
             name='assistant_message_emit_input',
             unpack_payload_callback=unpack
+        )
+        
+    def _message_output_setup(self):
+        """Sets up a unified output port for user and assistant MessagePayloads."""
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
+        self.ports.add_output(
+            name='message_output',
+            pack_payload_callback=pack
         )
         
     async def cleanup(self):

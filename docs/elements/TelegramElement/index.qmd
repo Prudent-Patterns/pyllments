@@ -24,7 +24,7 @@ The `TelegramElement` enables real-time chat interactions between a Telegram bot
 `on_message_criteria: callable, optional`<br>
 <span class="tab">Function to filter incoming messages (default: only private chats). Receives a Telethon `Message`.</span>
 
-**Example:**
+<!-- **Example:**
 ```python
 from pyllments.elements import TelegramElement
 from pyllments.payloads import MessagePayload
@@ -39,21 +39,21 @@ tele_el = TelegramElement(
 # Connect ports to your flow:
 tele_el.ports.message_output > some_el.ports.input
 some_el.ports.output > tele_el.ports.message_input
-```
+``` -->
 
 ## Input Ports
 
-| Port Name     | Payload Type    | Behavior                                                        |
-|---------------|-----------------|-----------------------------------------------------------------|
-| `message_input` | MessagePayload | Sends `MessagePayload` content to Telegram users via the bot.  |
-
-: {.hover}
+| Port Name                    | Payload Type   | Behavior                                                       |
+|------------------------------|----------------|----------------------------------------------------------------|
+| `assistant_message_emit_input` | MessagePayload | Sends assistant-originated `MessagePayload`s to Telegram via DM. |
 
 ## Output Ports
 
-| Port Name       | Payload Type    | Behavior                                                             |
-|-----------------|-----------------|----------------------------------------------------------------------|
-| `message_output`| MessagePayload  | Emits messages received from Telegram users as `MessagePayload`.      |
+| Port Name                   | Payload Type   | Behavior                                                             |
+|-----------------------------|----------------|----------------------------------------------------------------------|
+| `user_message_output`       | MessagePayload | Emits messages received from Telegram users.                         |
+| `assistant_message_output`  | MessagePayload | Emits messages sent by the assistant.                                 |
+| `message_output`            | MessagePayload | Unified port emitting both user and assistant messages.              |
 
 : {.hover}
 

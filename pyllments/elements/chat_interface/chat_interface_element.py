@@ -35,6 +35,7 @@ class ChatInterfaceElement(Element):
         - user_message_output: MessagePayload   # context building
         - assistant_message_output: MessagePayload  # (unused in context builder)
         - tools_response_output: ToolsResponsePayload
+        - message_output: MessagePayload        # unified port emitting both user and assistant messages
     """
 
     chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
@@ -56,6 +57,8 @@ class ChatInterfaceElement(Element):
         self._assistant_message_emit_input_setup()
         self._tools_response_emit_input_setup()
         self._tools_response_output_setup()
+        # Unified output port for both user and assistant messages
+        self._message_output_setup()
 
     def _user_message_output_setup(self):
         """Sets up an output port for user-originated MessagePayloads."""
@@ -92,10 +95,12 @@ class ChatInterfaceElement(Element):
     def _user_message_emit_input_setup(self):
         """Sets up an input port for user-originated MessagePayloads."""
         async def unpack(payload: MessagePayload):
-            # Process and store the user message (stream or atomic)
+            # Process and store the user message
             await self.model.add_message(payload)
             # Emit after model processing
             await self.ports.output['user_message_output'].stage_emit(payload=payload)
+            # Also emit on unified message_output port
+            await self.ports.output['message_output'].stage_emit(payload=payload)
         self.ports.add_input(
             name='user_message_emit_input',
             unpack_payload_callback=unpack)
@@ -103,10 +108,12 @@ class ChatInterfaceElement(Element):
     def _assistant_message_emit_input_setup(self):
         """Sets up an input port for assistant-originated MessagePayloads."""
         async def unpack(payload: MessagePayload):
-            # Process and store the assistant message (stream or atomic)
+            # Process and store the assistant message
             await self.model.add_message(payload)
             # Emit after model processing
             await self.ports.output['assistant_message_output'].stage_emit(payload=payload)
+            # Also emit on unified message_output port
+            await self.ports.output['message_output'].stage_emit(payload=payload)
         self.ports.add_input(
             name='assistant_message_emit_input',
             unpack_payload_callback=unpack)
@@ -128,6 +135,14 @@ class ChatInterfaceElement(Element):
 
         self.ports.add_output(
             name='tools_response_output',
+            pack_payload_callback=pack)
+
+    def _message_output_setup(self):
+        """Sets up a unified output port for user and assistant MessagePayloads."""
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
+        self.ports.add_output(
+            name='message_output',
             pack_payload_callback=pack)
 
     @Component.view

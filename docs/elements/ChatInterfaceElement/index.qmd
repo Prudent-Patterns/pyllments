@@ -11,20 +11,24 @@ It provides the essential component of user interaction through receiving `Messa
 
 ### Input Ports
 
-| Port Name | Payload Type | Behavior |
-|-----------------------|----------------------------|---------------------|
-| message_input | MessagePayload | Adds view of the message to the chatfeed |
-| message_emit_input | MessagePayload | Adds view of the message to the chatfeed and emits the message from its `message_output` port |
-| tools_response_input | ToolsResponsePayload | Adds view of the `ToolsResponsePayload` to the chatfeed and emits the payload from the `tools_response_output` port after the tools are called. Optionally requires user confirmation before calling the tools based on the requirements of the `ToolsResponsePayload` |
+| Port Name                    | Payload Type            | Behavior                                                                                           |
+|------------------------------|-------------------------|----------------------------------------------------------------------------------------------------|
+| `user_message_input`         | MessagePayload          | Displays a user message in the chat feed (no downstream emit).                                     |
+| `assistant_message_input`    | MessagePayload          | Displays an assistant message in the chat feed (no downstream emit).                                |
+| `user_message_emit_input`    | MessagePayload          | Displays and then emits user messages via `user_message_output` and `message_output`.              |
+| `assistant_message_emit_input` | MessagePayload        | Displays and then emits assistant messages via `assistant_message_output` and `message_output`.     |
+| `tools_response_emit_input`  | ToolsResponsePayload    | Displays and then emits tool response messages via `tools_response_output`.                         |
 
 : {.hover}
 
 ### Output Ports
 
-| Port Name              | Payload Type        | Behavior                                                        |
-|------------------------|---------------------|-----------------------------------------------------------------|
-| message_output         | MessagePayload      | Emitted when either a message is sent through the views or a message comes in through the `message_emit_input` port. |
-| tools_response_emit_output   | ToolsResponsePayload | Emitted when a `ToolsResponsePayload` is received through the `tools_response_input` port after the tools are called. |
+| Port Name                 | Payload Type            | Behavior                                                                                          |
+|---------------------------|-------------------------|---------------------------------------------------------------------------------------------------|
+| `user_message_output`     | MessagePayload          | Emits processed user messages.                                                                    |
+| `assistant_message_output`| MessagePayload          | Emits processed assistant messages.                                                               |
+| `message_output`          | MessagePayload          | Emits both user and assistant messages from their respective emit inputs.                        |
+| `tools_response_output`   | ToolsResponsePayload    | Emits processed tool response messages.                                                          |
 
 : {.hover}
 

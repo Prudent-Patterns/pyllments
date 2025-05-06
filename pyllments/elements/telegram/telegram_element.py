@@ -22,6 +22,7 @@ class TelegramElement(Element):
     - output:
         - user_message_output: MessagePayload (messages received from Telegram)
         - assistant_message_output: MessagePayload (messages sent by the assistant)
+        - message_output: MessagePayload        # unified port for both user and assistant messages
     """
     
     def __init__(self, **params):
