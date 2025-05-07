@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from inspect import Parameter
 from typing import Any, Dict, List, Optional
 import typer
+from typing import Annotated
 
 @dataclass
 class CommonOption:
@@ -21,16 +22,28 @@ class CommonOption:
         """
         Returns a Typer Option with the appropriate default and help text.
         """
-        return typer.Option(self.default, help=self.help)
+        # Use positional default first so Option(default, *param_decls) signature is correct
+        return typer.Option(self.default, help=self.help, show_default=True)
 
     def to_parameter(self) -> Parameter:
         """
         Returns an inspect.Parameter instance for dynamic signature building.
         """
+        # Explicitly supply the CLI flag name for this common option
+        flag = f"--{self.name.replace('_','-')}"
+        # Build an Annotated type for this common option: flag name then help
+        annotated_type = Annotated[
+            self.type,
+            typer.Option(
+                flag,
+                help=self.help,
+                show_default=True
+            )
+        ]
         return Parameter(
             name=self.name,
             kind=Parameter.KEYWORD_ONLY,
-            annotation=self.type,
+            annotation=annotated_type,
             default=self.default if self.default is not ... else Parameter.empty,
         )
 
@@ -69,6 +82,12 @@ class CommonOptions:
                 type=Optional[str],
                 default=None,
                 help="Path to the .env file containing environment variables."
+            ),
+            "host": CommonOption(
+                name="host",
+                type=str,
+                default="127.0.0.1",
+                help="Network interface to bind the server to. Defaults to localhost (127.0.0.1) for safer local development."
             ),
             "profile": CommonOption(
                 name="profile",
