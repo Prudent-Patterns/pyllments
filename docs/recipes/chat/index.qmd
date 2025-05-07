@@ -1,0 +1,9 @@
+---
+title: "Chat"
+description: "A simple chat recipe with a browser GUI"
+---
+
+```bash
+pyllments recipe run chat
+```
+

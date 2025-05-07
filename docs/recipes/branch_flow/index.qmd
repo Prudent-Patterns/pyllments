@@ -14,11 +14,11 @@ pyllments recipe run branch_chat
 ```
 ### Configuration
 
-| Argument         | Example | Description                                          | Default |
-| :--------------- | :--- | :------------------------------------------------:| :------ |
-| width            | 800    | Width of the chat interface.         | 800    |
-| height           | 942    | Height of the application.           | 942    |
-| custom_models    | *See Below*     | Add custom LLM models and/or base urls. | "{}"    |
+| Argument         | Description                                          | Default |
+| :--------------- | :------------------------------------------------:| :------ |
+| width            | Width of the chat interface.         | 800    |
+| height           | Height of the application.           | 942    |
+| custom_models    | Add custom LLM models and/or base urls. | "{}"    |
 
 ::: {layout-ncol=2}
 ![Branch Flow GUI](branch_flow_gui.jpg){.lightbox}

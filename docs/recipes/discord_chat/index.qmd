@@ -1,0 +1,44 @@
+---
+title: "Discord Chat"
+description: "A chat recipe with a Discord bot"
+format: 
+    html:
+        code-links:
+            - text: Recipe Code
+              icon: github
+              href: https://github.com/Prudent-Patterns/pyllments/blob/main/pyllments/recipes/available_recipes/discord_chat.py
+lightbox: true
+---
+
+``` bash
+pyllments recipe run discord_chat
+```
+
+To chat with the bot, you must create it through the [Discord Developer Portal](https://discord.com/developers/applications) and add the bot to your server. Once you and the bot share a server, you may message it directly and it will respond to you.
+
+### Configuration
+
+| Argument | Description | Default |
+|:-----------------|:-----------------------------------|:-----------------|
+| bot_token | The token for the discord bot. Not necessary if DISCORD_BOT_TOKEN env var present. | `None` |
+| model_name | The name of the LLM model to use for generating chat responses. | `gpt-4o-mini` |
+| model_base_url | Base URL for the LLM API endpoint. | `None` |
+| system_prompt | Optional system prompt to guide the conversation. | `None` |
+
+![](discord_chat_flow.jpg)
+
+**Steps of the flow**
+
+1.  When a message arrives from the Discord channel, it is packaged into a `MessagePayload` and emitted from the `user_message_output` port of the `DiscordElement`
+
+    1a. It is emitted to the `query` port of the `ContextBuilderElement`
+
+    1b. as well as to the `messages_input` port of the `HistoryHandlerElement`
+
+2.  When the `query` port of the `ContextBuilderElement` is filled, it generates and emits a `list[MessagePayload]` to the `LLMChatElement`, which may or may not include the history, depending on whether it is present or not.
+
+3.  The `LLMChatElement` receives the payloads at its `messages_emit_input` port, then generates a response callback, and packs it in a `MessagePayload` which is emitted from its `message_output` port and received back by the `DiscordElement`, which appears as a response from the bot in the channel after the actual call to the LLM is made to generate the content of the message.
+
+4.  When the message arrives at the `message_emit_input` port of the `DiscordElement` and after the content is generated, it is then forwarded to the `messages_emit_input` port of the `HistoryHandlerElement`, where it is saved into its internal storage.
+
+5.  The `HistoryHandlerElement` then emits a`list[MessagePayload]` to the `ContextBuilderElement`. This process allows us to populate the history of the `ContextBuilderElement` dynamically. (Note that this doesn't trigger it to emit a list of messages, only the `query` port is responsible for that.)

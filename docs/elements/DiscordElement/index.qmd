@@ -29,9 +29,9 @@ llm_el.ports.message_output > discord_el.ports.message_input
 
 ## Input Ports
 
-| Port Name                    | Payload Type   | Behavior                                               |
-|------------------------------|----------------|--------------------------------------------------------|
-| `assistant_message_emit_input` | MessagePayload | Sends assistant-originated `MessagePayload`s to Discord via DM. |
+| Port Name            | Payload Type   | Behavior                                                            |
+|----------------------|----------------|---------------------------------------------------------------------|
+| `message_emit_input` | MessagePayload | Sends `MessagePayload`s to Discord users via DM, processing assistant-originated payloads. |
 
 ## Output Ports
 

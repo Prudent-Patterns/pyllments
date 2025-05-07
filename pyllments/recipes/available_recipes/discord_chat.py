@@ -7,6 +7,10 @@ from pyllments.elements import DiscordElement, LLMChatElement, HistoryHandlerEle
 @dataclass
 class Config:
     """Choose the model to use for chatting with the discord bot"""
+    bot_token: str = field(
+        default=None,
+        metadata={'help': 'The token for the discord bot. Not necessary if DISCORD_BOT_TOKEN env var present.'}
+    )
     model_name: str = field(
         default='gpt-4o-mini',
         metadata={'help': 'The name of the model to use for the LLM chat.'})
@@ -17,7 +21,7 @@ class Config:
         default=None,
         metadata={'help': 'The system prompt to use for the chat bot.'})
 
-discord_el = DiscordElement()
+discord_el = DiscordElement(bot_token=config.bot_token)
 
 llm_chat_el = LLMChatElement(
     model_name=config.model_name,
@@ -50,6 +54,6 @@ context_builder = ContextBuilderElement(
 # Hook user and assistant flows like the chat recipe
 # Route incoming user messages into history
 discord_el.ports.user_message_output > history_handler_el.ports.message_emit_input
-# Send LLM responses to Discord then record them in history
-llm_chat_el.ports.message_output > discord_el.ports.assistant_message_emit_input
+# Send LLM responses to Discord then record them in history via unified emit port
+llm_chat_el.ports.message_output > discord_el.ports.message_emit_input
 discord_el.ports.assistant_message_output > history_handler_el.ports.message_emit_input

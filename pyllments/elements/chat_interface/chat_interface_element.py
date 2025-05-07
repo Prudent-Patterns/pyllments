@@ -26,16 +26,14 @@ class ChatInterfaceElement(Element):
     
     Ports:
     - input:
-        - user_message_input: MessagePayload      # display only (no emit)
-        - assistant_message_input: MessagePayload # display only (no emit)
-        - user_message_emit_input: MessagePayload
-        - assistant_message_emit_input: MessagePayload
+        - message_input: MessagePayload         # display only (no downstream emit)
+        - message_emit_input: MessagePayload    # display and then emit based on role
         - tools_response_emit_input: ToolsResponsePayload
     - output:
-        - user_message_output: MessagePayload   # context building
-        - assistant_message_output: MessagePayload  # (unused in context builder)
+        - user_message_output: MessagePayload
+        - assistant_message_output: MessagePayload
+        - message_output: MessagePayload        # unified port for both user and assistant messages
         - tools_response_output: ToolsResponsePayload
-        - message_output: MessagePayload        # unified port emitting both user and assistant messages
     """
 
     chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
@@ -50,11 +48,8 @@ class ChatInterfaceElement(Element):
         self._user_message_output_setup()
         self._assistant_message_output_setup()
         # Input-only ports (no emit)
-        self._user_message_input_setup()
-        self._assistant_message_input_setup()
-        # Emit ports (store + emit)
-        self._user_message_emit_input_setup()
-        self._assistant_message_emit_input_setup()
+        self._message_input_setup()
+        self._message_emit_input_setup()
         self._tools_response_emit_input_setup()
         self._tools_response_output_setup()
         # Unified output port for both user and assistant messages
@@ -76,46 +71,25 @@ class ChatInterfaceElement(Element):
             name='assistant_message_output',
             pack_payload_callback=pack)
     
-    def _user_message_input_setup(self):
-        """Sets up an input port for user-originated MessagePayloads (no emit)."""
+    def _message_input_setup(self):
+        """Sets up an input port for displaying MessagePayloads (no emit)."""
         async def unpack(payload: MessagePayload):
             await self.model.add_message(payload)
         self.ports.add_input(
-            name='user_message_input',
+            name='message_input',
             unpack_payload_callback=unpack)
 
-    def _assistant_message_input_setup(self):
-        """Sets up an input port for assistant-originated MessagePayloads (no emit)."""
+    def _message_emit_input_setup(self):
+        """Sets up an input port for emitting MessagePayloads after display."""
         async def unpack(payload: MessagePayload):
             await self.model.add_message(payload)
-        self.ports.add_input(
-            name='assistant_message_input',
-            unpack_payload_callback=unpack)
-
-    def _user_message_emit_input_setup(self):
-        """Sets up an input port for user-originated MessagePayloads."""
-        async def unpack(payload: MessagePayload):
-            # Process and store the user message
-            await self.model.add_message(payload)
-            # Emit after model processing
-            await self.ports.output['user_message_output'].stage_emit(payload=payload)
-            # Also emit on unified message_output port
+            # Emit to role-specific ports
+            port = 'user_message_output' if payload.model.role == 'user' else 'assistant_message_output'
+            await self.ports.output[port].stage_emit(payload=payload)
+            # Emit unified message port
             await self.ports.output['message_output'].stage_emit(payload=payload)
         self.ports.add_input(
-            name='user_message_emit_input',
-            unpack_payload_callback=unpack)
-
-    def _assistant_message_emit_input_setup(self):
-        """Sets up an input port for assistant-originated MessagePayloads."""
-        async def unpack(payload: MessagePayload):
-            # Process and store the assistant message
-            await self.model.add_message(payload)
-            # Emit after model processing
-            await self.ports.output['assistant_message_output'].stage_emit(payload=payload)
-            # Also emit on unified message_output port
-            await self.ports.output['message_output'].stage_emit(payload=payload)
-        self.ports.add_input(
-            name='assistant_message_emit_input',
+            name='message_emit_input',
             unpack_payload_callback=unpack)
     
     def _tools_response_emit_input_setup(self):

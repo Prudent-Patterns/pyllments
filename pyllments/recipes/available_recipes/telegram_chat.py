@@ -51,5 +51,5 @@ context_builder = ContextBuilderElement(
 # Route incoming user messages into history
 telegram_el.ports.user_message_output > history_handler_el.ports.message_emit_input
 # Send LLM responses to Telegram then record them in history
-llm_chat_el.ports.message_output > telegram_el.ports.assistant_message_emit_input
+llm_chat_el.ports.message_output > telegram_el.ports.message_emit_input
 telegram_el.ports.assistant_message_output > history_handler_el.ports.message_emit_input

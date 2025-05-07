@@ -92,8 +92,8 @@ context_builder = ContextBuilderElement(
 # Route user messages into history only after chat interface processing
 chat_interface_el.ports.user_message_output > history_handler_el.ports.message_emit_input
 
-# Connect LLM output into chat interface for display
-llm_chat_el.ports.message_output > chat_interface_el.ports.assistant_message_emit_input
+# Connect LLM output into chat interface for display via unified emit port
+llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input
 
 # Route assistant messages into history only after chat interface display
 chat_interface_el.ports.assistant_message_output > history_handler_el.ports.message_emit_input
