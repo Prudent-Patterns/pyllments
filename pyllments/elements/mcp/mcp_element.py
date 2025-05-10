@@ -2,14 +2,13 @@ from typing import Union, Literal
 
 import param
 from pydantic import Field, create_model, RootModel, BaseModel
-from loguru import logger
 
 from pyllments.base.element_base import Element
 from pyllments.payloads import SchemaPayload, StructuredPayload, ToolsResponsePayload
 from pyllments.common.pydantic_models import CleanModel
 from .mcp_model import MCPModel
 
-# TODO: Consider the access rights and confirmation ability of the tool response payload
+# TODO: Consider the access rights and confirmation ability of the tools response payload
 class MCPElement(Element):
     """An Element that handles tool calling with the Model Context Protocol."""
 
@@ -22,9 +21,9 @@ class MCPElement(Element):
 
         self._tools_schema_output_setup()
         self._tool_request_structured_input_setup()
-        self._tool_response_output_setup()
+        self._tools_response_output_setup()
 
-        # self._tool_response_output_setup()
+        # self._tools_response_output_setup()
     
     def _tools_schema_output_setup(self):
         async def pack(tools_schema: type(BaseModel)) -> SchemaPayload:
@@ -49,14 +48,14 @@ class MCPElement(Element):
     def _tool_request_structured_input_setup(self):
         async def unpack(payload: StructuredPayload):
             tool_request_list = payload.model.data
-            await self.ports.tool_response_output.stage_emit(tool_request_list=tool_request_list)
+            await self.ports.tools_response_output.stage_emit(tool_request_list=tool_request_list)
 
         self.ports.add_input(
             name='tool_request_structured_input',
             unpack_payload_callback=unpack,
             readiness_check=self.model.await_ready)
 
-    def _tool_response_output_setup(self):
+    def _tools_response_output_setup(self):
         """For the purpose of passing tools to LLMs (see litellm tool call format)"""
         async def pack(tool_request_list: list) -> ToolsResponsePayload:
             tool_responses = {}
@@ -66,7 +65,7 @@ class MCPElement(Element):
                 
                 # Add error handling if the tool is not found in the dictionary
                 if hybrid_name not in self.model.tools:
-                    logger.error(f"Tool {hybrid_name} not found in tools")
+                    self.logger.error(f"Tool {hybrid_name} not found in tools")
                     continue
                     
                 description = self.model.tools[hybrid_name]['description']
@@ -82,7 +81,7 @@ class MCPElement(Element):
                 }
             return ToolsResponsePayload(tool_responses=tool_responses)
             
-        self.ports.add_output(name='tool_response_output', pack_payload_callback=pack)
+        self.ports.add_output(name='tools_response_output', pack_payload_callback=pack)
 
     @property
     def tools_schema(self) -> BaseModel:

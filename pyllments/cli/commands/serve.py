@@ -10,12 +10,15 @@ from pyllments.serve import serve as serve_file
 from pyllments.logging import logger
 from pyllments.cli.serve_helper import CommonOptions
 
-app = typer.Typer()
+app = typer.Typer(
+    invoke_without_command=True,
+    context_settings={"allow_interspersed_args": True}
+)
 
 # Shared options for serve command
 common_opts = CommonOptions().get_typer_options()
 
-@app.command("serve")
+@app.callback()
 def serve(
     filename: str,
     logging: bool = common_opts["logging"],

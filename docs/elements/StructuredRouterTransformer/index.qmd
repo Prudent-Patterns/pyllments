@@ -118,8 +118,6 @@ You can connect multiple downstream input ports to each of these output ports, a
 
 : {.hover}
 
-<!-- Need Examples - schemas and use -->
-
 ## Data and Schema Structures
 
 ### Message Structure
@@ -166,4 +164,79 @@ print(payload.model.data)  # {'tools': ['a', 'b']}
 ```
 - `.model.data` holds the raw Python object validated by Pydantic.
 
-## Routing Map Configuration
+## Routing Map & Generated Schema
+
+This element dynamically builds a Pydantic union model from your `routing_map`. Below is an example mapping (taken from the `mcp_flow.py` recipe) and the corresponding JSON Schema snippet it produces.
+
+### Example `routing_map`
+```python
+from pyllments.elements import StructuredRouterTransformer
+from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
+
+structured_router_el = StructuredRouterTransformer(
+    routing_map={
+        'reply': {
+            'description': 'Send a chat reply back to the user',
+            'outputs': {
+                'message': {
+                    'description': 'The assistant's textual response',
+                    'schema': {'pydantic_model': str},
+                    'ports': [chat_interface_el.ports.message_input],
+                    'transform': lambda txt: MessagePayload(content=txt, role='assistant')
+                }
+            }
+        },
+        'tools': {
+            'description': 'Tools invocation route',
+            'outputs': {
+                'tools': {
+                    'description': 'Which tools to call',
+                    'schema': {'payload_type': SchemaPayload},
+                    'payload_type': StructuredPayload
+                }
+            }
+        }
+    }
+)
+```
+
+### Example Generated JSON Schema
+```json
+{
+  "$defs": {
+    "reply_route": {
+      "title": "reply_route",
+      "description": "Send a chat reply back to the user",
+      "type": "object",
+      "properties": {
+        "route": { "type": "string", "const": "reply" },
+        "message": {
+          "type": "string",
+          "description": "The assistant's textual response"
+        }
+      },
+      "required": ["route", "message"]
+    },
+    "tools_route": {
+      "title": "tools_route",
+      "description": "Tools invocation route",
+      "type": "object",
+      "properties": {
+        "route": { "type": "string", "const": "tools" },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Which tools to call"
+        }
+      },
+      "required": ["route", "tools"]
+    }
+  },
+  "discriminator": { "propertyName": "route" },
+  "oneOf": [
+    {"$ref": "#/$defs/reply_route"},
+    {"$ref": "#/$defs/tools_route"}
+  ],
+  "type": "object"
+}
+```

@@ -7,11 +7,12 @@ import signal
 import os
 import subprocess
 import inspect
-from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Dict, List
 from pydantic import BaseModel, create_model
+from pathlib import Path
+import concurrent.futures
+import functools
 
-from loguru import logger
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 import param
@@ -112,6 +113,11 @@ class MCPModel(Model):
         self.mcps = deepcopy(self.mcps)
         self.context_stack = AsyncExitStack()
         self._child_processes = []
+        # Shared thread pool for executing sync tools efficiently
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=os.cpu_count() or 4,
+            thread_name_prefix=f"{self.__class__.__name__}-tool-exec"
+        )
         atexit.register(self._force_kill_processes)
         # Start async setup in background
         self.loop = LoopRegistry.get_loop()
@@ -124,7 +130,7 @@ class MCPModel(Model):
         await self.mcp_setup(self.mcps)
         await self.tools_setup()
         self._setup_complete = True
-        logger.info("MCPModel setup complete")
+        self.logger.info("MCPModel setup complete")
 
     async def await_ready(self):
         """Await until the model setup is complete."""
@@ -147,16 +153,21 @@ class MCPModel(Model):
         """Set up a script-based MCP server."""
         mcp_spec = self.mcps[mcp_name]
         script = mcp_spec['script']
-        if script.endswith('.py'):
+        # Canonicalize and validate script path
+        script_path = Path(script).expanduser().resolve()
+        if not script_path.exists():
+            raise FileNotFoundError(f"Script not found for MCP '{mcp_name}': {script_path}")
+        # Determine executor based on file suffix
+        if script_path.suffix == '.py':
             command = mcp_spec.get('command', sys.executable)
-        elif script.endswith('.js'):
+        elif script_path.suffix == '.js':
             command = 'npx'
         else:
-            raise ValueError(f"Unsupported script type: {script}")
+            raise ValueError(f"Unsupported script type: {script_path.suffix}")
 
         server_params = StdioServerParameters(
             command=command,
-            args=[script] + mcp_spec.get('args', []),
+            args=[str(script_path)] + mcp_spec.get('args', []),
             env=mcp_spec.get('env', {})
         )
 
@@ -184,34 +195,42 @@ class MCPModel(Model):
         callables = spec.get('tools', {})
         perms = spec.get('tools_requiring_permission', [])
         tool_dict: dict[str, dict] = {}
-        for fname, func in callables.items():
+        for fname, orig_func in callables.items():
+            # Capture original signature for argument model
+            sig = inspect.signature(orig_func)
+            # Wrap synchronous functions so they behave asynchronously via the shared executor
+            if not asyncio.iscoroutinefunction(orig_func):
+                async def _async_wrapper(*args, _orig=orig_func, **kwargs):
+                    bound_fn = functools.partial(_orig, *args, **kwargs)
+                    return await self.loop.run_in_executor(self._executor, bound_fn)
+                _async_wrapper.__name__ = orig_func.__name__
+                _async_wrapper.__doc__ = orig_func.__doc__
+                wrapped = _async_wrapper
+            else:
+                wrapped = orig_func
             hybrid = f"{mcp_name}_{fname}"
-            # Build dynamic Pydantic model for arguments
-            sig = inspect.signature(func)
+            # Build dynamic Pydantic model for arguments using the original function's signature
             fields: dict[str, tuple[Any, Any]] = {}
             for arg_name, p in sig.parameters.items():
                 ann = p.annotation if p.annotation is not inspect._empty else Any
                 default = p.default if p.default is not inspect._empty else ...
                 fields[arg_name] = (ann, default)
-            arg_model = create_model(
-                f"{func.__name__}Arguments", __base__=BaseModel, **fields
-            )
+            # Name the Pydantic model uniquely to avoid collisions across MCPs
+            model_name = f"{mcp_name}_{orig_func.__name__}_Arguments"
+            arg_model = create_model(model_name, __base__=BaseModel, **fields)
             schema = arg_model.model_json_schema()
             params = {
                 'properties': schema.get('properties', {}),
                 'required': schema.get('required', []),
-                'title': schema.get('title', f"{fname}Arguments"),
+                'title': schema.get('title', model_name),
                 'type': 'object'
             }
-            self.hybrid_name_mcp_tool_map[hybrid] = {
-                'mcp_name': mcp_name,
-                'tool_name': fname
-            }
+            self.hybrid_name_mcp_tool_map[hybrid] = {'mcp_name': mcp_name, 'tool_name': fname}
             tool_dict[hybrid] = {
-                'description': func.__doc__ or '',
+                'description': orig_func.__doc__ or '',
                 'parameters': params,
                 'permission_required': fname in perms,
-                'func': func,
+                'func': wrapped,
                 'arg_model': arg_model
             }
         return tool_dict
@@ -251,7 +270,7 @@ class MCPModel(Model):
                 part = await self.create_tools_from_mcp(name)
             combined.update(part)
         self.tools = combined
-        logger.debug(f"MCPModel: Tools ready: {list(self.tools.keys())}")
+        self.logger.debug(f"MCPModel: Tools ready: {list(self.tools.keys())}")
 
     def create_calls(self, tool_calls: list[dict]):
         call_list = []
@@ -282,7 +301,8 @@ class MCPModel(Model):
                     if asyncio.iscoroutinefunction(func):
                         result = await func(**kwargs)
                     else:
-                        result = func(**kwargs)
+                        # Offload sync function to a thread to avoid blocking the main event loop
+                        result = await asyncio.to_thread(func, **kwargs)
                     text = str(result)
                     # Wrap in a Pydantic model so .model_dump() works
                     return PythonToolResponse(

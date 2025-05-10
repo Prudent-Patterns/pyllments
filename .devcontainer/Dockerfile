@@ -27,17 +27,17 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Set UV link mode to avoid hardlink warning (Fix for second warning)
-# ENV UV_LINK_MODE=copy
+ENV UV_LINK_MODE=copy
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=../uv.lock,target=uv.lock \
     --mount=type=bind,source=../pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-install-project --extra full --extra dev
 
 # Copy both the pyproject.toml and uv.lock files into the container
 COPY ../pyproject.toml ../uv.lock ./
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen
+    uv sync --frozen --extra full --extra dev

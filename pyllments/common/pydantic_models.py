@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic.config import ConfigDict
 
 
 class CleanModel(BaseModel):
@@ -13,6 +14,7 @@ class CleanModel(BaseModel):
             for item in obj:
                 cls.remove_titles_recursively(item)
 
-    model_config = {
-        "json_schema_extra": lambda schema, model: model.remove_titles_recursively(schema)
-    }
+    # Use ConfigDict to attach a JSON schema hook that strips titles recursively
+    model_config = ConfigDict(
+        json_schema_extra=lambda schema, model: CleanModel.remove_titles_recursively(schema)
+    )

@@ -43,7 +43,7 @@ initial_context_builder_el = ContextBuilderElement(
             'message': "The following is the user's query to you."
         },
         'user_message': {
-            'ports': [chat_interface_el.ports.output['message_output']],
+            'ports': [chat_interface_el.ports.user_message_output],
         },
         'schema': {
             'payload_type': SchemaPayload,
@@ -142,7 +142,7 @@ mcp_el = MCPElement(mcps={
 mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
 structured_router_el.ports.tools_tools > mcp_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
-mcp_el.ports.tool_response_output > chat_interface_el.ports.tools_response_emit_input
+mcp_el.ports.tools_response_output > chat_interface_el.ports.tools_response_emit_input
 
 #########
 mcp_schema_pipe_el = PipeElement(receive_callback=lambda p: f"Schema from MCP received in pipe: {p.model.schema.model_json_schema()}")
@@ -180,7 +180,7 @@ final_context_builder_el = ContextBuilderElement(
             'message': "The following is the user's query to you."
         },
         'user_message': {
-            'ports': [chat_interface_el.ports.message_output],
+            'ports': [chat_interface_el.ports.user_message_output],
         }
     },
     trigger_map={
@@ -201,8 +201,8 @@ final_context_builder_el.ports.messages_output > final_context_pipe_el.ports.pip
 history_handler_el = HistoryHandlerElement()
 history_handler_el.ports.message_history_output > initial_context_builder_el.ports.history
 history_handler_el.ports.message_history_output > final_context_builder_el.ports.history
-chat_interface_el.ports.message_output > history_handler_el.ports.messages_input
-chat_interface_el.ports.tools_response_output > history_handler_el.ports.tool_responses_input
+chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input
+chat_interface_el.ports.tools_response_output > history_handler_el.ports.tools_responses_input
 structured_router_el.ports.reply_message > history_handler_el.ports.message_emit_input
 
 

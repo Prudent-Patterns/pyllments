@@ -34,7 +34,7 @@ class HistoryHandlerElement(Element):
         - message_emit_input: MessagePayload - Human and AI messages handled - triggers output of the message context
         - messages_input: MessagePayload | list[MessagePayload] - Messages to add to context
         - tool_response_emit_input: ToolsResponsePayload - Tool responses that trigger output of tool response context
-        - tool_responses_input: ToolsResponsePayload | list[ToolsResponsePayload] - Tool responses to add to context
+        - tools_responses_input: ToolsResponsePayload | list[ToolsResponsePayload] - Tool responses to add to context
     - output:
         - message_history_output: List[MessagePayload] - Current message context
     """
@@ -50,7 +50,7 @@ class HistoryHandlerElement(Element):
         
         # Tool response ports
         self._tool_response_emit_input_setup()
-        self._tool_responses_input_setup()
+        self._tools_responses_input_setup()
         
         # Output ports
         self._message_history_output_setup()
@@ -93,7 +93,7 @@ class HistoryHandlerElement(Element):
 
         self.ports.add_input(name='tool_response_emit_input', unpack_payload_callback=unpack)
 
-    def _tool_responses_input_setup(self):
+    def _tools_responses_input_setup(self):
         async def unpack(payload: Union[List[ToolsResponsePayload], ToolsResponsePayload]):
             items = payload if isinstance(payload, list) else [payload]
             # schedule background task to update history without blocking other ports
@@ -103,7 +103,7 @@ class HistoryHandlerElement(Element):
                 self.model.load_entries(items)
             LoopRegistry.get_loop().create_task(_handle())
 
-        self.ports.add_input(name='tool_responses_input', unpack_payload_callback=unpack)
+        self.ports.add_input(name='tools_responses_input', unpack_payload_callback=unpack)
     
     def _message_history_output_setup(self):
         async def pack(context: list[MessagePayload]) -> list[MessagePayload]:

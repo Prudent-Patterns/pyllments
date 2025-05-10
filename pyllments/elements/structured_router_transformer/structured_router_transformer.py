@@ -4,8 +4,9 @@ from typing import Union, Literal
 import asyncio
 
 import param
-from pydantic import BaseModel, create_model, RootModel
+from pydantic import BaseModel, create_model, RootModel, Field
 from loguru import logger
+from pydantic.config import ConfigDict
 
 from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.base.element_base import Element
@@ -130,6 +131,12 @@ class StructuredRouterTransformer(Element):
                 elif 'pydantic_model' in schema_spec:
                     # pydantic model provided directly—no schema input port needed
                     pass
+                elif 'payload_type' in schema_spec:
+                    # payload_type provided—create schema input port expecting that payload
+                    flow_map['input'][input_key] = {
+                        'payload_type': schema_spec['payload_type'],
+                        'persist': True,
+                    }
                 else:
                     raise ValueError(f"No valid schema parameters for output '{data_field}' in route '{route}'")
         # incoming message_input mapping (unchanged)
@@ -162,45 +169,60 @@ class StructuredRouterTransformer(Element):
             'pydantic_model'
             )
         
+    def _build_route_model(self, route, params):
+        """
+        Helper to build a Pydantic sub-model for a single route, including titles and descriptions.
+        """
+        outputs = params.get('outputs', {})
+        if not outputs:
+            return None
+        # Route-level description metadata
+        route_desc = params.get('description')
+        # Build field definitions with optional descriptions
+        # Always include 'route' discriminator field without description, validation via Literal
+        fields = {'route': (Literal[route], ...)}
+        added = False
+        for field_name, spec in outputs.items():
+            schema_spec = spec.get('schema', {})
+            if 'pydantic_model' in schema_spec:
+                p_mod = schema_spec['pydantic_model']
+                field_desc = spec.get('description')
+                if field_desc:
+                    fields[field_name] = (p_mod, Field(..., description=field_desc))
+                else:
+                    fields[field_name] = (p_mod, ...)
+                added = True
+        if not added:
+            return None
+        # Assemble ConfigDict merging CleanModel JSON schema hook and title, with optional description
+        config_kwargs = {**CleanModel.model_config, 'title': f"{route}_route"}
+        if route_desc is not None:
+            config_kwargs['description'] = route_desc
+        config = ConfigDict(**config_kwargs)
+        return create_model(f"{route}_route", __config__=config, **fields)
+
     def set_pydantic_schema(self, pydantic_schema=None):
         """
         Builds a unified RootModel union from each route's sub-models.
-        Each sub-model is named '<route>_route' and includes:
-          - A Literal 'route' field enforcing the route key.
-          - One field per data_field from the route's outputs, with its Pydantic model.
-          - CleanModel base for consistent validation.
         """
         if pydantic_schema:
             self.pydantic_model = pydantic_schema
-        else:
-            sub_models = []
-            # Build one Pydantic model per route
-            for route, params in self.routing_map.items():
-                outputs = params.get('outputs', {})
-                if not outputs:
-                    raise ValueError(f"No outputs defined for route '{route}' when building schema")
-                # Begin fields with the 'route' discriminator
-                fields = {'route': (Literal[route], ...)}
-                added_fields = False
-                # Include only outputs that have an initial pydantic_model
-                for field_name, spec in outputs.items():
-                    schema_spec = spec.get('schema', {})
-                    if 'pydantic_model' in schema_spec:
-                        p_mod = schema_spec['pydantic_model']
-                        fields[field_name] = (p_mod, ...)
-                        added_fields = True
-                # Skip routes without any initial schema field
-                if not added_fields:
-                    continue
-                # Always use CleanModel as base
-                fields['__base__'] = CleanModel
-                sub_model = create_model(f"{route}_route", **fields)
-                sub_models.append(sub_model)
-            # Union all route sub-models into a RootModel for incoming validation
-            self.pydantic_model = create_model(
-                '',
-                __base__=(RootModel[Union[*sub_models]], CleanModel),
-            )
+            return
+
+        sub_models = []
+        for route, params in self.routing_map.items():
+            model = self._build_route_model(route, params)
+            if model:
+                sub_models.append(model)
+
+        if not sub_models:
+            raise ValueError("No valid route sub-models generated for schema")
+
+        # Combine all route models into a discriminated union RootModel
+        self.pydantic_model = create_model(
+            '',
+            __base__=(RootModel[Union[*sub_models]], CleanModel),
+        )
 
     def flow_fn_setup(self):
 

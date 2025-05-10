@@ -1,5 +1,5 @@
 ---
-title: "ContextBuilder"
+title: "ContextBuilderElement"
 ---
 
 The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order. For example, a resulting message sequence might look like:

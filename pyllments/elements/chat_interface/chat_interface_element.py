@@ -94,10 +94,12 @@ class ChatInterfaceElement(Element):
     
     def _tools_response_emit_input_setup(self):
         async def unpack(payload: ToolsResponsePayload):
-            # Add the payload to the chat model and immediately stage for emit
+            # Add payload to chat model (renders permission prompt if needed)
             await self.model.add_message(payload)
+            # Wait until tools have been executed (auto or after approval)
+            await payload.model.await_ready()
+            # Then emit the completed tool response downstream
             await self.ports.output['tools_response_output'].stage_emit(payload=payload)
-
         self.ports.add_input(
             name='tools_response_emit_input',
             unpack_payload_callback=unpack)
@@ -143,7 +145,7 @@ class ChatInterfaceElement(Element):
                 )
             elif isinstance(message, ToolsResponsePayload):
                 message_and_tool_response_views.append(
-                    message.create_tool_response_view()
+                    message.create_tools_response_view()
                 )
 
         self.chatfeed_view.extend(message_and_tool_response_views)
@@ -176,7 +178,7 @@ class ChatInterfaceElement(Element):
 
             elif isinstance(new_item, ToolsResponsePayload):
                 # Append the dynamic tool response view, which has its own prompt logic
-                self.chatfeed_view.append(new_item.create_tool_response_view())
+                self.chatfeed_view.append(new_item.create_tools_response_view())
 
         # This watcher should be called before the payload starts streaming.
         self.watch_once(_update_chatfeed, 'message_list', precedence=0)
