@@ -1,9 +1,9 @@
 import param
-import asyncio
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
 from pyllments.payloads.tools_response import ToolsResponsePayload
+
 
 class ChatInterfaceModel(Model):
     # TODO: Implement batch interface for messages - populating message_list > iterating

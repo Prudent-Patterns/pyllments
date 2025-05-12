@@ -29,7 +29,7 @@ This element is responsible for assembling and managing the chat history and con
 | message_emit_input        | MessagePayload                                               | Loads the message into history and emits the current context payload.        |
 | messages_input            | MessagePayload \| list[MessagePayload]                       | Loads one or more messages into history without emitting.                     |
 | tool_response_emit_input  | ToolsResponsePayload                                         | Loads the tool response into history and emits the current context payload.   |
-| tool_responses_input      | ToolsResponsePayload \| list[ToolsResponsePayload]           | Loads one or more tool responses into history without emitting.               |
+| tools_responses_input      | ToolsResponsePayload \| list[ToolsResponsePayload]           | Loads one or more tool responses into history without emitting.               |
 
 : {.hover}
 

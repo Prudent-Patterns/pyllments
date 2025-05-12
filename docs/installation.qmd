@@ -11,12 +11,41 @@ python >= 3.11
 
 ## Using uv (Super duper fast)
 [Get uv](https://docs.astral.sh/uv/getting-started/installation/#pypi)
+
+**Lightweight Installation**
+
+Essentials only.
+
 ```{.bash}
 uv pip install pyllments
 ```
+
+**Full Installation**
+
+If you intend to use your own hardware for some heavy lifting and processing.
+Includes dependencies for retrieval, embedding, processing. (e.g. PyTorch, lancedb, sentence-transformers)
+
+```{.bash}
+uv pip install pyllments[full]
+```
+
 ## Using pip (Not super duper fast)
+
+**Lightweight Installation**
+
+Essentials only.
+
 ```{.bash}
 pip install pyllments
+```
+
+**Full Installation**
+
+If you intend to use your own hardware for some heavy lifting and processing.
+Includes dependencies for retrieval, embedding, processing. (e.g. PyTorch, lancedb, sentence-transformers)
+
+```{.bash}
+pip install pyllments[full]
 ```
 
 :::

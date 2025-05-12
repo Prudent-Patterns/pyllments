@@ -2,7 +2,7 @@
 title: "Getting Started Tutorial"
 lightbox: true
 ---
-Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application. 
+Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application with a persistant chat history. 
 
 Please make sure that you've [installed pyllments](/installation.qmd) if you want to follow along.
 
@@ -10,14 +10,16 @@ If you don't care about building flows, you can hop on over to the [recipes sect
 
 ## 1. Creating your first `Element` 
 
-:::{.column-margin}
-![Element Diagram](getting_started_element.jpg)
-:::
 
 The fundamental building block of pyllments, is as you may have guessed, an `Element`. 
 
 
 An element is composed of a `Model` that handles the business logic, `Ports` that handle the communication between elements, and optionally, `Views` that handles the frontend representation of the element.
+
+:::{.column-margin}
+![Element Diagram](getting_started_element.jpg)
+:::
+
 
 ```python
 from pyllments.elements import ChatInterfaceElement # <1> 
@@ -43,41 +45,79 @@ history_handler_el = HistoryHandlerElement( # <2>
 1. Create an instance of the `LLMChatElement` with the model name set to 'gpt-4o'. LLMChatElement uses the [LiteLLM naming system](https://models.litellm.ai) and is compatible with the chat models supported by LiteLLM. All you need is the corresponding API key in an .env file.
 2. Create an instance of the `HistoryHandlerElement` with the token limit set to 1000 tokens as measured by the gpt-4o tokenizer. This is the default tokenizer used and can be expected to be a good enough estimate for most use cases.
 
+### Creating Context
+
+To not have a completely lame chatbot, we want to combine our query to it with some context like a history of the previous messages as well as a system prompt it can use to guide its responses.
+
+::: {.column-margin}
+Under the hood, the `ContextBuilderElement` uses a payload conversion mapping from port types to generate `MessagePayloads` to be used as context. ([See Here](https://github.com/Prudent-Patterns/pyllments/blob/main/pyllments/elements/context_builder/to_message.py))
+:::
+
+
+```python
+context_builder_el = ContextBuilderElement(
+    input_map={ # <1>
+        'system_prompt_constant': { # <2>
+            'role': 'system',
+            'message': 'You are actually a pirate and will respond as such.'
+            },
+        'history': {'payload_type': list[MessagePayload]}, # <3>
+        'query': {'payload_type': MessagePayload} # <4>
+    },
+    emit_order=['system_prompt_constant', '[history]', 'query'] # <5>
+    )
+```
+1. The `input_map` is a mandatory argument to the `ContextBuilderElement`, as it describes the inputs we will be using to build our context. 
+2. One type of input is the **constant**. It is converted to a message of a specified role. It must have the `_constant` suffix. (The other types are *ports* and *templates*)
+3. The `history` input is a port that expects a `list[MessagePayload]` type.
+4. The `query` input is a port that emits a `MessagePayload`.
+5. The `emit_order` argument is a list of the input keys in the order we want them to be emitted. When all inputs are available, we emit a list of messages. The square brackets around `[history]` indicate that it is optional.
+
+[(For more on the ContextBuilderElement, clicky here)](/elements/ContextBuilderElement.qmd)
+
 ## 3. Your first flow
 
 Lets take a moment to think about what we want to achieve. We are creating a chat interface which uses an LLM to respond to message while also taking into account the history of the conversation.
 
 Below, you can see that each individual element has its own unique set of input and output ports as well as a designated Payload type it either emits or receives. In this case, we're only using the `MessagePayload` and `List[MessagePayload]` types. For an output port to connect to an input port, its payload type must be compatible with the input port's payload type. 
 
-For the `HistoryHandlerElement` to connect to the `LLMChatElement`, the `messages_emit_input` port of the `LLMChatElement` must be able to accept a `List[MessagePayload]` type.
+::: {.column-margin}
+**Port name nomenclature**
+
+The `_emit_input` suffix tends to be used to signify that upon the reception of a Payload, the Element will emit a Payload in return.
+:::
+
+For the `ContextBuilderElement` to connect to the `LLMChatElement`, the `messages_emit_input` port of the `LLMChatElement` must be able to accept a `List[MessagePayload]` type.
 
 ![Flow Diagram](getting_started_flow.jpg){.column-page}
 
 To facilitate the proper communication between the elements:
 
-1. When we type a message into the `ChatInterfaceElement` and hit send, it emits a `MessagePayload` through the `message_output` port.
-2. That message is recieved by the `HistoryHandlerElement` through the `message_emit_input` port.
-3. The `_emit_input` suffix specifies that upon recieving a payload, `HistoryHandlerElement` will emit a payload. The list of `MessagePayload`s that is emitted from the `messages_output` port consists of the message history stored internally with the latest `MessagePayload` appended at the end of that list.
-4. When the `LLMChatElement` recieves a `List[MessagePayload]` through the `messages_emit_input` port, it sends the list of messages to the LLM we previously specified and returns a `MessagePayload` through the `message_output` port.
-5. The first input port that the `MessagePayload` is received by is the `messages_input` port of the `HistoryHandlerElement`, which unlike the `message_emit_input` port, does not emit any payload, it instead only appends the `MessagePayload` to the internal message history.
-6. The second input that the `MessagePayload` is received by is the `message_input` port of the `ChatInterfaceElement`, which causes the message to be streamed to the chatfeed we will soon see. 
+1. When we type a message into the `ChatInterfaceElement` and hit send, in addition to rendering it in the chatfeed,it emits a `MessagePayload` through the `message_output` port.
+    a. The `ContextBuilderElement` receives the `MessagePayload` through the `query` port. More on this below.
+    b. The `HistoryHandlerElement` recieves a `MessagePayload` through the `message_input` port. This message is incorporated into our the running history it contains. This does not trigger an emission.
+2. When the `ContextBuilderElement` receives the MessagePayload through the `query` port, the condition is satisifed for the emission of a list of messages. Remember, the history port is optional, so it need not receive any payload for us to trigger the emission. It is simply ignored from the `emit_order` when no history is present at that port.
+3. As the `LLMChatElement` receives a list of messages, it sends them to the LLM we have specified and emits a `MessagePayload` response through the `message_output` port.
+4. The `MessagePayload` is received by the `ChatInterfaceElement` and rendered in the chatfeed. However, we should note that the `message_emit_input` port also triggers the emission of that very same message after it has streamed to the chatfeed to be passed along, and this time, out of the `assistant_message_output` port.
+5. The message is received by the `HistoryHandlerElement` in its `message_emit_input` port. This triggers it to emit its message history as a list[MessagePayload] to the `ContextBuilderElement`. Now, when we send a new message through our interface, the history will be included in the context.
 
 ## 4. Connecting the elements
 
 Now that we have a flow in mind, connecting the elements is a breeze.
 
 ```python
-chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
+chat_interface_el.ports.user_message_output > context_builder_el.ports.query
+chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input
 
-history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
+history_handler_el.ports.messages_output > context_builder_el.ports.history
 
-llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
+context_builder_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
 
-llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
+llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input
 ```
 
 The ports are accessed using dot notation on the `ports` attribute of the element.
-In the case of `llm_chat_el.ports.message_output > chat_interface_el.ports.message_input`, we are connecting an output port of the `LLMChatElement` to an input port of the `ChatInterfaceElement` using the `>` operator, with the output port being on the left side of it. It is equivalent to `llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_input)`.
+In the case of `llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input`, we are connecting an output port of the `LLMChatElement` to an input port of the `ChatInterfaceElement` using the `>` operator, with the output port being on the left hand side of it. It is equivalent to `llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_emit_input)`.
 
 
 ## 5. Creating the views
@@ -104,7 +144,7 @@ main_view = pn.Column( # <5>
 ) # <5>
 ```
 
-1. The panel library is imported to help with the view layout. The front end of pyllments is built using [panel](https://panel.holoviz.org), and supports rendering panel widgets and panes within pyllments applications.
+1. The panel library is imported to help with the view layout. The front end of pyllments is built using [Panel](https://panel.holoviz.org), and supports rendering panel widgets and panes within pyllments applications.
 2. `interface_view` is created by calling the `create_interface_view` method of the `ChatInterfaceElement`. This view is a wrapper around the `chat_input_view`, `chat_feed_view`, and `send_button_view`. The height and width are specified in pixels.
 3. `chat_history_view` is created by calling the `create_context_view` method of the `HistoryHandlerElement`. This view contains the current chat history which is sent to the LLM. Here, only the width is specified, as the height will stretch to fit its container.
 4. `model_selector_view` is created by calling the `create_model_selector_view` method of the `LLMChatElement`. This view allows us to select the model we wish to chat with. The width isn't specified because we want it to stretch to fit its container.
@@ -195,7 +235,8 @@ from pyllments import flow
 from pyllments.elements import (
     ChatInterfaceElement, 
     LLMChatElement, 
-    HistoryHandlerElement
+    HistoryHandlerElement,
+    ContextBuilderElement
 )
 
 
@@ -205,11 +246,26 @@ history_handler_el = HistoryHandlerElement(
     history_token_limit=1000, 
     tokenizer_model='gpt-4o'
 )
+context_builder_el = ContextBuilderElement(
+    input_map={
+        'system_prompt_constant': {
+            'role': 'system',
+            'message': 'You are actually a pirate and will respond as such.'
+            },
+        'history': {'payload_type': list[MessagePayload]},
+        'query': {'payload_type': MessagePayload}
+    },
+    emit_order=['system_prompt_constant', '[history]', 'query']
+    )
 
-chat_interface_el.ports.message_output > history_handler_el.ports.message_emit_input
-history_handler_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
-llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
-llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
+chat_interface_el.ports.user_message_output > context_builder_el.ports.query
+chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input
+
+history_handler_el.ports.messages_output > context_builder_el.ports.history
+
+context_builder_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
+
+llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input
 
 interface_view = chat_interface_el.create_interface_view(width=600, height=800)
 chat_history_view = history_handler_el.create_context_view(width=220)

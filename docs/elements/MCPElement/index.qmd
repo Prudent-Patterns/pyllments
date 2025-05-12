@@ -56,7 +56,7 @@ mcps = {
 
 | Port Name                         | Payload Type        | Behavior                                                                                  |
 |-----------------------------------|---------------------|-------------------------------------------------------------------------------------------|
-| tool_request_structured_input     | StructuredPayload   | Receives a Payload whose `model.data` is a list of dicts, each containing:<br><span class="tab">`name`: str — hybrid tool name.</span><br><span class="tab">`parameters`: dict — tool arguments (optional).</span><br>Example:<br><code>[<br>{'name': 'todo_add', 'parameters': {'task': 'Buy milk'}}, {'name': 'weather_get', 'parameters': {'city': 'SF'}}<br>]</code><br>Unpacks and forwards these entries to `tool_response_output`. |
+| tool_request_structured_input     | StructuredPayload   | Receives a Payload whose `model.data` is a list of dicts, each containing:<br><span class="tab">`name`: str — hybrid tool name.</span><br><span class="tab">`parameters`: dict — tool arguments (optional).</span><br>Example:<br><code>[<br>{'name': 'todo_add', 'parameters': {'task': 'Buy milk'}}, {'name': 'weather_get', 'parameters': {'city': 'SF'}}<br>]</code><br>Unpacks and forwards these entries to `tools_response_output`. |
 
 : {.hover}
 
@@ -65,7 +65,7 @@ mcps = {
 | Port Name              | Payload Type         | Behavior                                                                        |
 |------------------------|----------------------|---------------------------------------------------------------------------------|
 | tools_schema_output    | SchemaPayload        | Emits a `SchemaPayload` containing the Pydantic schema for available tools.|
-| tool_response_output   | ToolsResponsePayload | Emits a `ToolsResponsePayload` containing tool results mapping tool names to their responses.<br>Example:<br><code>{<br>  'weather_temp_mcp': {<br>   'mcp_name': 'weather_mcp',<br>    'tool_name': 'temp',<br>    'permission_required': False,<br>    'description': 'Get the temperature in a location',<br>    'parameters': {'location': 'San Francisco'},<br>    'response': {<br>      'meta': None,<br>      'content': [{<br>        'type': 'text',<br>        'text': 'The temperature is 54F.',<br>        'annotations': None<br>      }],<br>      'isError': False<br>    }<br>  }<br>}<</code> |
+| tools_response_output  | ToolsResponsePayload | Emits a `ToolsResponsePayload` containing tool results mapping tool names to their responses.<br>Example:<br><code>{<br>  'weather_temp_mcp': {<br>   'mcp_name': 'weather_mcp',<br>    'tool_name': 'temp',<br>    'permission_required': False,<br>    'description': 'Get the temperature in a location',<br>    'parameters': {'location': 'San Francisco'},<br>    'response': {<br>      'meta': None,<br>      'content': [{<br>        'type': 'text',<br>        'text': 'The temperature is 54F.',<br>        'annotations': None<br>      }],<br>      'isError': False<br>    }<br>  }<br>}<</code> |
 
 : {.hover}
 

@@ -45,7 +45,7 @@ some_el.ports.output > tele_el.ports.message_input
 
 | Port Name            | Payload Type   | Behavior                                                   |
 |----------------------|----------------|------------------------------------------------------------|
-| `message_emit_input` | MessagePayload | Sends `MessagePayload`s to Telegram users via DM. Handles assistant-originated payloads. |
+| `assistant_message_emit_input` | MessagePayload | Sends assistant-originated `MessagePayload`s to Telegram users via DM. |
 
 ## Output Ports
 
@@ -53,7 +53,6 @@ some_el.ports.output > tele_el.ports.message_input
 |-----------------------------|----------------|----------------------------------------------------------------------|
 | `user_message_output`       | MessagePayload | Emits messages received from Telegram users.                         |
 | `assistant_message_output`  | MessagePayload | Emits messages sent by the assistant.                                 |
-| `message_output`            | MessagePayload | Unified port emitting both user and assistant messages.              |
 
 : {.hover}
 

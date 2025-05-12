@@ -13,7 +13,7 @@ The ContextBuilder helps you build an ordered list of messages from incoming pay
 
 ## Instantiation
 
-When initializing a `ContextBuilder`, you must provide an `input_map`, which defines the necessary components such as inputs, constants, and templates with optional keys such as `ports`, `payload_type`, `persist`, `callback`, and `depends_on` to be converted to messages and emitted. In conjunction, you may provide optional arguments like `emit_order`, `trigger_map`, `build_fn`, and `outgoing_input_port` as described below.
+When initializing a `ContextBuilderElement`, you must provide an `input_map`, which defines the necessary components such as inputs, constants, and templates with optional keys such as `ports`, `payload_type`, `persist`, `callback`, and `depends_on` to be converted to messages and emitted. In conjunction, you may provide optional arguments like `emit_order`, `trigger_map`, `build_fn`, and `outgoing_input_ports` as described below.
 
 ### Inputs Setup
 
@@ -143,20 +143,20 @@ def build_fn(port_a, port_b, system_constant, active_input_port, c):
 
 ### Output setup
 
-`outgoing_input_port`
+`outgoing_input_ports`
 
-This parameter identifies the port to which the `ContextBuilder`'s output will be sent. You can assign it either during instantiation or manually connect it afterwards.
+This parameter identifies the port(s) to which the `ContextBuilderElement`'s output will be sent. You can assign it either during instantiation or manually connect it afterwards.
 
 **Example (during instantiation):**
 
 ```python
-cb = ContextBuilder(..., outgoing_input_port=some_element.ports.some_input_port)
+cb = ContextBuilderElement(..., outgoing_input_ports=[some_element.ports.some_input_port])
 ```
 
 **Alternatively, manually connecting after initialization:**
 
 ```python
-cb = ContextBuilder(...)
+cb = ContextBuilderElement(...)
 cb.ports.messages_output > some_element.ports.some_input_port
 ```
 
