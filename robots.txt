@@ -1,1 +1,1 @@
-Sitemap: https://Prudent-Patterns.github.io/pyllments/sitemap.xml
+Sitemap: https://docs.prudentpatterns.com/sitemap.xml

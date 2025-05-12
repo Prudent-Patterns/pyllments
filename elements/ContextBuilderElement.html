@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Introduction – Pyllments Documentation</title>
+<title>ContextBuilderElement – Pyllments Documentation</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -20,27 +20,62 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<link href=".//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-46f4cc9626f044588a66931b604fc9c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-45c2526ed84a0312490eb0414fac66ad.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="..//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-46f4cc9626f044588a66931b604fc9c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-45c2526ed84a0312490eb0414fac66ad.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -88,7 +123,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../styles.css">
 </head>
 
 <body class="nav-sidebar floating nav-fixed quarto-light">
@@ -98,10 +133,10 @@ document.addEventListener("DOMContentLoaded", function() {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a href="./index.html" class="navbar-brand navbar-brand-logo">
-    <img src="./assets/logo/pyllments_logo_128.png" alt="" class="navbar-logo">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../assets/logo/pyllments_logo_128.png" alt="" class="navbar-logo">
     </a>
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../index.html">
     <span class="navbar-title">Pyllments Documentation</span>
     </a>
   </div>
@@ -112,19 +147,19 @@ document.addEventListener("DOMContentLoaded", function() {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./getting_started" aria-current="page"> 
+    <a class="nav-link active" href="../getting_started" aria-current="page"> 
 <span class="menu-text">Getting Started</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./how_to"> 
+    <a class="nav-link" href="../how_to"> 
 <span class="menu-text">How-To</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./elements"> 
+    <a class="nav-link" href="../elements"> 
 <span class="menu-text">Elements</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./api_reference"> 
+    <a class="nav-link" href="../api_reference"> 
 <span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
@@ -145,7 +180,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Introduction</li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../elements/ContextBuilderElement.html">🧩 Elements</a></li><li class="breadcrumb-item"><a href="../elements/ContextBuilderElement.html">ContextBuilderElement</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -159,19 +194,19 @@ document.addEventListener("DOMContentLoaded", function() {
     <ul class="list-unstyled mt-1">
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./index.html" class="sidebar-item-text sidebar-link">
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🚀 Introduction</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./installation.html" class="sidebar-item-text sidebar-link">
+  <a href="../installation.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🔧 Installation</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./getting_started" class="sidebar-item-text sidebar-link">
+  <a href="../getting_started" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🎓 Getting Started Tutorial</span></a>
   </div>
 </li>
@@ -186,19 +221,19 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/chat_interface.html" class="sidebar-item-text sidebar-link">
+  <a href="../how_to/chat_interface.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Build a Chat Interface</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/conversation_history.html" class="sidebar-item-text sidebar-link">
+  <a href="../how_to/conversation_history.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Use Conversation History</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/retriever.html" class="sidebar-item-text sidebar-link">
+  <a href="../how_to/retriever.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Use a Retriever</span></a>
   </div>
 </li>
@@ -215,61 +250,61 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/ContextBuilderElement.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/ContextBuilderElement.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">ContextBuilderElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/ChatInterfaceElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/ChatInterfaceElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">ChatInterfaceElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/LLMChatElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/LLMChatElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">LLMChatElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/APIElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/APIElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">APIElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/HistoryHandlerElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/HistoryHandlerElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">HistoryHandlerElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/DiscordElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/DiscordElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">DiscordElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/StructuredRouterTransformer/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/StructuredRouterTransformer/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">StructuredRouterTransformer</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/TelegramElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/TelegramElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">TelegramElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/MCPElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/MCPElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">MCPElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/PipeElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../elements/PipeElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">PipeElement</span></a>
   </div>
 </li>
@@ -286,25 +321,25 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/architecture.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/architecture.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Architecture</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/elements.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/elements.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Elements</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/ports.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/ports.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Ports</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/Views/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../explanation/Views/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Views</span></a>
   </div>
 </li>
@@ -312,7 +347,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a href="./recipes/index.html" class="sidebar-item-text sidebar-link">
+            <a href="../recipes/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">👨‍🍳 Recipes</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -321,31 +356,31 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Multi Chat Flow</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Simple Flow API</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/discord_chat/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/discord_chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Discord Chat</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/chat/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Chat</span></a>
   </div>
 </li>
@@ -356,15 +391,25 @@ document.addEventListener("DOMContentLoaded", function() {
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#instantiation" id="toc-instantiation" class="nav-link active" data-scroll-target="#instantiation">Instantiation</a>
+  <ul class="collapse">
+  <li><a href="#inputs-setup" id="toc-inputs-setup" class="nav-link" data-scroll-target="#inputs-setup">Inputs Setup</a></li>
+  <li><a href="#output-setup" id="toc-output-setup" class="nav-link" data-scroll-target="#output-setup">Output setup</a></li>
+  </ul></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
-<header id="title-block-header" class="quarto-title-block default">
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../elements/ContextBuilderElement.html">🧩 Elements</a></li><li class="breadcrumb-item"><a href="../elements/ContextBuilderElement.html">ContextBuilderElement</a></li></ol></nav>
 <div class="quarto-title">
-<h1 class="title">Introduction</h1>
+<h1 class="title">ContextBuilderElement</h1>
 </div>
 
 
@@ -381,9 +426,178 @@ document.addEventListener("DOMContentLoaded", function() {
 </header>
 
 
-<p>This be my introduction</p>
+<p>The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order. For example, a resulting message sequence might look like:</p>
+<pre><code>1. main_system_prompt_constant,
+2. user_query,
+3. secondary_system_prompt_template,
+4. additional_query</code></pre>
+<section id="instantiation" class="level2">
+<h2 class="anchored" data-anchor-id="instantiation">Instantiation</h2>
+<p>When initializing a <code>ContextBuilderElement</code>, you must provide an <code>input_map</code>, which defines the necessary components such as inputs, constants, and templates with optional keys such as <code>ports</code>, <code>payload_type</code>, <code>persist</code>, <code>callback</code>, and <code>depends_on</code> to be converted to messages and emitted. In conjunction, you may provide optional arguments like <code>emit_order</code>, <code>trigger_map</code>, <code>build_fn</code>, and <code>outgoing_input_ports</code> as described below.</p>
+<section id="inputs-setup" class="level3">
+<h3 class="anchored" data-anchor-id="inputs-setup">Inputs Setup</h3>
+<p>Absent <code>emit_order</code>, <code>trigger_map</code>, and <code>build_fn</code>, the <code>ContextBuilder</code> will wait until all regular ports have received payloads and then emit messages in the order defined by the <code>input_map</code>.</p>
+<section id="input_map" class="level4">
+<h4 class="anchored" data-anchor-id="input_map">1. input_map</h4>
+<p>This is a dictionary used to create input ports, constants, and templates. Each key maps to a configuration dictionary with specific properties based on the entry type:</p>
+<p>Keys:</p>
+<ul>
+<li><strong>Regular ports</strong>: Keys without special suffixes create input ports</li>
+<li><strong>Constants</strong>: Keys ending with <code>_constant</code> create preset messages</li>
+<li><strong>Templates</strong>: Keys ending with <code>_template</code> create dynamic messages using Jinja2 templates</li>
+</ul>
+<p><strong>Port Configuration Options:</strong></p>
+<ul>
+<li><code>role</code>: The role to assign to the message (e.g., ‘user’, ‘assistant’, ‘system’)</li>
+<li><code>payload_type</code>: The expected payload type (e.g., <code>MessagePayload</code>, <code>list[MessagePayload]</code>)</li>
+<li><code>ports</code>: Optional list of output ports to connect this input port to. (<strong>Automatic</strong> inference of <code>payload_type</code> so it’s not necessary to specify when ports are provided - the type is inferred from the first port connection)</li>
+<li><code>persist</code>: Boolean flag indicating whether the payload should persist after being emitted (defaults to <code>False</code>)</li>
+<li><code>depends_on</code>: Optional port name or list of port names that must have payloads before this entry is included.</li>
+<li><code>callback</code>: Optional function to transform the payload when received<br>(e.g., <code>lambda payload: MessagePayload(content=payload.model.content.strip())</code>)</li>
+</ul>
+<p><strong>Constant Configuration Options:</strong></p>
+<ul>
+<li><code>role</code>: The role to assign to the message (e.g., ‘system’, ‘user’, ‘assistant’)</li>
+<li><code>message</code>: The content of the constant message</li>
+<li><code>depends_on</code>: Optional port name or list of port names that must have payloads before this constant is included.</li>
+</ul>
+<p><strong>Template Configuration Options:</strong></p>
+<ul>
+<li><code>role</code>: The role to assign to the message</li>
+<li><code>template</code>: Jinja2 template string that can reference other port contents</li>
+<li><code>depends_on</code>: Optional port name or list of port names that must have payloads before this template is included.</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>input_map <span class="op">=</span> {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'port_a'</span>: {</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">'role'</span>: <span class="st">'user'</span>, </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">'payload_type'</span>: MessagePayload, </span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">'persist'</span>: <span class="va">True</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">'callback'</span>: <span class="kw">lambda</span> payload: payload.model.content.strip()</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'port_b'</span>: {<span class="st">'role'</span>: <span class="st">'assistant'</span>, <span class="st">'payload_type'</span>: <span class="bu">list</span>[MessagePayload]}, </span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">'user_constant'</span>: {<span class="st">'role'</span>: <span class="st">'user'</span>, <span class="st">'message'</span>: <span class="st">"This text will be a user message"</span>}, </span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">'system_template'</span>: {<span class="st">'role'</span>: <span class="st">'system'</span>, <span class="st">'template'</span>: <span class="st">"</span><span class="sc">{{</span><span class="st"> port_a </span><span class="sc">}}</span><span class="st">  --  </span><span class="sc">{{</span><span class="st"> port_b </span><span class="sc">}}</span><span class="st">"</span>}</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This creates two input ports (with a callback for port_a), a constant user message, and a template that combines content from both ports.</p>
+<p><strong>Emission Condition:</strong></p>
+<p>For the case where <code>emit_order</code>, <code>trigger_map</code>, and <code>build_fn</code> parameters are absent – When all ports receive payloads, all of the Payloads from the ports will be coerced into MessagePayloads and emitted in their key order. If persist is False, the payloads on the ports will be cleared, otherwise they will be retained for future emissions.</p>
+<hr>
+</section>
+<section id="emit_order" class="level4">
+<h4 class="anchored" data-anchor-id="emit_order">2. <code>emit_order</code></h4>
+<p>The <code>emit_order</code> parameter provides a simple way to specify the order in which messages should be emitted. The ContextBuilder will wait until all required payloads are available before emitting.</p>
+<p><strong>Example:</strong></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>emit_order <span class="op">=</span> [<span class="st">'port_a'</span>, <span class="st">'port_b'</span>, <span class="st">'system_constant'</span>, <span class="st">'system_template'</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This specifies that messages should be emitted in the order listed, once all required payloads are available.</p>
+<p><strong>Optional Ports:</strong></p>
+<p>To mark a port as optional, use square brackets around the port name:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>emit_order <span class="op">=</span> [<span class="st">'port_a'</span>, <span class="st">'[port_b]'</span>, <span class="st">'system_constant'</span>, <span class="st">'system_template'</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>In this case, if <code>port_b</code> is not provided, the <code>ContextBuilder</code> will still emit the other messages without it, so make sure that you are aware of the order in which payloads arrive at the <code>ContextBuilder</code>.</p>
+<hr>
+</section>
+<section id="trigger_map" class="level4">
+<h4 class="anchored" data-anchor-id="trigger_map">3. <code>trigger_map</code></h4>
+<p>The <code>trigger_map</code> establishes rules for when the <code>ContextBuilder</code> should emit messages. Each key corresponds to a triggering port and points to an ordered list of ports, constants, or templates that should be included in the emission after all of the ports in the list have received payloads.(as long as they are not marked optional with square brackets e.g.&nbsp;‘[port_b]’)</p>
+<p><strong>Example:</strong></p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>trigger_map <span class="op">=</span> {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'port_a'</span>: [<span class="st">'port_a'</span>, <span class="st">'port_b'</span>, <span class="st">'system_constant'</span>],</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'port_b'</span>: [<span class="st">'port_b'</span>, <span class="st">'system_constant'</span>]</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>In this example, if <code>port_a</code> receives a payload, the builder will stay in that trigger’s mode until all of the ports in the list have received payloads(port_a and port_b), after which the list of messages will be emitted and the trigger mechanism reset, awaiting a new trigger to go off to determine the next list of messages to emit. Keep in mind that the incoming payloads are stored regardless of what trigger mode we’re in, however, the payloads within the trigger’s list will be cleared after emission.</p>
+<hr>
+</section>
+<section id="build_fn" class="level4">
+<h4 class="anchored" data-anchor-id="build_fn">4. <code>build_fn</code></h4>
+<p>For more complex control over the message building process, you can define a custom build function. This function is called every time any port receives a payload and receives:</p>
+<ul>
+<li>All defined ports and their payloads</li>
+<li>The <code>active_input_port</code> parameter indicating which port just received a payload</li>
+<li>A persistent dictionary <code>c</code> for storing state between calls</li>
+</ul>
+<p>Your function should return a list of port/message names that should be processed and emitted. Remember that persist flags and the provided callback still apply.</p>
+<p><strong>Example:</strong></p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> build_fn(port_a, port_b, system_constant, active_input_port, c):</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> active_input_port <span class="op">==</span> port_a:</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> [port_a, port_b, system_constant]</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> [port_b, system_constant]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><em>Comment:</em> This sample build function adjusts the emission order based on which port was activated.</p>
+<hr>
+</section>
+</section>
+<section id="output-setup" class="level3">
+<h3 class="anchored" data-anchor-id="output-setup">Output setup</h3>
+<p><code>outgoing_input_ports</code></p>
+<p>This parameter identifies the port(s) to which the <code>ContextBuilderElement</code>’s output will be sent. You can assign it either during instantiation or manually connect it afterwards.</p>
+<p><strong>Example (during instantiation):</strong></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>cb <span class="op">=</span> ContextBuilderElement(..., outgoing_input_ports<span class="op">=</span>[some_element.ports.some_input_port])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>Alternatively, manually connecting after initialization:</strong></p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>cb <span class="op">=</span> ContextBuilderElement(...)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>cb.ports.messages_output <span class="op">&gt;</span> some_element.ports.some_input_port</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This ensures that the accumulated messages are correctly routed to the intended downstream component. <!--  TODO: Add more implementation and use details
+---
+
+## Processing Strategies
+
+The ContextBuilder uses several strategies to determine when and how to emit messages, in the following order of priority:
+
+1. **Custom build function**: If `build_fn` is provided, it has the highest priority
+2. **Trigger map**: If the active port is in the `trigger_map`, that ordering is used
+3. **Emit order**: If all required ports for the `emit_order` are available, that ordering is used
+4. **Default behavior**: If all required regular ports have payloads, use the order from the input maps
+
+## Callbacks
+
+Callbacks provide a way to transform payloads as they are received by the ContextBuilder. This is useful for preprocessing or filtering payload content before it's used in message construction.
+
+**Example:**
+
+```python
+'port_a': {
+    'role': 'user',
+    'payload_type': MessagePayload,
+    'callback': lambda payload: payload.model.content.upper()  # Convert to uppercase
+}
+```
+
+Callbacks receive the raw payload and should return the transformed payload or value. The transformation is applied before the payload is stored or used in template rendering.
+
+## Templates
+
+Templates use Jinja2 syntax and can reference the content of any port payload. The template will only be rendered when all referenced ports have received payloads.
+
+**Example:**
+
+```python
+'system_template': {'role': 'system', 'template': "Context: {{ port_a }}\nAdditional info: {{ port_b }}"}
+```
+
+*Comment:* This creates a system message that combines the content from `port_a` and `port_b`.
+
+---
+
+## Payload Persistence
+
+By default, port payloads are cleared after being used in a message emission, unless:
+
+1. The port is marked with `'persist': True` in its configuration
+2. The port is the one that just received a payload (triggering the current processing)
+3. The port is a constant or template (these always persist)
+
+This behavior allows you to control which inputs should be reused across multiple emissions.
+
+---
+
+## Summary
+
+The `ContextBuilder` is a powerful tool for managing and sequencing message payloads. By configuring the input maps, emission rules, and optionally a custom build function, you can effectively control how messages are accumulated and emitted within your system.
+
+Happy building! --></p>
 
 
+</section>
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

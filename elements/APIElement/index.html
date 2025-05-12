@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Introduction – Pyllments Documentation</title>
+<title>APIElement – Pyllments Documentation</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -20,27 +20,62 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<link href=".//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-46f4cc9626f044588a66931b604fc9c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-45c2526ed84a0312490eb0414fac66ad.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-46f4cc9626f044588a66931b604fc9c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-45c2526ed84a0312490eb0414fac66ad.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -88,7 +123,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../../styles.css">
 </head>
 
 <body class="nav-sidebar floating nav-fixed quarto-light">
@@ -98,10 +133,10 @@ document.addEventListener("DOMContentLoaded", function() {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a href="./index.html" class="navbar-brand navbar-brand-logo">
-    <img src="./assets/logo/pyllments_logo_128.png" alt="" class="navbar-logo">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../../assets/logo/pyllments_logo_128.png" alt="" class="navbar-logo">
     </a>
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">Pyllments Documentation</span>
     </a>
   </div>
@@ -112,19 +147,19 @@ document.addEventListener("DOMContentLoaded", function() {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./getting_started" aria-current="page"> 
+    <a class="nav-link active" href="../../getting_started" aria-current="page"> 
 <span class="menu-text">Getting Started</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./how_to"> 
+    <a class="nav-link" href="../../how_to"> 
 <span class="menu-text">How-To</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./elements"> 
+    <a class="nav-link" href="../../elements"> 
 <span class="menu-text">Elements</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./api_reference"> 
+    <a class="nav-link" href="../../api_reference"> 
 <span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
@@ -145,7 +180,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Introduction</li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../elements/ContextBuilderElement.html">🧩 Elements</a></li><li class="breadcrumb-item"><a href="../../elements/APIElement/index.html">APIElement</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -159,19 +194,19 @@ document.addEventListener("DOMContentLoaded", function() {
     <ul class="list-unstyled mt-1">
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🚀 Introduction</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./installation.html" class="sidebar-item-text sidebar-link">
+  <a href="../../installation.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🔧 Installation</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./getting_started" class="sidebar-item-text sidebar-link">
+  <a href="../../getting_started" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🎓 Getting Started Tutorial</span></a>
   </div>
 </li>
@@ -186,19 +221,19 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/chat_interface.html" class="sidebar-item-text sidebar-link">
+  <a href="../../how_to/chat_interface.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Build a Chat Interface</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/conversation_history.html" class="sidebar-item-text sidebar-link">
+  <a href="../../how_to/conversation_history.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Use Conversation History</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./how_to/retriever.html" class="sidebar-item-text sidebar-link">
+  <a href="../../how_to/retriever.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">How to Use a Retriever</span></a>
   </div>
 </li>
@@ -215,61 +250,61 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/ContextBuilderElement.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/ContextBuilderElement.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">ContextBuilderElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/ChatInterfaceElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/ChatInterfaceElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">ChatInterfaceElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/LLMChatElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/LLMChatElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">LLMChatElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/APIElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/APIElement/index.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">APIElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/HistoryHandlerElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/HistoryHandlerElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">HistoryHandlerElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/DiscordElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/DiscordElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">DiscordElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/StructuredRouterTransformer/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/StructuredRouterTransformer/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">StructuredRouterTransformer</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/TelegramElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/TelegramElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">TelegramElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/MCPElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/MCPElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">MCPElement</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./elements/PipeElement/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../elements/PipeElement/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">PipeElement</span></a>
   </div>
 </li>
@@ -286,25 +321,25 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/architecture.html" class="sidebar-item-text sidebar-link">
+  <a href="../../explanation/architecture.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Architecture</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/elements.html" class="sidebar-item-text sidebar-link">
+  <a href="../../explanation/elements.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Elements</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/ports.html" class="sidebar-item-text sidebar-link">
+  <a href="../../explanation/ports.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Ports</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./explanation/Views/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../explanation/Views/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Views</span></a>
   </div>
 </li>
@@ -312,7 +347,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a href="./recipes/index.html" class="sidebar-item-text sidebar-link">
+            <a href="../../recipes/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">👨‍🍳 Recipes</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -321,31 +356,31 @@ document.addEventListener("DOMContentLoaded", function() {
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
+  <a href="../../recipes/multi_chat_flow.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Multi Chat Flow</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
+  <a href="../../recipes/simple_flow_api.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Simple Flow API</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/discord_chat/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../recipes/discord_chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Discord Chat</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/chat/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../recipes/chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Chat</span></a>
   </div>
 </li>
@@ -356,15 +391,33 @@ document.addEventListener("DOMContentLoaded", function() {
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#instantiation" id="toc-instantiation" class="nav-link active" data-scroll-target="#instantiation">Instantiation</a>
+  <ul class="collapse">
+  <li><a href="#input-setup" id="toc-input-setup" class="nav-link" data-scroll-target="#input-setup">Input Setup</a></li>
+  </ul></li>
+  <li><a href="#input-ports" id="toc-input-ports" class="nav-link" data-scroll-target="#input-ports">Input Ports</a></li>
+  <li><a href="#output-ports" id="toc-output-ports" class="nav-link" data-scroll-target="#output-ports">Output Ports</a></li>
+  <li><a href="#response-strategies" id="toc-response-strategies" class="nav-link" data-scroll-target="#response-strategies">Response Strategies</a>
+  <ul class="collapse">
+  <li><a href="#response-dictionary" id="toc-response-dictionary" class="nav-link" data-scroll-target="#response-dictionary">1. Response Dictionary</a></li>
+  <li><a href="#trigger-map" id="toc-trigger-map" class="nav-link" data-scroll-target="#trigger-map">2. Trigger Map</a></li>
+  <li><a href="#custom-build-function" id="toc-custom-build-function" class="nav-link" data-scroll-target="#custom-build-function">3. Custom Build Function</a></li>
+  <li><a href="#request-serialization" id="toc-request-serialization" class="nav-link" data-scroll-target="#request-serialization">Request Serialization</a></li>
+  </ul></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
-<header id="title-block-header" class="quarto-title-block default">
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../elements/ContextBuilderElement.html">🧩 Elements</a></li><li class="breadcrumb-item"><a href="../../elements/APIElement/index.html">APIElement</a></li></ol></nav>
 <div class="quarto-title">
-<h1 class="title">Introduction</h1>
+<h1 class="title">APIElement</h1>
 </div>
 
 
@@ -381,9 +434,202 @@ document.addEventListener("DOMContentLoaded", function() {
 </header>
 
 
-<p>This be my introduction</p>
+<p>This element allows you to define a FastAPI endpoint that responds to a request, structure the type of payload it passes into your flow, and then extract the information from the Payload the APIElement recieves to build the response.</p>
+<section id="instantiation" class="level2">
+<h2 class="anchored" data-anchor-id="instantiation">Instantiation</h2>
+<p>When creating an <code>APIElement</code>, you configure how the HTTP request body is constructed and emitted from your flow. You supply parameters and mappings that drive the API behavior.</p>
+<section id="input-setup" class="level3">
+<h3 class="anchored" data-anchor-id="input-setup">Input Setup</h3>
+<section id="input_map" class="level4">
+<h4 class="anchored" data-anchor-id="input_map">1. <code>input_map</code></h4>
+<p>A dictionary defining the expected inputs for the API. Each key creates an input port:</p>
+<ul>
+<li><strong>payload class</strong>: a direct <code>Payload</code> subclass (e.g., <code>MessagePayload</code>) creates a port for that type, with <code>persist=True</code> by default.</li>
+<li><strong>dict config</strong>: you can specify:
+<ul>
+<li><code>payload_type</code>: class — Payload type to accept.</li>
+<li><code>ports</code>: list[<code>InputPort</code>] — upstream ports to connect.</li>
+<li><code>persist</code>: bool, default <code>True</code> — whether to clear the port after a response.</li>
+</ul></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>input_map <span class="op">=</span> {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'user_query'</span>: MessagePayload,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'history'</span>: {<span class="st">'ports'</span>: [history_el.ports.messages_output], <span class="st">'persist'</span>: <span class="va">False</span>}</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="response_dict" class="level4">
+<h4 class="anchored" data-anchor-id="response_dict">2. <code>response_dict</code></h4>
+<p>Defines how to build the JSON response once inputs arrive. Keys must match <code>input_map</code> ports:</p>
+<ul>
+<li>For each <code>{port_name: {alias: attr_or_fn}}</code>:
+<ul>
+<li>If <code>attr_or_fn</code> is a <code>str</code>, read <code>payload.model.&lt;attr_or_fn&gt;</code>.</li>
+<li>If callable, invoke it (awaiting if coroutine) with the payload.</li>
+</ul></li>
+</ul>
+<p>When <strong>all</strong> <code>response_dict</code> keys have data, the element emits a <code>{alias: value}</code> response and clears non-persistent inputs.</p>
+</section>
+<section id="trigger_map-optional" class="level4">
+<h4 class="anchored" data-anchor-id="trigger_map-optional">3. <code>trigger_map</code> (optional)</h4>
+<p>A mapping <code>{trigger_port: (callback_fn, [required_ports])}</code>:</p>
+<ul>
+<li>Fires when <code>trigger_port</code> receives a payload and <strong>all</strong> <code>required_ports</code> hold data.</li>
+<li><code>callback_fn(**payloads)</code> returns a dict to emit as the response.</li>
+</ul>
+</section>
+<section id="build_fn-optional" class="level4">
+<h4 class="anchored" data-anchor-id="build_fn-optional">4. <code>build_fn</code> (optional)</h4>
+<p>A custom function <code>(active_input_port, c, **port_payloads) → dict</code> with persistent state <code>c</code>:</p>
+<ul>
+<li>Called on every input arrival (after <code>response_dict</code> and <code>trigger_map</code>).</li>
+<li>Return a dict to emit as the response, or <code>None</code> to skip.</li>
+</ul>
+</section>
+<section id="request_output_fn" class="level4">
+<h4 class="anchored" data-anchor-id="request_output_fn">5. <code>request_output_fn</code></h4>
+<p>A function mapping the final request dict to a <code>Payload</code> subclass. This parameter is required in non-test mode to construct the request payload into your flow; its signature also defines the default Pydantic model for request validation (unless overridden via <code>request_pydantic_model</code>).</p>
+</section>
+<section id="other-parameters" class="level4">
+<h4 class="anchored" data-anchor-id="other-parameters">6. Other parameters</h4>
+<ul>
+<li><code>endpoint: str</code> — URL path (default: <code>'api'</code>).</li>
+<li><code>outgoing_input_port: InputPort</code> — connect <code>api_output</code> to a downstream element.</li>
+<li><code>app: FastAPI</code> — application to register routes on (default: shared AppRegistry).</li>
+<li><code>test: bool</code> — register only a test route if <code>True</code>.</li>
+<li><code>timeout: float</code> — seconds to wait for a response (default: 30s).</li>
+<li><code>request_pydantic_model: Type[BaseModel]</code> — optional override for the Pydantic model used to validate incoming requests; by default it’s inferred from the parameters of <code>request_output_fn</code>.</li>
+</ul>
+</section>
+</section>
+</section>
+<section id="input-ports" class="level2">
+<h2 class="anchored" data-anchor-id="input-ports">Input Ports</h2>
+<table class="table-hover caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 29%">
+<col style="width: 49%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Port Name</th>
+<th>Payload Type</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&lt;key&gt;</code></td>
+<td>As defined in <code>input_map</code></td>
+<td>Receives payloads to include in the API request under <code>key</code>.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="output-ports" class="level2">
+<h2 class="anchored" data-anchor-id="output-ports">Output Ports</h2>
+<table class="table-hover caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 33%">
+<col style="width: 55%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Port Name</th>
+<th>Payload Type</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>api_output</code></td>
+<td>Payload type returned by <code>request_output_fn</code></td>
+<td>Emits the constructed payload into the flow when an HTTP request is received.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="response-strategies" class="level2">
+<h2 class="anchored" data-anchor-id="response-strategies">Response Strategies</h2>
+<p>The <code>APIElement</code> builds and emits the response in the following order of priority:</p>
+<ol type="1">
+<li><strong>Response Dictionary</strong> (<code>response_dict</code>)</li>
+<li><strong>Trigger Map</strong> (<code>trigger_map</code>)</li>
+<li><strong>Custom Build Function</strong> (<code>build_fn</code>)</li>
+</ol>
+<section id="response-dictionary" class="level3">
+<h3 class="anchored" data-anchor-id="response-dictionary">1. Response Dictionary</h3>
+<p>When you supply a <code>response_dict</code>, once <strong>all</strong> keys have received payloads, the element:</p>
+<ul>
+<li>Gathers each payload from its input port</li>
+<li>For each <code>(alias → attr_or_fn)</code> mapping:
+<ul>
+<li>If <code>attr_or_fn</code> is a <code>str</code>, reads <code>payload.model.&lt;attr_or_fn&gt;</code></li>
+<li>If <code>attr_or_fn</code> is callable, calls it with the payload (awaiting if necessary)</li>
+</ul></li>
+<li>Returns a JSON object of <code>{alias: value, ...}</code> and clears those payloads</li>
+</ul>
+</section>
+<section id="trigger-map" class="level3">
+<h3 class="anchored" data-anchor-id="trigger-map">2. Trigger Map</h3>
+<p>If no <code>response_dict</code> is defined or not all ports are ready, but a <code>trigger_map</code> is provided:</p>
+<ul>
+<li>When an input port listed in <code>trigger_map</code> receives a payload, and <strong>all</strong> its <code>required_ports</code> have payloads:
+<ul>
+<li>Calls the corresponding <code>(callback_fn, required_ports)</code></li>
+<li>Uses the returned dict as the API response</li>
+</ul></li>
+</ul>
+<p><strong>Trigger Semantics:</strong> - Similar to ContextBuilder, the trigger fires only when all <code>required_ports</code> have data. - Because input ports persist their payloads, triggers will still fire if dependencies were received earlier. - Unlike ContextBuilder, APIElement does not queue multiple trigger runs internally; each satisfying event invokes the trigger immediately (subject to HTTP-level serialization).</p>
+<p><strong>Concurrency Note:</strong> The APIElement processes one trigger at a time. While a previous response is pending (i.e., <code>response_future</code> is active), additional trigger invocations will not start new processing and incoming HTTP requests at the API endpoint will receive a <code>429 Too Many Requests</code> error until the current request completes.</p>
+</section>
+<section id="custom-build-function" class="level3">
+<h3 class="anchored" data-anchor-id="custom-build-function">3. Custom Build Function</h3>
+<p>If neither <code>response_dict</code> nor <code>trigger_map</code> produces a response, and you provided a <code>build_fn</code>:</p>
+<ul>
+<li>The element calls your <code>build_fn(active_input_port, c, **port_kwargs)</code> on every arrival</li>
+<li>The returned dict (if non-<code>None</code>) becomes the API response</li>
+</ul>
+</section>
+<section id="request-serialization" class="level3">
+<h3 class="anchored" data-anchor-id="request-serialization">Request Serialization</h3>
+<p>The <code>APIElement</code> processes one request at a time to maintain consistent state. Internally, it:</p>
+<ul>
+<li>Sets a <code>response_future</code> when a new request is received.</li>
+<li>Blocks additional HTTP requests until the current <code>response_future</code> is fulfilled or times out.</li>
+<li>Automatically clears the <code>response_future</code> on completion.</li>
+</ul>
+<p>If a second request arrives before the first is resolved, the endpoint will return a <code>429 Too Many Requests</code> error.</p>
+<!-- ## Example
+
+```python
+from pyllments.elements import APIElement
+from pyllments.payloads import MessagePayload
+
+api_el = APIElement(
+    input_map={
+        'user_query': MessagePayload,
+        'conversation_history': list[MessagePayload]
+    },
+    response_dict={
+        'user_query': {'query_text': lambda p: p.model.content},
+        'conversation_history': {'history': lambda p: [m.model.content for m in p]}
+    },
+    endpoint='chat',
+    request_output_fn=lambda query_text, history: MessagePayload(
+        role='assistant', content=f"You asked: {query_text}"),
+)
+
+# Wire up the flow
+chat_builder_el.ports.user_output > api_el.ports.user_query
+history_handler_el.ports.message_history_output > api_el.ports.conversation_history
+``` -->
 
 
+</section>
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

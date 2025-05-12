@@ -1,83 +1,123 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/installation.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/elements/PipeElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/index.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/elements/ContextBuilderElement.html</loc>
+    <lastmod>2025-05-12T22:20:02.342Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/misc/mermaid_renders_flow.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/elements/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/how_to/chat_interface.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/elements/DiscordElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.342Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/how_to/conversation_history.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/elements/APIElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.342Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/explanation/elements.html</loc>
-    <lastmod>2025-02-10T01:47:01.863Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/elements/ChatInterfaceElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.342Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/elements/ChatInterfaceElement.html</loc>
-    <lastmod>2025-02-10T01:47:01.863Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/misc/mermaid_renders_flow.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/elements/LLMChatElement.html</loc>
-    <lastmod>2025-02-10T01:47:01.863Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/installation.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/recipes/multi_chat_flow.html</loc>
-    <lastmod>2025-02-10T01:47:01.866Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/explanation/elements.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/recipes/index.html</loc>
-    <lastmod>2025-02-10T01:47:01.866Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/getting_started/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/recipes/simple_flow_api.html</loc>
-    <lastmod>2025-02-10T01:47:01.866Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/recipes/chat/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.347Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/recipes/simple_flow.html</loc>
-    <lastmod>2025-02-10T01:47:01.866Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/recipes/multi_chat_flow.html</loc>
+    <lastmod>2025-05-12T22:20:02.347Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/recipes/branch_flow/index.html</loc>
-    <lastmod>2025-02-10T01:47:01.866Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/recipes/simple_flow_api.html</loc>
+    <lastmod>2025-05-12T22:20:02.348Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/about.html</loc>
-    <lastmod>2025-02-10T01:47:01.848Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/how_to/chat_interface.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/explanation/architecture.html</loc>
-    <lastmod>2025-02-10T01:47:01.863Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/how_to/conversation_history.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/explanation/ports.html</loc>
-    <lastmod>2025-02-10T01:47:01.863Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/how_to/retriever.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/how_to/retriever.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/recipes/discord_chat/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.347Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/misc/mermaid_renders.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/recipes/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.347Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/introduction.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/recipes/branch_flow/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.347Z</lastmod>
   </url>
   <url>
-    <loc>https://Prudent-Patterns.github.io/pyllments/getting_started/index.html</loc>
-    <lastmod>2025-02-10T01:47:01.864Z</lastmod>
+    <loc>https://docs.prudentpatterns.com/about.html</loc>
+    <lastmod>2025-05-12T22:20:02.326Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/explanation/ports.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/explanation/architecture.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/misc/mermaid_renders.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/introduction.html</loc>
+    <lastmod>2025-05-12T22:20:02.345Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/elements/LLMChatElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.342Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/elements/HistoryHandlerElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.342Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/elements/StructuredRouterTransformer/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/elements/TelegramElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.prudentpatterns.com/elements/MCPElement/index.html</loc>
+    <lastmod>2025-05-12T22:20:02.343Z</lastmod>
   </url>
 </urlset>

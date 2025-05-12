@@ -1,35 +1,304 @@
 [
   {
+    "objectID": "elements/PipeElement/index.html",
+    "href": "elements/PipeElement/index.html",
+    "title": "PipeElement",
+    "section": "",
+    "text": "The PipeElement is a utility Element for testing and debugging pyllments flows by capturing and emitting arbitrary payloads. It can function as:",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "PipeElement"
+    ]
+  },
+  {
+    "objectID": "elements/PipeElement/index.html#instantiation",
+    "href": "elements/PipeElement/index.html#instantiation",
+    "title": "PipeElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\nreceive_callback: callable = lambda x: x\nFunction invoked on each received payload for inspection or transformation. Should return a printable object for logging.\nstore_received_payloads: bool = True\nWhether to append incoming payloads to the received_payloads list for later inspection.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "PipeElement"
+    ]
+  },
+  {
+    "objectID": "elements/PipeElement/index.html#input-ports",
+    "href": "elements/PipeElement/index.html#input-ports",
+    "title": "PipeElement",
+    "section": "Input Ports",
+    "text": "Input Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\npipe_input\nAny\nReceives any payload. If store_received_payloads is True, appends to received_payloads. Invokes receive_callback and fulfills send_and_receive futures.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "PipeElement"
+    ]
+  },
+  {
+    "objectID": "elements/PipeElement/index.html#output-ports",
+    "href": "elements/PipeElement/index.html#output-ports",
+    "title": "PipeElement",
+    "section": "Output Ports",
+    "text": "Output Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\npipe_output\nAny\nEmits payloads scheduled via send_payload or send_and_receive into the flow.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "PipeElement"
+    ]
+  },
+  {
+    "objectID": "elements/PipeElement/index.html#methods",
+    "href": "elements/PipeElement/index.html#methods",
+    "title": "PipeElement",
+    "section": "Methods",
+    "text": "Methods\nclear_received_payloads()\nClears all entries from the received_payloads list.\nsend_payload(payload: Any):\nEmits a payload into the flow.\nsend_and_receive(payload: Any, timeout: float = None) -&gt; Any:\nSends a payload and blocks until a response arrives on this pipe if the timeout is None, otherwise",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "PipeElement"
+    ]
+  },
+  {
+    "objectID": "elements/ContextBuilderElement.html",
+    "href": "elements/ContextBuilderElement.html",
+    "title": "ContextBuilderElement",
+    "section": "",
+    "text": "The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order. For example, a resulting message sequence might look like:",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "ContextBuilderElement"
+    ]
+  },
+  {
+    "objectID": "elements/ContextBuilderElement.html#instantiation",
+    "href": "elements/ContextBuilderElement.html#instantiation",
+    "title": "ContextBuilderElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nWhen initializing a ContextBuilderElement, you must provide an input_map, which defines the necessary components such as inputs, constants, and templates with optional keys such as ports, payload_type, persist, callback, and depends_on to be converted to messages and emitted. In conjunction, you may provide optional arguments like emit_order, trigger_map, build_fn, and outgoing_input_ports as described below.\n\nInputs Setup\nAbsent emit_order, trigger_map, and build_fn, the ContextBuilder will wait until all regular ports have received payloads and then emit messages in the order defined by the input_map.\n\n1. input_map\nThis is a dictionary used to create input ports, constants, and templates. Each key maps to a configuration dictionary with specific properties based on the entry type:\nKeys:\n\nRegular ports: Keys without special suffixes create input ports\nConstants: Keys ending with _constant create preset messages\nTemplates: Keys ending with _template create dynamic messages using Jinja2 templates\n\nPort Configuration Options:\n\nrole: The role to assign to the message (e.g., ‘user’, ‘assistant’, ‘system’)\npayload_type: The expected payload type (e.g., MessagePayload, list[MessagePayload])\nports: Optional list of output ports to connect this input port to. (Automatic inference of payload_type so it’s not necessary to specify when ports are provided - the type is inferred from the first port connection)\npersist: Boolean flag indicating whether the payload should persist after being emitted (defaults to False)\ndepends_on: Optional port name or list of port names that must have payloads before this entry is included.\ncallback: Optional function to transform the payload when received(e.g., lambda payload: MessagePayload(content=payload.model.content.strip()))\n\nConstant Configuration Options:\n\nrole: The role to assign to the message (e.g., ‘system’, ‘user’, ‘assistant’)\nmessage: The content of the constant message\ndepends_on: Optional port name or list of port names that must have payloads before this constant is included.\n\nTemplate Configuration Options:\n\nrole: The role to assign to the message\ntemplate: Jinja2 template string that can reference other port contents\ndepends_on: Optional port name or list of port names that must have payloads before this template is included.\n\nExample:\ninput_map = {\n    'port_a': {\n        'role': 'user', \n        'payload_type': MessagePayload, \n        'persist': True,\n        'callback': lambda payload: payload.model.content.strip()\n    },\n    'port_b': {'role': 'assistant', 'payload_type': list[MessagePayload]}, \n    'user_constant': {'role': 'user', 'message': \"This text will be a user message\"}, \n    'system_template': {'role': 'system', 'template': \"{{ port_a }}  --  {{ port_b }}\"}\n}\nThis creates two input ports (with a callback for port_a), a constant user message, and a template that combines content from both ports.\nEmission Condition:\nFor the case where emit_order, trigger_map, and build_fn parameters are absent – When all ports receive payloads, all of the Payloads from the ports will be coerced into MessagePayloads and emitted in their key order. If persist is False, the payloads on the ports will be cleared, otherwise they will be retained for future emissions.\n\n\n\n2. emit_order\nThe emit_order parameter provides a simple way to specify the order in which messages should be emitted. The ContextBuilder will wait until all required payloads are available before emitting.\nExample:\nemit_order = ['port_a', 'port_b', 'system_constant', 'system_template']\nThis specifies that messages should be emitted in the order listed, once all required payloads are available.\nOptional Ports:\nTo mark a port as optional, use square brackets around the port name:\nemit_order = ['port_a', '[port_b]', 'system_constant', 'system_template']\nIn this case, if port_b is not provided, the ContextBuilder will still emit the other messages without it, so make sure that you are aware of the order in which payloads arrive at the ContextBuilder.\n\n\n\n3. trigger_map\nThe trigger_map establishes rules for when the ContextBuilder should emit messages. Each key corresponds to a triggering port and points to an ordered list of ports, constants, or templates that should be included in the emission after all of the ports in the list have received payloads.(as long as they are not marked optional with square brackets e.g. ‘[port_b]’)\nExample:\ntrigger_map = {\n    'port_a': ['port_a', 'port_b', 'system_constant'],\n    'port_b': ['port_b', 'system_constant']\n}\nIn this example, if port_a receives a payload, the builder will stay in that trigger’s mode until all of the ports in the list have received payloads(port_a and port_b), after which the list of messages will be emitted and the trigger mechanism reset, awaiting a new trigger to go off to determine the next list of messages to emit. Keep in mind that the incoming payloads are stored regardless of what trigger mode we’re in, however, the payloads within the trigger’s list will be cleared after emission.\n\n\n\n4. build_fn\nFor more complex control over the message building process, you can define a custom build function. This function is called every time any port receives a payload and receives:\n\nAll defined ports and their payloads\nThe active_input_port parameter indicating which port just received a payload\nA persistent dictionary c for storing state between calls\n\nYour function should return a list of port/message names that should be processed and emitted. Remember that persist flags and the provided callback still apply.\nExample:\ndef build_fn(port_a, port_b, system_constant, active_input_port, c):\n    if active_input_port == port_a:\n        return [port_a, port_b, system_constant]\n    else:\n        return [port_b, system_constant]\nComment: This sample build function adjusts the emission order based on which port was activated.\n\n\n\n\nOutput setup\noutgoing_input_ports\nThis parameter identifies the port(s) to which the ContextBuilderElement’s output will be sent. You can assign it either during instantiation or manually connect it afterwards.\nExample (during instantiation):\ncb = ContextBuilderElement(..., outgoing_input_ports=[some_element.ports.some_input_port])\nAlternatively, manually connecting after initialization:\ncb = ContextBuilderElement(...)\ncb.ports.messages_output &gt; some_element.ports.some_input_port\nThis ensures that the accumulated messages are correctly routed to the intended downstream component.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "ContextBuilderElement"
+    ]
+  },
+  {
+    "objectID": "elements/index.html",
+    "href": "elements/index.html",
+    "title": "🧩 Elements",
+    "section": "",
+    "text": "An Element is the eponymous unit of Pyllments that is behind its modularity, composability, and extensibility.\nEach Element is self-contained, and offers a straightfoward and predictable interface for connecting to other Elements. At its core, it is composed of a Model which handles its business logic, and a set of Ports which handle its connectivity. Some elements also contain optional Views, which you are free to compose to generate a GUI.\nGenerally speaking, a Payload arrives at one of the Element’s input ports, and in reaction to this, the Element does something depending on its intended functionality. It could absorb the Payload, and change its state while not proceeding any further, or it can emit another payload after some processing.\nAs an example, lets consider the interaction between a ChatInterfaceElement and a LLMChatElement where a message is sent to a large language model to receive a response.\nchat_interface_el.ports.message_output &gt; llm_chat_el.ports.messages_emit_input\nllm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_input\nThe ChatInterfaceElement doesn’t need to receive any Payloads, as the MessagePayload is created when you type a message into its chat input field and hit send. When you send the message, it shows up in the chat feed, and a MessagePayload is emitted from the message_output port.\nThe LLMChatElement receives the MessagePayload, and uses it to create and emit a MessagePayload in return. This is indicated by the _emit_input suffix. It tells us that when this port received a Payload, it will also be reactively emitting something. This naming convention helps us grok the flow of data throughout the program.\nAnd as we can see, the LLMChatElement is emitting a MessagePayload in return, which is captured by the message_input port of the ChatInterfaceElement, which is meant to receive a MessagePayload and stream it into the chat feed.\nThe Model of the ChatInterfaceElement is handling the storage of the received payloads, and the outer Element class is handling the integration of the Model, Ports, and Views."
+  },
+  {
+    "objectID": "elements/DiscordElement/index.html",
+    "href": "elements/DiscordElement/index.html",
+    "title": "DiscordElement",
+    "section": "",
+    "text": "The DiscordElement enables real-time direct-message interactions between a Discord bot and users. It uses a DiscordModel to authenticate and listen for incoming messages, and provides ports to send and receive MessagePayloads.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "DiscordElement"
+    ]
+  },
+  {
+    "objectID": "elements/DiscordElement/index.html#instantiation",
+    "href": "elements/DiscordElement/index.html#instantiation",
+    "title": "DiscordElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\nbot_token: str Discord bot token for authentication. If not provided, reads from the DISCORD_BOT_TOKEN environment variable.\non_message_criteria: callable, optional Function to filter incoming Discord messages (default: only direct messages). Receives a discord.Message and returns bool.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "DiscordElement"
+    ]
+  },
+  {
+    "objectID": "elements/DiscordElement/index.html#input-ports",
+    "href": "elements/DiscordElement/index.html#input-ports",
+    "title": "DiscordElement",
+    "section": "Input Ports",
+    "text": "Input Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nassistant_message_emit_input\nMessagePayload\nSends assistant-originated MessagePayloads to Discord users via DM.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "DiscordElement"
+    ]
+  },
+  {
+    "objectID": "elements/DiscordElement/index.html#output-ports",
+    "href": "elements/DiscordElement/index.html#output-ports",
+    "title": "DiscordElement",
+    "section": "Output Ports",
+    "text": "Output Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nuser_message_output\nMessagePayload\nEmits messages received from Discord users.\n\n\nassistant_message_output\nMessagePayload\nEmits messages forwarded after assistant-originated payloads are sent.\n\n\nmessage_output\nMessagePayload\nUnified port emitting both user and assistant messages.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "DiscordElement"
+    ]
+  },
+  {
+    "objectID": "elements/APIElement/index.html",
+    "href": "elements/APIElement/index.html",
+    "title": "APIElement",
+    "section": "",
+    "text": "This element allows you to define a FastAPI endpoint that responds to a request, structure the type of payload it passes into your flow, and then extract the information from the Payload the APIElement recieves to build the response.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "APIElement"
+    ]
+  },
+  {
+    "objectID": "elements/APIElement/index.html#instantiation",
+    "href": "elements/APIElement/index.html#instantiation",
+    "title": "APIElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nWhen creating an APIElement, you configure how the HTTP request body is constructed and emitted from your flow. You supply parameters and mappings that drive the API behavior.\n\nInput Setup\n\n1. input_map\nA dictionary defining the expected inputs for the API. Each key creates an input port:\n\npayload class: a direct Payload subclass (e.g., MessagePayload) creates a port for that type, with persist=True by default.\ndict config: you can specify:\n\npayload_type: class — Payload type to accept.\nports: list[InputPort] — upstream ports to connect.\npersist: bool, default True — whether to clear the port after a response.\n\n\nExample:\ninput_map = {\n    'user_query': MessagePayload,\n    'history': {'ports': [history_el.ports.messages_output], 'persist': False}\n}\n\n\n2. response_dict\nDefines how to build the JSON response once inputs arrive. Keys must match input_map ports:\n\nFor each {port_name: {alias: attr_or_fn}}:\n\nIf attr_or_fn is a str, read payload.model.&lt;attr_or_fn&gt;.\nIf callable, invoke it (awaiting if coroutine) with the payload.\n\n\nWhen all response_dict keys have data, the element emits a {alias: value} response and clears non-persistent inputs.\n\n\n3. trigger_map (optional)\nA mapping {trigger_port: (callback_fn, [required_ports])}:\n\nFires when trigger_port receives a payload and all required_ports hold data.\ncallback_fn(**payloads) returns a dict to emit as the response.\n\n\n\n4. build_fn (optional)\nA custom function (active_input_port, c, **port_payloads) → dict with persistent state c:\n\nCalled on every input arrival (after response_dict and trigger_map).\nReturn a dict to emit as the response, or None to skip.\n\n\n\n5. request_output_fn\nA function mapping the final request dict to a Payload subclass. This parameter is required in non-test mode to construct the request payload into your flow; its signature also defines the default Pydantic model for request validation (unless overridden via request_pydantic_model).\n\n\n6. Other parameters\n\nendpoint: str — URL path (default: 'api').\noutgoing_input_port: InputPort — connect api_output to a downstream element.\napp: FastAPI — application to register routes on (default: shared AppRegistry).\ntest: bool — register only a test route if True.\ntimeout: float — seconds to wait for a response (default: 30s).\nrequest_pydantic_model: Type[BaseModel] — optional override for the Pydantic model used to validate incoming requests; by default it’s inferred from the parameters of request_output_fn.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "APIElement"
+    ]
+  },
+  {
+    "objectID": "elements/APIElement/index.html#input-ports",
+    "href": "elements/APIElement/index.html#input-ports",
+    "title": "APIElement",
+    "section": "Input Ports",
+    "text": "Input Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\n&lt;key&gt;\nAs defined in input_map\nReceives payloads to include in the API request under key.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "APIElement"
+    ]
+  },
+  {
+    "objectID": "elements/APIElement/index.html#output-ports",
+    "href": "elements/APIElement/index.html#output-ports",
+    "title": "APIElement",
+    "section": "Output Ports",
+    "text": "Output Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\napi_output\nPayload type returned by request_output_fn\nEmits the constructed payload into the flow when an HTTP request is received.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "APIElement"
+    ]
+  },
+  {
+    "objectID": "elements/APIElement/index.html#response-strategies",
+    "href": "elements/APIElement/index.html#response-strategies",
+    "title": "APIElement",
+    "section": "Response Strategies",
+    "text": "Response Strategies\nThe APIElement builds and emits the response in the following order of priority:\n\nResponse Dictionary (response_dict)\nTrigger Map (trigger_map)\nCustom Build Function (build_fn)\n\n\n1. Response Dictionary\nWhen you supply a response_dict, once all keys have received payloads, the element:\n\nGathers each payload from its input port\nFor each (alias → attr_or_fn) mapping:\n\nIf attr_or_fn is a str, reads payload.model.&lt;attr_or_fn&gt;\nIf attr_or_fn is callable, calls it with the payload (awaiting if necessary)\n\nReturns a JSON object of {alias: value, ...} and clears those payloads\n\n\n\n2. Trigger Map\nIf no response_dict is defined or not all ports are ready, but a trigger_map is provided:\n\nWhen an input port listed in trigger_map receives a payload, and all its required_ports have payloads:\n\nCalls the corresponding (callback_fn, required_ports)\nUses the returned dict as the API response\n\n\nTrigger Semantics: - Similar to ContextBuilder, the trigger fires only when all required_ports have data. - Because input ports persist their payloads, triggers will still fire if dependencies were received earlier. - Unlike ContextBuilder, APIElement does not queue multiple trigger runs internally; each satisfying event invokes the trigger immediately (subject to HTTP-level serialization).\nConcurrency Note: The APIElement processes one trigger at a time. While a previous response is pending (i.e., response_future is active), additional trigger invocations will not start new processing and incoming HTTP requests at the API endpoint will receive a 429 Too Many Requests error until the current request completes.\n\n\n3. Custom Build Function\nIf neither response_dict nor trigger_map produces a response, and you provided a build_fn:\n\nThe element calls your build_fn(active_input_port, c, **port_kwargs) on every arrival\nThe returned dict (if non-None) becomes the API response\n\n\n\nRequest Serialization\nThe APIElement processes one request at a time to maintain consistent state. Internally, it:\n\nSets a response_future when a new request is received.\nBlocks additional HTTP requests until the current response_future is fulfilled or times out.\nAutomatically clears the response_future on completion.\n\nIf a second request arrives before the first is resolved, the endpoint will return a 429 Too Many Requests error.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "APIElement"
+    ]
+  },
+  {
+    "objectID": "elements/ChatInterfaceElement/index.html",
+    "href": "elements/ChatInterfaceElement/index.html",
+    "title": "ChatInterfaceElement",
+    "section": "",
+    "text": "This element is the backbone of flows involving user interaction through the browser by offering multiple Views you are able to compose to create your chat interface, including an input area, chat feed, and send button.\nIt provides the essential component of user interaction through receiving MessagePayloads and ToolsResponsePayloads, generating MessagePayloads as responses, as well as granting tool call permission to received ToolsResponsePayloads.\n\nInput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nmessage_input\nMessagePayload\nDisplays any incoming message in the chat feed (no downstream emit).\n\n\nmessage_emit_input\nMessagePayload\nDisplays and then emits messages (user or assistant) via user_message_output, assistant_message_output, and message_output.\n\n\ntools_response_emit_input\nToolsResponsePayload\nDisplays and then emits tool response messages via tools_response_output.\n\n\n\n\n\nOutput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nuser_message_output\nMessagePayload\nEmits processed user messages.\n\n\nassistant_message_output\nMessagePayload\nEmits processed assistant messages.\n\n\nmessage_output\nMessagePayload\nEmits both user and assistant messages from their respective emit inputs.\n\n\ntools_response_output\nToolsResponsePayload\nEmits processed tool response messages.\n\n\n\n\n\nViews\n\n\n\n\n\n\n\n\nView Name\nDescription\nImage\n\n\n\n\nchatfeed_view\nDisplays the chat history.\n\n\n\nchat_input_view\nDisplays the chat input area.Args:placeholder: str = 'Yap Here'Text to display as placeholder in the chat input area.\n\n\n\nsend_button_view\nDisplays the send button.\n\n\n\ninterface_view\nDisplays the chat interface.Args:height: int = 800Total height of the interface (feed + input).input_height: Optional[int] = 120Height allocated to the chat input area.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "ChatInterfaceElement"
+    ]
+  },
+  {
     "objectID": "installation.html",
     "href": "installation.html",
     "title": "Installation Instructions",
     "section": "",
-    "text": "You can install Pyllments using either of the following methods:\n\nUsing uv (Super duper fast)\n\n\nGet uv\nuv pip install pyllments\nqua## Using pip\npip install pyllments",
+    "text": "Requires:\npython &gt;= 3.11\n\nUsing uv (Super duper fast)Using pip (Not super duper fast)\n\n\nGet uv\nLightweight Installation\nEssentials only.\nuv pip install pyllments\nFull Installation\nIf you intend to use your own hardware for some heavy lifting and processing. Includes dependencies for retrieval, embedding, processing. (e.g. PyTorch, lancedb, sentence-transformers)\nuv pip install pyllments[full]\n\n\nLightweight Installation\nEssentials only.\npip install pyllments\nFull Installation\nIf you intend to use your own hardware for some heavy lifting and processing. Includes dependencies for retrieval, embedding, processing. (e.g. PyTorch, lancedb, sentence-transformers)\npip install pyllments[full]",
     "crumbs": [
       "Getting Started",
       "🔧 Installation"
     ]
   },
   {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "What is Pyllments?",
+    "objectID": "explanation/Views/index.html",
+    "href": "explanation/Views/index.html",
+    "title": "Views",
     "section": "",
-    "text": "Build Modular, LLM-Powered Applications with Ease.\n\n\n\n\n\n\n\n\n\n🧩\n\n\nModular Components\n\n\n⚡\n\n\nFlow-Based Programming\n\n\n🎨\n\n\nFront End Framework\n\n\n🔌\n\n\nLLM + vDB Integrations\n\n\n\n\n\n\n\n\n\n\nPyllments consists of a set of Elements with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.\nPyllments comes with a set of pre-built parameterized application you can run immediately from the command line like so:\npyllments recipe run branch_flow --height 900 --width 700\nSee Recipes Here\n\nElements:\n\nEasily integrate into your own projects\nHave front end components associated with them, which allows you to build your own composable GUIs to interact with your flows\nCan individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)\n\n\n\nElements are building blocks with a consistent interface\n\n\n\n\n\n\n\n▷\n\n\n\n\n\nElements can create and manage easily composable front-end components called Views\n\n\n\n\nYour browser does not support the video tag.    ▷ \n\n\n\nUsing their Ports interface, Elements can be connected in endless permutations.\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\nAttach API endpoints to any part of the flow\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\n\n\n\nflowchart LR\nsubgraph chat_interface_el [ChatInterfaceElement]\n  direction TB\n  subgraph chat_interface_el_views [Views]\n    direction LR\n    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View\n  end\n  subgraph chat_interface_el_Ports [Ports]\n      direction LR\n      subgraph chat_interface_el_input [Input]\n          direction TB\n          message_input:::InputPort ~~~ message_emit_input:::InputPort\n      end\n      subgraph chat_interface_el_output [Output]\n          direction TB\n          message_output:::OutputPort\n      end\n      chat_interface_el_input ~~~ chat_interface_el_output\n  end\n  chat_interface_el_views ~~~ chat_interface_el_Ports\nend\n\nsubgraph llm_chat_el [LLMChatElement]\n  direction TB\n  subgraph llm_Views [Views]\n    direction LR\n    model_selector_view:::View\n  end\n  subgraph llm_Ports [Ports]\n      direction LR\n      subgraph llm_chat_input [Input]\n          direction TB\n          messages_input:::InputPort\n      end\n      subgraph llm_chat_output [Output]\n          direction TB\n          llm_message_output[message_output]:::OutputPort\n      end\n      llm_chat_input ~~~ llm_chat_output\n  end\n  llm_Views ~~~ llm_Ports\nend\n\nmessage_output --MessagePayload--&gt; messages_input\n\n\n\n\n\n\nKey Features:\n\nModular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.\nReactive Design: Utilizes the Param library for reactive programming, ensuring seamless updates between models and views.\nVisualization Support: Leverages the Panel library for creating interactive web-based user interfaces.\nLLM Integration: Easily incorporate Large Language Models into your applications.\nFlexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.",
+    "text": "Views",
     "crumbs": [
       "Getting Started",
-      "🚀 Introduction"
+      "💡 Explanation",
+      "Views"
     ]
   },
   {
-    "objectID": "recipes/index.html",
-    "href": "recipes/index.html",
-    "title": "Recipes",
+    "objectID": "getting_started/index.html",
+    "href": "getting_started/index.html",
+    "title": "Getting Started Tutorial",
     "section": "",
-    "text": "Recipes are pre-made flows that you can run straight from the command line.\nClick on a recipe to see more details and configuration options.\npyllments recipe run &lt;recipe-name&gt; [&lt;args&gt;...]\n\n\n\n\n\nTitle\n\n\nDescription\n\n\n\n\n\n\nBranching Chat Flow\n\n\nCreate a multi-tabbed chat interface that allows users to branch conversations and create new ones.\n\n\n\n\nMulti Chat Flow\n\n\nA multi chat flow recipe\n\n\n\n\nSimple Flow\n\n\nA simple flow recipe\n\n\n\n\nSimple Flow API\n\n\nA simple flow API recipe\n\n\n\n\n\nNo matching items",
+    "text": "Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application with a persistant chat history.\nPlease make sure that you’ve installed pyllments if you want to follow along.\nIf you don’t care about building flows, you can hop on over to the recipes section to run pre-built applications. Or skip to the very end to run our example flow."
+  },
+  {
+    "objectID": "getting_started/index.html#creating-your-first-element",
+    "href": "getting_started/index.html#creating-your-first-element",
+    "title": "Getting Started Tutorial",
+    "section": "1. Creating your first Element",
+    "text": "1. Creating your first Element\nThe fundamental building block of pyllments, is as you may have guessed, an Element.\nAn element is composed of a Model that handles the business logic, Ports that handle the communication between elements, and optionally, Views that handles the frontend representation of the element.\n\n\n\n\n\nElement Diagram\n\n\n1from pyllments.elements import ChatInterfaceElement\n\n2chat_interface_el = ChatInterfaceElement()\n\n1\n\nImport the ChatInterfaceElement from the pyllments.elements subpackage. This is how to import an element efficiently.\n\n2\n\nCreate an instance of the ChatInterfaceElement."
+  },
+  {
+    "objectID": "getting_started/index.html#adding-more-elements",
+    "href": "getting_started/index.html#adding-more-elements",
+    "title": "Getting Started Tutorial",
+    "section": "2. Adding more elements",
+    "text": "2. Adding more elements\nNow that we’re getting the hang of it, lets create a couple more.\nfrom pyllments.elements import LLMChatElement, HistoryHandlerElement\n\n1llm_chat_el = LLMChatElement(model_name='gpt-4o')\n2history_handler_el = HistoryHandlerElement(\n    history_token_limit=1000, \n    tokenizer_model='gpt-4o'\n)\n\n1\n\nCreate an instance of the LLMChatElement with the model name set to ‘gpt-4o’. LLMChatElement uses the LiteLLM naming system and is compatible with the chat models supported by LiteLLM. All you need is the corresponding API key in an .env file.\n\n2\n\nCreate an instance of the HistoryHandlerElement with the token limit set to 1000 tokens as measured by the gpt-4o tokenizer. This is the default tokenizer used and can be expected to be a good enough estimate for most use cases.\n\n\n\nCreating Context\nTo not have a completely lame chatbot, we want to combine our query to it with some context like a history of the previous messages as well as a system prompt it can use to guide its responses.\n\n\nUnder the hood, the ContextBuilderElement uses a payload conversion mapping from port types to generate MessagePayloads to be used as context. (See Here)\ncontext_builder_el = ContextBuilderElement(\n1    input_map={\n2        'system_prompt_constant': {\n            'role': 'system',\n            'message': 'You are actually a pirate and will respond as such.'\n            },\n3        'history': {'payload_type': list[MessagePayload]},\n4        'query': {'payload_type': MessagePayload}\n    },\n5    emit_order=['system_prompt_constant', '[history]', 'query']\n    )\n\n1\n\nThe input_map is a mandatory argument to the ContextBuilderElement, as it describes the inputs we will be using to build our context.\n\n2\n\nOne type of input is the constant. It is converted to a message of a specified role. It must have the _constant suffix. (The other types are ports and templates)\n\n3\n\nThe history input is a port that expects a list[MessagePayload] type.\n\n4\n\nThe query input is a port that emits a MessagePayload.\n\n5\n\nThe emit_order argument is a list of the input keys in the order we want them to be emitted. When all inputs are available, we emit a list of messages. The square brackets around [history] indicate that it is optional.\n\n\n(For more on the ContextBuilderElement, clicky here)"
+  },
+  {
+    "objectID": "getting_started/index.html#your-first-flow",
+    "href": "getting_started/index.html#your-first-flow",
+    "title": "Getting Started Tutorial",
+    "section": "3. Your first flow",
+    "text": "3. Your first flow\nLets take a moment to think about what we want to achieve. We are creating a chat interface which uses an LLM to respond to message while also taking into account the history of the conversation.\nBelow, you can see that each individual element has its own unique set of input and output ports as well as a designated Payload type it either emits or receives. In this case, we’re only using the MessagePayload and List[MessagePayload] types. For an output port to connect to an input port, its payload type must be compatible with the input port’s payload type.\n\n\nPort name nomenclature\nThe _emit_input suffix tends to be used to signify that upon the reception of a Payload, the Element will emit a Payload in return.\nFor the ContextBuilderElement to connect to the LLMChatElement, the messages_emit_input port of the LLMChatElement must be able to accept a List[MessagePayload] type.\n\n\n\nFlow Diagram\n\n\nTo facilitate the proper communication between the elements:\n\nWhen we type a message into the ChatInterfaceElement and hit send, in addition to rendering it in the chatfeed,it emits a MessagePayload through the message_output port.\n\nThe ContextBuilderElement receives the MessagePayload through the query port. More on this below.\nThe HistoryHandlerElement recieves a MessagePayload through the message_input port. This message is incorporated into our the running history it contains. This does not trigger an emission.\n\nWhen the ContextBuilderElement receives the MessagePayload through the query port, the condition is satisifed for the emission of a list of messages. Remember, the history port is optional, so it need not receive any payload for us to trigger the emission. It is simply ignored from the emit_order when no history is present at that port.\nAs the LLMChatElement receives a list of messages, it sends them to the LLM we have specified and emits a MessagePayload response through the message_output port.\nThe MessagePayload is received by the ChatInterfaceElement and rendered in the chatfeed. However, we should note that the message_emit_input port also triggers the emission of that very same message after it has streamed to the chatfeed to be passed along, and this time, out of the assistant_message_output port.\nThe message is received by the HistoryHandlerElement in its message_emit_input port. This triggers it to emit its message history as a list[MessagePayload] to the ContextBuilderElement. Now, when we send a new message through our interface, the history will be included in the context."
+  },
+  {
+    "objectID": "getting_started/index.html#connecting-the-elements",
+    "href": "getting_started/index.html#connecting-the-elements",
+    "title": "Getting Started Tutorial",
+    "section": "4. Connecting the elements",
+    "text": "4. Connecting the elements\nNow that we have a flow in mind, connecting the elements is a breeze.\nchat_interface_el.ports.user_message_output &gt; context_builder_el.ports.query\nchat_interface_el.ports.user_message_output &gt; history_handler_el.ports.messages_input\n\nhistory_handler_el.ports.messages_output &gt; context_builder_el.ports.history\n\ncontext_builder_el.ports.messages_output &gt; llm_chat_el.ports.messages_emit_input\n\nllm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_emit_input\nThe ports are accessed using dot notation on the ports attribute of the element. In the case of llm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_emit_input, we are connecting an output port of the LLMChatElement to an input port of the ChatInterfaceElement using the &gt; operator, with the output port being on the left hand side of it. It is equivalent to llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_emit_input)."
+  },
+  {
+    "objectID": "getting_started/index.html#creating-the-views",
+    "href": "getting_started/index.html#creating-the-views",
+    "title": "Getting Started Tutorial",
+    "section": "5. Creating the views",
+    "text": "5. Creating the views\nAfter connecting the elements, we can create the views responsible for generating the visual components of our application.\n\n\n\nElement Views\n\n\n1import panel as pn\n\n2interface_view = chat_interface_el.create_interface_view(width=600, height=800)\n3chat_history_view = history_handler_el.create_context_view(width=220)\n4model_selector_view = llm_chat_el.create_model_selector_view()\n\n5main_view = pn.Column(\n    model_selector_view,\n    pn.Spacer(height=10),\n    pn.Row(\n        interface_view,\n        pn.Spacer(width=10),\n        chat_history_view\n        ),\n    styles={'width': 'fit-content'}\n)\n\n1\n\nThe panel library is imported to help with the view layout. The front end of pyllments is built using Panel, and supports rendering panel widgets and panes within pyllments applications.\n\n2\n\ninterface_view is created by calling the create_interface_view method of the ChatInterfaceElement. This view is a wrapper around the chat_input_view, chat_feed_view, and send_button_view. The height and width are specified in pixels.\n\n3\n\nchat_history_view is created by calling the create_context_view method of the HistoryHandlerElement. This view contains the current chat history which is sent to the LLM. Here, only the width is specified, as the height will stretch to fit its container.\n\n4\n\nmodel_selector_view is created by calling the create_model_selector_view method of the LLMChatElement. This view allows us to select the model we wish to chat with. The width isn’t specified because we want it to stretch to fit its container.\n\n5\n\nLastly, we use the panel row and column layout helpers to organize the views. The spacers are used to create some visual space between the views and neaten things up."
+  },
+  {
+    "objectID": "getting_started/index.html#serve-your-flow-as-an-application",
+    "href": "getting_started/index.html#serve-your-flow-as-an-application",
+    "title": "Getting Started Tutorial",
+    "section": "6. Serve your flow as an application",
+    "text": "6. Serve your flow as an application\nTo create an application from your flow, you must create a function decorated with a @flow decorator that returns a view object. Every time the page is reloaded, the code in that function will be executed. This means that you have the option of instantiating the elements every single time the page is reloaded, or reusing them.\n\nReused ElementsNew Element Creation\n\n\nfrom pyllments import flow\n\n# {{ Element creation here }}\n\n@flow\ndef my_flow():\n    # {{ View creation here }}\n    return main_view\n\n\nfrom pyllments import flow\n\n@flow\ndef my_flow():\n    # {{ Element and view creation here }}\n    return main_view\n\n\n\nMake sure that you .env file is in your working directory or its parent directories. (Alternatively, you can specify the path to the .env file using the --env flag)\nSave your code as a python file my_flow.py and serve it:\npyllments serve my_flow.py\nAdd a --logging flag to see under the hood.\n\n\n\n\n\n\nMore info on the pyllments serve command\n\n\n\n\n\npyllments serve --help\n-----------------------------------------\n Usage: pyllments serve [OPTIONS] FILENAME                                               \n                                                                                         \n Start a Pyllments server                                                                \n                                                                                         \n╭─ Arguments ───────────────────────────────────────────────────────────────────────────╮\n│ *    filename      TEXT  [default: None] [required]                                   │\n╰───────────────────────────────────────────────────────────────────────────────────────╯\n╭─ Options ─────────────────────────────────────────────────────────────────────────────╮\n│ --logging            --no-logging             Enable logging. [default: no-logging]   │\n│ --logging-level                      TEXT     Set logging level. [default: INFO]      │\n│ --no-gui             --no-no-gui              Don't look for GUI components.          │\n│                                               [default: no-no-gui]                    │\n│ --port                               INTEGER  Port to run server on. [default: 8000]  │\n│ --env                                TEXT     Path to .env file. [default: None]      │\n│ --host           -H                  TEXT     Network interface to bind the server    │\n│                                               to. Defaults to localhost (127.0.0.1)   │\n│                                               for safer local development.            │\n│                                               [default: 127.0.0.1]                    │\n│ --profile            --no-profile             Enable profiling output.                │\n│                                               [default: no-profile]                   │\n│ --config         -c                  TEXT     Additional configuration options for    │\n│                                               the served file. Provide either         │\n│                                               multiple key=value pairs or a single    │\n│                                               dictionary literal (e.g. '{\"key\":       │\n│                                               \"value\"}').                             │\n│ --help                                        Show this message and exit.             │\n╰───────────────────────────────────────────────────────────────────────────────────────╯\n\n\n\n\n\nVideo\nFront End Video"
+  },
+  {
+    "objectID": "getting_started/index.html#putting-it-all-together",
+    "href": "getting_started/index.html#putting-it-all-together",
+    "title": "Getting Started Tutorial",
+    "section": "7. Putting it all together",
+    "text": "7. Putting it all together\nimport panel as pn\nfrom pyllments import flow\nfrom pyllments.elements import (\n    ChatInterfaceElement, \n    LLMChatElement, \n    HistoryHandlerElement,\n    ContextBuilderElement\n)\n\n\nchat_interface_el = ChatInterfaceElement()\nllm_chat_el = LLMChatElement(model_name='gpt-4o')\nhistory_handler_el = HistoryHandlerElement(\n    history_token_limit=1000, \n    tokenizer_model='gpt-4o'\n)\ncontext_builder_el = ContextBuilderElement(\n    input_map={\n        'system_prompt_constant': {\n            'role': 'system',\n            'message': 'You are actually a pirate and will respond as such.'\n            },\n        'history': {'payload_type': list[MessagePayload]},\n        'query': {'payload_type': MessagePayload}\n    },\n    emit_order=['system_prompt_constant', '[history]', 'query']\n    )\n\nchat_interface_el.ports.user_message_output &gt; context_builder_el.ports.query\nchat_interface_el.ports.user_message_output &gt; history_handler_el.ports.messages_input\n\nhistory_handler_el.ports.messages_output &gt; context_builder_el.ports.history\n\ncontext_builder_el.ports.messages_output &gt; llm_chat_el.ports.messages_emit_input\n\nllm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_emit_input\n\ninterface_view = chat_interface_el.create_interface_view(width=600, height=800)\nchat_history_view = history_handler_el.create_context_view(width=220)\nmodel_selector_view = llm_chat_el.create_model_selector_view()\n\n@flow\ndef my_flow():\n    main_view = pn.Column(\n        model_selector_view,\n        pn.Spacer(height=10),\n        pn.Row(\n            interface_view,\n            pn.Spacer(width=10),\n            chat_history_view\n            ),\n        styles={'width': 'fit-content'}\n    )\n    return main_view\nCLI:\npyllments serve my_flow.py --logging"
+  },
+  {
+    "objectID": "recipes/chat/index.html",
+    "href": "recipes/chat/index.html",
+    "title": "Chat",
+    "section": "",
+    "text": "pyllments recipe run chat",
     "crumbs": [
       "Getting Started",
-      "👨‍🍳 Recipes"
+      "👨‍🍳 Recipes",
+      "Chat"
     ]
   },
   {
@@ -45,15 +314,26 @@
     ]
   },
   {
-    "objectID": "recipes/simple_flow.html",
-    "href": "recipes/simple_flow.html",
-    "title": "Simple Flow",
+    "objectID": "recipes/discord_chat/index.html",
+    "href": "recipes/discord_chat/index.html",
+    "title": "Discord Chat",
     "section": "",
-    "text": "pyllments recipe run simple_flow",
+    "text": "pyllments recipe run discord_chat\nTo chat with the bot, you must create it through the Discord Developer Portal and add the bot to your server. Once you and the bot share a server, you may message it directly and it will respond to you.\n\nConfiguration\n\n\n\n\n\n\n\n\nArgument\nDescription\nDefault\n\n\n\n\nbot_token\nThe token for the discord bot. Not necessary if DISCORD_BOT_TOKEN env var present.\nNone\n\n\nmodel_name\nThe name of the LLM model to use for generating chat responses.\ngpt-4o-mini\n\n\nmodel_base_url\nBase URL for the LLM API endpoint.\nNone\n\n\nsystem_prompt\nOptional system prompt to guide the conversation.\nNone\n\n\n\n\nSteps of the flow\n\nWhen a message arrives from the Discord channel, it is packaged into a MessagePayload and emitted from the user_message_output port of the DiscordElement\n1a. It is emitted to the query port of the ContextBuilderElement\n1b. as well as to the messages_input port of the HistoryHandlerElement\nWhen the query port of the ContextBuilderElement is filled, it generates and emits a list[MessagePayload] to the LLMChatElement, which may or may not include the history, depending on whether it is present or not.\nThe LLMChatElement receives the payloads at its messages_emit_input port, then generates a response callback, and packs it in a MessagePayload which is emitted from its message_output port and received back by the DiscordElement, which appears as a response from the bot in the channel after the actual call to the LLM is made to generate the content of the message.\nWhen the message arrives at the message_emit_input port of the DiscordElement and after the content is generated, it is then forwarded to the messages_emit_input port of the HistoryHandlerElement, where it is saved into its internal storage.\nThe HistoryHandlerElement then emits alist[MessagePayload] to the ContextBuilderElement. This process allows us to populate the history of the ContextBuilderElement dynamically. (Note that this doesn’t trigger it to emit a list of messages, only the query port is responsible for that.)",
     "crumbs": [
       "Getting Started",
       "👨‍🍳 Recipes",
-      "Simple Flow"
+      "Discord Chat"
+    ]
+  },
+  {
+    "objectID": "recipes/index.html",
+    "href": "recipes/index.html",
+    "title": "Recipes",
+    "section": "",
+    "text": "Recipes are pre-made flows that you can run straight from the command line.\nClick on a recipe to see more details and configuration options.\npyllments recipe run &lt;recipe-name&gt; [&lt;args&gt;...]\n\n\n\n\n\n\nTitle\n\n\n\nDescription\n\n\n\n\n\n\n\n\nBranching Chat Flow\n\n\nCreate a multi-tabbed chat interface that allows users to branch conversations and create new ones.\n\n\n\n\n\n\nChat\n\n\nA simple chat recipe with a browser GUI\n\n\n\n\n\n\nDiscord Chat\n\n\nA chat recipe with a Discord bot\n\n\n\n\n\n\nMulti Chat Flow\n\n\nA multi chat flow recipe\n\n\n\n\n\n\nSimple Flow API\n\n\nA simple flow API recipe\n\n\n\n\n\n\nNo matching items",
+    "crumbs": [
+      "Getting Started",
+      "👨‍🍳 Recipes"
     ]
   },
   {
@@ -61,7 +341,7 @@
     "href": "recipes/branch_flow/index.html",
     "title": "Branching Chat Flow",
     "section": "",
-    "text": "pyllments recipe run branch_flow\n\nConfiguration\n\n\n\n\n\n\n\n\n\nArgument\nExample\nDescription\nDefault\n\n\n\n\nwidth\n800\nWidth of the chat interface.\n800\n\n\nheight\n942\nHeight of the application.\n942\n\n\ncustom_models\nSee Below\nAdd custom LLM models and/or base urls.\n“{}”\n\n\n\n\n\n\n\n\n\n\n\n\nBranch Flow GUI\n\n\n\n\n\n\n\nBranch Flow Flow Diagram\n\n\n\n\n\nThis recipe enables both entirely new chats and forked conversations from existing ones, managed by an integrated flow system.\n\nNew Chat: Start fresh conversations.\nBranching: Fork from existing chats, optionally copying messages.\nTabbed Interface: Manage multiple chats/branches simultaneously.\nLLM Integration: Seamlessly connects UI with LLM backend.",
+    "text": "pyllments recipe run branch_chat\n\nConfiguration\n\n\n\n\n\n\n\n\nArgument\nDescription\nDefault\n\n\n\n\nwidth\nWidth of the chat interface.\n800\n\n\nheight\nHeight of the application.\n942\n\n\ncustom_models\nAdd custom LLM models and/or base urls.\n“{}”\n\n\n\n\n\n\n\n\n\nBranch Flow GUI\n\n\n\n\n\n\n\nBranch Flow Flow Diagram\n\n\n\n\n\nThis recipe enables both entirely new chats and forked conversations from existing ones, managed by an integrated flow system.\n\nNew Chat: Start fresh conversations.\nBranching: Fork from existing chats, optionally copying messages.\nTabbed Interface: Manage multiple chats/branches simultaneously.\nLLM Integration: Seamlessly connects UI with LLM backend.",
     "crumbs": [
       "Getting Started",
       "👨‍🍳 Recipes",
@@ -76,6 +356,17 @@
     "text": "About this site\npyllments serve flow.py --logging=True"
   },
   {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "What is Pyllments?",
+    "section": "",
+    "text": "Build Modular, LLM-Powered Applications with Ease.\n\n\n\n\n\n\n\n\n\n🧩\n\n\nModular Components\n\n\n⚡\n\n\nFlow-Based Programming\n\n\n🎨\n\n\nFront End Framework\n\n\n🔌\n\n\nLLM + vDB Integrations\n\n\n\n\n\n\n\n\n\n\nPyllments consists of a set of Elements with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.\nPyllments comes with a set of pre-built parameterized application you can run immediately from the command line like so:\npyllments recipe run branch_flow --height 900 --width 700\nSee Recipes Here\n\nElements:\n\nEasily integrate into your own projects\nHave front end components associated with them, which allows you to build your own composable GUIs to interact with your flows\nCan individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)\n\n\n\nElements are building blocks with a consistent interface\n\n\n\n\n\n\n\n▷\n\n\n\n\n\nElements can create and manage easily composable front-end components called Views\n\n\n\n\nYour browser does not support the video tag.    ▷ \n\n\n\nUsing their Ports interface, Elements can be connected in endless permutations.\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\nAttach API endpoints to any part of the flow\n\n\n\n\n\nYour browser does not support the video tag.   ▷ \n\n\n\n\n\n\n\nflowchart LR\nsubgraph chat_interface_el [ChatInterfaceElement]\n  direction TB\n  subgraph chat_interface_el_views [Views]\n    direction LR\n    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View\n  end\n  subgraph chat_interface_el_Ports [Ports]\n      direction LR\n      subgraph chat_interface_el_input [Input]\n          direction TB\n          message_input:::InputPort ~~~ message_emit_input:::InputPort\n      end\n      subgraph chat_interface_el_output [Output]\n          direction TB\n          message_output:::OutputPort\n      end\n      chat_interface_el_input ~~~ chat_interface_el_output\n  end\n  chat_interface_el_views ~~~ chat_interface_el_Ports\nend\n\nsubgraph llm_chat_el [LLMChatElement]\n  direction TB\n  subgraph llm_Views [Views]\n    direction LR\n    model_selector_view:::View\n  end\n  subgraph llm_Ports [Ports]\n      direction LR\n      subgraph llm_chat_input [Input]\n          direction TB\n          messages_input:::InputPort\n      end\n      subgraph llm_chat_output [Output]\n          direction TB\n          llm_message_output[message_output]:::OutputPort\n      end\n      llm_chat_input ~~~ llm_chat_output\n  end\n  llm_Views ~~~ llm_Ports\nend\n\nmessage_output --MessagePayload--&gt; messages_input\n\n\n\n\n\n\nKey Features:\n\nModular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.\nReactive Design: Utilizes the Param library for reactive programming, ensuring seamless updates between models and views.\nVisualization Support: Leverages the Panel library for creating interactive web-based user interfaces.\nLLM Integration: Easily incorporate Large Language Models into your applications.\nFlexible Connectivity: Elements communicate through input and output ports, allowing for complex data flows. Payload System: A versatile payload system for handling various types of data, including text, images, and audio.",
+    "crumbs": [
+      "Getting Started",
+      "🚀 Introduction"
+    ]
+  },
+  {
     "objectID": "introduction.html",
     "href": "introduction.html",
     "title": "Introduction",
@@ -83,52 +374,171 @@
     "text": "This be my introduction"
   },
   {
-    "objectID": "getting_started/index.html",
-    "href": "getting_started/index.html",
-    "title": "Getting Started Tutorial",
+    "objectID": "elements/LLMChatElement/index.html",
+    "href": "elements/LLMChatElement/index.html",
+    "title": "LLMChatElement",
     "section": "",
-    "text": "Lets create a simple flow that helps illustrate the core concepts of pyllments by building and serving a chat application.\nPlease make sure that you’ve installed pyllments if you want to follow along.\nIf you don’t care about building flows, you can hop on over to the recipes section to run pre-built applications. d"
+    "text": "The LLMChatElement is a core component for integrating Large Language Models (LLMs) into chat applications. It handles the communication with LLM providers and generates responses based on input messages. Its interface is meant to receive MessagePayloads and respond with a MessagePayload in turn.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "LLMChatElement"
+    ]
   },
   {
-    "objectID": "getting_started/index.html#creating-your-first-element",
-    "href": "getting_started/index.html#creating-your-first-element",
-    "title": "Getting Started Tutorial",
-    "section": "1. Creating your first Element",
-    "text": "1. Creating your first Element\n\n\n\n\n\nElement Diagram\n\n\nThe fundamental building block of pyllments, is as you may have guessed, an Element.\nAn element is composed of a Model that handles the business logic, Ports that handle the communication between elements, and optionally, Views that handles the frontend representation of the element.\n1from pyllments.elements import ChatInterfaceElement\n\n2chat_interface_el = ChatInterfaceElement()\n\n1\n\nImport the ChatInterfaceElement from the pyllments.elements subpackage. This is how most elements are efficiently imported.\n\n2\n\nCreate an instance of the ChatInterfaceElement"
+    "objectID": "elements/LLMChatElement/index.html#instantiation",
+    "href": "elements/LLMChatElement/index.html#instantiation",
+    "title": "LLMChatElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\nmodel_name: str = ‘gpt-4o-mini’ The name of the model to use for the LLM. model_args: dict = {} Additional arguments to pass to the model. base_url: str = None The base URL for the model. Optional, to be used with custom endpoints. output_mode: Literal[‘atomic’, ‘stream’] = ‘stream’ Whether to stream the response or return it all at once.\n\nInput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nmessages_emit_input\nUnion[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]]\nProcesses incoming messages or lists of messages/tool responses to generate an LLM response which is emitted from the message_output port.\n\n\n\n\n\nOutput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nmessage_output\nMessagePayload\nEmits a MessagePayload containing the LLM’s response to the next element.\n\n\n\n\n\nViews\n(See here for styling options)\n\n\n\n\n\n\n\n\nView Name\nDescription\nImage\n\n\n\n\nmodel_selector_view\nAllows selection of LLM provider and model for generating responses.Args:models: list or dict, optionalA list or dict of models. If a dict, the keys are used as display names.show_provider_selector: bool, default TrueWhether to include a provider selection widget.provider: str, default 'OpenAI'The default provider value.model: str or dict, default 'gpt-4o-mini'The default model (this update assumes it is a string to be pre-selected).orientation: {'vertical', 'horizontal'}, default 'horizontal'Layout orientation for the provider and model selectors.model_selector_width: int = Noneprovider_selector_width: int = Noneselector_css: list[str] = []height: int = 57\nWith provider:Without provider:",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "LLMChatElement"
+    ]
   },
   {
-    "objectID": "getting_started/index.html#adding-more-elements",
-    "href": "getting_started/index.html#adding-more-elements",
-    "title": "Getting Started Tutorial",
-    "section": "2. Adding more elements",
-    "text": "2. Adding more elements\nNow that we’re getting the hang of it, lets create a couple more.\nfrom pyllments.elements import LLMChatElement, HistoryHandlerElement\n\n1llm_chat_el = LLMChatElement(model_name='gpt-4o')\n2history_handler_el = HistoryHandlerElement(\n    history_token_limit=1000, \n    tokenizer_model='gpt-4o'\n)\n\n1\n\nCreate an instance of the LLMChatElement with the model name set to ‘gpt-4o’. LLMChatElement uses the LiteLLM naming system and is compatible with the chat models supported by LiteLLM. All you need is the corresponding API key in an .env file.\n\n2\n\nCreate an instance of the HistoryHandlerElement with the token limit set to 1000 tokens as measured by the gpt-4o tokenizer. This is the default tokenizer used and can be expected to be a good enough estimate for most use cases."
+    "objectID": "elements/HistoryHandlerElement/index.html",
+    "href": "elements/HistoryHandlerElement/index.html",
+    "title": "HistoryHandlerElement",
+    "section": "",
+    "text": "This element is responsible for assembling and managing the chat history and context for downstream elements. It handles incoming messages and tool responses, optionally persists them to a SQLite database, and emits the current context for use by other elements in the flow. The token limits are set upon instantiation, and will determine the size of the context window as well as the amount of messages kept in the history from which that context history is assembled from.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "HistoryHandlerElement"
+    ]
   },
   {
-    "objectID": "getting_started/index.html#your-first-flow",
-    "href": "getting_started/index.html#your-first-flow",
-    "title": "Getting Started Tutorial",
-    "section": "3. Your first flow",
-    "text": "3. Your first flow\nLets take a moment to think about what we want to achieve. We are creating a chat interface which uses an LLM to respond to message while also taking into account the history of the conversation.\nBelow, you can see that each individual element has its own unique set of input and output ports as well as a designated Payload type it either emits or receives. In this case, we’re only using the MessagePayload and List[MessagePayload] types. For an output port to connect to an input port, its payload type must be compatible with the input port’s payload type.\nFor the HistoryHandlerElement to connect to the LLMChatElement, the messages_emit_input port of the LLMChatElement must be able to accept a List[MessagePayload] type.\n\n\n\nFlow Diagram\n\n\nTo facilitate the proper communication between the elements:\n\nWhen we type a message into the ChatInterfaceElement and hit send, it emits a MessagePayload through the message_output port.\nThat message is recieved by the HistoryHandlerElement through the message_emit_input port.\nThe _emit_input suffix specifies that upon recieving a payload, HistoryHandlerElement will emit a payload. The list of MessagePayloads that is emitted from the messages_output port consists of the message history stored internally with the latest MessagePayload appended at the end of that list.\nWhen the LLMChatElement recieves a List[MessagePayload] through the messages_emit_input port, it sends the list of messages to the LLM we previously specified and returns a MessagePayload through the message_output port.\nThe first input port that the MessagePayload is received by is the messages_input port of the HistoryHandlerElement, which unlike the message_emit_input port, does not emit any payload, it instead only appends the MessagePayload to the internal message history.\nThe second input that the MessagePayload is received by is the message_input port of the ChatInterfaceElement, which causes the message to be streamed to the chatfeed we will soon see."
+    "objectID": "elements/HistoryHandlerElement/index.html#instantiation",
+    "href": "elements/HistoryHandlerElement/index.html#instantiation",
+    "title": "HistoryHandlerElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\nshow_tool_responses: bool = False Whether to include tool response payload views in the context view. persist: bool = False Whether to persist messages and tool responses to a SQLite database. db_path: str = None Custom path for the history database file (optional when persist=True). Should be higher than the history_token_limit. history_token_limit: int = 32000 The max number of tokens to keep in the history. context_token_limit: int = 16000 The max number of tokens to include in the context window. tokenizer_model: str = 'gpt-4o' The tokenizer model to use for token length estimation. (Using tiktoken)\n\nInput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nmessage_emit_input\nMessagePayload\nLoads the message into history and emits the current context payload.\n\n\nmessages_input\nMessagePayload | list[MessagePayload]\nLoads one or more messages into history without emitting.\n\n\ntool_response_emit_input\nToolsResponsePayload\nLoads the tool response into history and emits the current context payload.\n\n\ntools_responses_input\nToolsResponsePayload | list[ToolsResponsePayload]\nLoads one or more tool responses into history without emitting.\n\n\n\n\n\nOutput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nmessage_history_output\nList[MessagePayload]\nEmits a list of MessagePayload representing the current context.\n\n\n\n\n\nViews\n(See here for styling options)\n\n\n\n\n\n\n\n\nView Name\nDescription\nImage\n\n\n\n\ncontext_view\nDisplays a column of message and optional tool response history entries.Args:title: str = 'Current History'The header text shown above the history container.column_css: list = []CSS stylesheets for the main column layout.container_css: list = []CSS stylesheets for the scrollable context container.title_css: list = []CSS stylesheets for the title Markdown pane.title_visible: bool = TrueWhether the title header is visible.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "HistoryHandlerElement"
+    ]
   },
   {
-    "objectID": "getting_started/index.html#connecting-the-elements",
-    "href": "getting_started/index.html#connecting-the-elements",
-    "title": "Getting Started Tutorial",
-    "section": "4. Connecting the elements",
-    "text": "4. Connecting the elements\nNow that we have a flow in mind, connecting the elements is a breeze.\nchat_interface_el.ports.message_output &gt; history_handler_el.ports.message_emit_input\n\nhistory_handler_el.ports.messages_output &gt; llm_chat_el.ports.messages_emit_input\n\nllm_chat_el.ports.message_output &gt; history_handler_el.ports.messages_input\n\nllm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_input\nThe ports are accessed using dot notation on the ports attribute of the element. In the case of llm_chat_el.ports.message_output &gt; chat_interface_el.ports.message_input, we are connecting an output port of the LLMChatElement to an input port of the ChatInterfaceElement using the &gt; operator, with the output port being on the left side of it. It is equivalent to llm_chat_el.ports.message_output.connect(chat_interface_el.ports.message_input)."
+    "objectID": "elements/StructuredRouterTransformer/index.html",
+    "href": "elements/StructuredRouterTransformer/index.html",
+    "title": "StructuredRouterTransformer",
+    "section": "",
+    "text": "At a high level, the purpose of this element is twofold. Firstly, it dynamically generates a JSON schema for an LLM to follow, and secondly, it handles the resulting structured data by routing it(and optionally transforming it) out of the desired ports.\nBy using a routing_map, it:\nIt leverages the FlowController for port management and routing logic.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "StructuredRouterTransformer"
+    ]
   },
   {
-    "objectID": "getting_started/index.html#testing-your-flow",
-    "href": "getting_started/index.html#testing-your-flow",
-    "title": "Getting Started Tutorial",
-    "section": "5. Testing your flow",
-    "text": "5. Testing your flow"
+    "objectID": "elements/StructuredRouterTransformer/index.html#instantiation",
+    "href": "elements/StructuredRouterTransformer/index.html#instantiation",
+    "title": "StructuredRouterTransformer",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\nrouting_map: dict Mapping of route names to configuration dicts. Each dict may include the following keys: outputs: dictMapping of field names to spec dicts. schema: dictEither {'pydantic_model': type} for static schemas or {'ports': [InputPort]} for dynamic updates. ports: list[InputPort]InputPort instances to emit each field value. payload_type: type, optionalPayload class for emission (defaults to StructuredPayload). transform: callable, optionalAccepts raw field value and returns a Payload.\nExample:\nfrom typing import Literal\nfrom pydantic import BaseModel\nfrom pyllments.elements import StructuredRouterTransformer\nfrom pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload\n\n# Optional override of the generated schema\nclass OverrideSchema(BaseModel):\n    route: Literal['override']\n    override_data: str\n\nsrt = StructuredRouterTransformer(\n    routing_map={\n        'reply': {\n            'outputs': {\n                'content': {\n                    'schema': {'pydantic_model': str},  # static schema without schema input port\n                    'ports': [chat_interface_el.ports.message_input],\n                    'transform': lambda text: MessagePayload(content=text, role='assistant')\n                }\n            }\n        },\n        'dynamic': {\n            'outputs': {\n                'value': {\n                    'schema': {'ports': [schema_provider_el.ports.schema_output]},  # dynamic schema via SchemaPayload\n                    'ports': [consumer_el.ports.value_input],\n                    'payload_type': StructuredPayload\n                }\n            }\n        },\n        'simple': {\n            'outputs': {\n                'number': {\n                    'schema': {'pydantic_model': int},    # direct Pydantic type\n                    'ports': [number_consumer_el.ports.number_input]\n                }\n            }\n        }\n    },\n    incoming_output_port=llm_el.ports.output['message_output'],\n    pydantic_model=OverrideSchema\n)\nNote on schema spec:\n- You can supply schema as a direct pydantic_model (no schema input port created).\n- Or specify schema with ports: [InputPort] to receive schema updates at runtime.\n- The schema input port always accepts SchemaPayload by default.\nincoming_output_port: OutputPort, optional Port to receive upstream MessagePayload JSON input (defaults to message_input).\nflow_controller: FlowController, optional Custom flow controller for routing and port management.\npydantic_model: BaseModel Generated unified model for JSON input validation.\n\nInput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nmessage_input\nMessagePayload\nReceives a JSON payload containing a route and data fields to parse and dispatch.\n\n\n&lt;route&gt;_&lt;field&gt;_schema_input\nSchemaPayload\nReceives SchemaPayload updates for the specified field; rebuilds the internal schema.\n\n\n\n\n\nGenerated Output Ports\nFor each route defined in the routing_map and for each field under that route’s outputs, the element automatically creates an output port named &lt;route&gt;_&lt;field&gt;. When a JSON message arrives on the message_input port:\n\nThe transformer parses the message and validates it against its pydantic_model.\nIt reads the route discriminator and looks up the corresponding outputs spec.\nFor each field in that outputs spec:\n\nIt extracts the field value from the validated object.\nIf a transform function is provided, applies it to the value to produce a payload.\nOtherwise, wraps the raw value in StructuredPayload.\nEmits the resulting payload on the &lt;route&gt;_&lt;field&gt; port.\n\n\nYou can connect multiple downstream input ports to each of these output ports, and all will receive the payload when it is emitted.\n\n\nOutput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\n&lt;route&gt;_&lt;field&gt;\nStructuredPayload (default) or Payload via transform\nEmits the field value packaged as a payload; you can connect multiple input ports to this output, and all will receive the payload. For StructuredPayload, access raw data via .model.data.\n\n\nschema_output\nSchemaPayload\nEmits the unified Pydantic schema when it changes; consumers can connect to receive updated schemas.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "StructuredRouterTransformer"
+    ]
   },
   {
-    "objectID": "getting_started/index.html#deploying-your-flow",
-    "href": "getting_started/index.html#deploying-your-flow",
-    "title": "Getting Started Tutorial",
-    "section": "6. Deploying your flow",
-    "text": "6. Deploying your flow"
+    "objectID": "elements/StructuredRouterTransformer/index.html#data-and-schema-structures",
+    "href": "elements/StructuredRouterTransformer/index.html#data-and-schema-structures",
+    "title": "StructuredRouterTransformer",
+    "section": "Data and Schema Structures",
+    "text": "Data and Schema Structures\n\nMessage Structure\nThe element receives a MessagePayload whose model.content is a JSON string matching the generated Pydantic schema. The expected JSON format is:\n{\n  \"route\": \"&lt;route_name&gt;\",\n  \"&lt;field1&gt;\": &lt;value1&gt;,\n  \"&lt;field2&gt;\": &lt;value2&gt;,\n  ...\n}\n\n&lt;route_name&gt; must be one of the keys in routing_map.\nSubsequent fields correspond to the names defined under routing_map[route]['outputs'] and will be validated by Pydantic.\n\n\n\nSchema Input Payload (&lt;route&gt;_&lt;field&gt;_schema_input)\nTo update a field’s schema at runtime, send a SchemaPayload with a Pydantic model:\nfrom pyllments.payloads.schema import SchemaPayload\n\nnew_schema = SchemaPayload(schema=CustomFieldModel)\nsrt.ports.reply_content_schema_input &gt; schema_provider_el.ports.schema_output\n\nCustomFieldModel must inherit from pydantic.BaseModel or RootModel.\nUpon receipt, the element rebuilds the unified pydantic_model including this update.\n\n\n\nSchema Output Payload (schema_output)\nThe element emits its unified pydantic_model whenever it changes via a SchemaPayload on schema_output:\n\npayload.model.schema is the Pydantic RootModel class representing the union of all routes.\nYou can call .model_json_schema() on this class to get the JSON Schema dictionary.\n\n\n\nStructuredPayload Data\nFor output ports without a custom transform, the element wraps field values in StructuredPayload:\nfrom pyllments.payloads.structured import StructuredPayload\n\npayload = StructuredPayload(data={\"tools\": [\"a\",\"b\"]})\nprint(payload.model.data)  # {'tools': ['a', 'b']}\n\n.model.data holds the raw Python object validated by Pydantic.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "StructuredRouterTransformer"
+    ]
+  },
+  {
+    "objectID": "elements/StructuredRouterTransformer/index.html#routing-map-generated-schema",
+    "href": "elements/StructuredRouterTransformer/index.html#routing-map-generated-schema",
+    "title": "StructuredRouterTransformer",
+    "section": "Routing Map & Generated Schema",
+    "text": "Routing Map & Generated Schema\nThis element dynamically builds a Pydantic union model from your routing_map. Below is an example mapping (taken from the mcp_flow.py recipe) and the corresponding JSON Schema snippet it produces.\n\nExample routing_map\nfrom pyllments.elements import StructuredRouterTransformer\nfrom pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload\n\nstructured_router_el = StructuredRouterTransformer(\n    routing_map={\n        'reply': {\n            'description': 'Send a chat reply back to the user',\n            'outputs': {\n                'message': {\n                    'description': 'The assistant's textual response',\n                    'schema': {'pydantic_model': str},\n                    'ports': [chat_interface_el.ports.message_input],\n                    'transform': lambda txt: MessagePayload(content=txt, role='assistant')\n                }\n            }\n        },\n        'tools': {\n            'description': 'Tools invocation route',\n            'outputs': {\n                'tools': {\n                    'description': 'Which tools to call',\n                    'schema': {'payload_type': SchemaPayload},\n                    'payload_type': StructuredPayload\n                }\n            }\n        }\n    }\n)\n\n\nExample Generated JSON Schema\n{\n  \"$defs\": {\n    \"reply_route\": {\n      \"title\": \"reply_route\",\n      \"description\": \"Send a chat reply back to the user\",\n      \"type\": \"object\",\n      \"properties\": {\n        \"route\": { \"type\": \"string\", \"const\": \"reply\" },\n        \"message\": {\n          \"type\": \"string\",\n          \"description\": \"The assistant's textual response\"\n        }\n      },\n      \"required\": [\"route\", \"message\"]\n    },\n    \"tools_route\": {\n      \"title\": \"tools_route\",\n      \"description\": \"Tools invocation route\",\n      \"type\": \"object\",\n      \"properties\": {\n        \"route\": { \"type\": \"string\", \"const\": \"tools\" },\n        \"tools\": {\n          \"type\": \"array\",\n          \"items\": { \"type\": \"string\" },\n          \"description\": \"Which tools to call\"\n        }\n      },\n      \"required\": [\"route\", \"tools\"]\n    }\n  },\n  \"discriminator\": { \"propertyName\": \"route\" },\n  \"oneOf\": [\n    {\"$ref\": \"#/$defs/reply_route\"},\n    {\"$ref\": \"#/$defs/tools_route\"}\n  ],\n  \"type\": \"object\"\n}",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "StructuredRouterTransformer"
+    ]
+  },
+  {
+    "objectID": "elements/TelegramElement/index.html",
+    "href": "elements/TelegramElement/index.html",
+    "title": "TelegramElement",
+    "section": "",
+    "text": "The TelegramElement enables real-time chat interactions between a Telegram bot and users using Telethon. It handles authentication, incoming messages based on configurable criteria, and outgoing message sending.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "TelegramElement"
+    ]
+  },
+  {
+    "objectID": "elements/TelegramElement/index.html#instantiation",
+    "href": "elements/TelegramElement/index.html#instantiation",
+    "title": "TelegramElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\napp_id: str Telegram application ID. If not provided, loads from TELEGRAM_APP_ID env var.\napi_hash: str Telegram API hash. If not provided, loads from TELEGRAM_API_HASH env var.\nbot_token: str Telegram bot token for authentication. If not provided, loads from TELEGRAM_BOT_TOKEN env var.\nstart_message_with: Union[int, str], optional Chat ID or username to message upon startup.\non_message_criteria: callable, optional Function to filter incoming messages (default: only private chats). Receives a Telethon Message.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "TelegramElement"
+    ]
+  },
+  {
+    "objectID": "elements/TelegramElement/index.html#input-ports",
+    "href": "elements/TelegramElement/index.html#input-ports",
+    "title": "TelegramElement",
+    "section": "Input Ports",
+    "text": "Input Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nassistant_message_emit_input\nMessagePayload\nSends assistant-originated MessagePayloads to Telegram users via DM.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "TelegramElement"
+    ]
+  },
+  {
+    "objectID": "elements/TelegramElement/index.html#output-ports",
+    "href": "elements/TelegramElement/index.html#output-ports",
+    "title": "TelegramElement",
+    "section": "Output Ports",
+    "text": "Output Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\nuser_message_output\nMessagePayload\nEmits messages received from Telegram users.\n\n\nassistant_message_output\nMessagePayload\nEmits messages sent by the assistant.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "TelegramElement"
+    ]
+  },
+  {
+    "objectID": "elements/MCPElement/index.html",
+    "href": "elements/MCPElement/index.html",
+    "title": "MCPElement",
+    "section": "",
+    "text": "The purpose of this Element is to enable agentic capabilities when coupled with LLMs. It facilitates tool invocation via the Model Context Protocol (MCP). It can start and manage MCP servers (e.g., script-based or SSE servers), wrap Python functions as tools, and expose Pydantic schemas for tool arguments. When receiving a StructuredPayload containing the tool names and arguments, it emits a ToolResponsePayload containing the callbacks for the chosen tools to run, as well other metadata related to the tool call. Because it expects structured input, it also has the capacity to send out a pydantic schema containing the exact format it expects, along with the tool names and expected arguments.",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "MCPElement"
+    ]
+  },
+  {
+    "objectID": "elements/MCPElement/index.html#instantiation",
+    "href": "elements/MCPElement/index.html#instantiation",
+    "title": "MCPElement",
+    "section": "Instantiation",
+    "text": "Instantiation\nArguments:\nmcps: dict A mapping of server names to MCP configurations. Each configuration dict may include the following keys: type: strProtocol type; one of ‘script’, ‘sse’, ‘mcp_class’, or ‘functions’. script: str (optional)Path to the script for ‘script’ type servers. command: str (optional)Executable to run the script (defaults to the Python interpreter). args: list[str] (optional)Command-line arguments for the script. env: dict (optional)Environment variables for the subprocess. host: str (optional)Host address for ‘sse’ type servers. port: int (optional)Port number for ‘sse’ type servers. tools: dict[str, Callable] (optional)Mapping of function names to Python callables for ‘functions’ type. tools_requiring_permission: list[str] (optional)List of tool names that require user permission.\nExample:\nmcps = {\n    'todo': {\n        'type': 'script',\n        'script': 'todo_server.py',\n        'command': 'python',\n        'args': ['--logging'],\n        'env': {'API_KEY': 'xyz'},\n        'tools_requiring_permission': ['remove_todo']\n    },\n    'weather': {\n        'type': 'sse',\n        'host': 'localhost',\n        'port': 1234\n    },\n    'custom_funcs': {\n        'type': 'functions',\n        'tools': {\n            'calculate': calculate,\n            'get_current_time': get_current_time\n        },\n        'tools_requiring_permission': ['calculate']\n    }\n}\nloop: Any, optional The asyncio event loop to use for setup. Defaults to the main loop from LoopRegistry.\n\nInput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\ntool_request_structured_input\nStructuredPayload\nReceives a Payload whose model.data is a list of dicts, each containing:name: str — hybrid tool name.parameters: dict — tool arguments (optional).Example:[{‘name’: ‘todo_add’, ‘parameters’: {‘task’: ‘Buy milk’}}, {‘name’: ‘weather_get’, ‘parameters’: {‘city’: ‘SF’}}]Unpacks and forwards these entries to tools_response_output.\n\n\n\n\n\nOutput Ports\n\n\n\n\n\n\n\n\nPort Name\nPayload Type\nBehavior\n\n\n\n\ntools_schema_output\nSchemaPayload\nEmits a SchemaPayload containing the Pydantic schema for available tools.\n\n\ntools_response_output\nToolsResponsePayload\nEmits a ToolsResponsePayload containing tool results mapping tool names to their responses.Example:{ ‘weather_temp_mcp’: { ‘mcp_name’: ‘weather_mcp’, ‘tool_name’: ‘temp’, ‘permission_required’: False, ‘description’: ‘Get the temperature in a location’, ‘parameters’: {‘location’: ‘San Francisco’}, ‘response’: { ‘meta’: None, ‘content’: [{ ‘type’: ‘text’, ‘text’: ‘The temperature is 54F.’, ‘annotations’: None }], ‘isError’: False } }}&lt;",
+    "crumbs": [
+      "Getting Started",
+      "🧩 Elements",
+      "MCPElement"
+    ]
   }
 ]
