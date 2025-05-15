@@ -1,1 +1,1 @@
-Sitemap: https://docs.prudentpatterns.com/sitemap.xml
+Sitemap: https://docs.pyllments.com/sitemap.xml

@@ -1,8 +1,23 @@
 [
   {
+    "listing": "/elements/index.html",
+    "items": [
+      "/elements/APIElement/index.html",
+      "/elements/ChatInterfaceElement/index.html",
+      "/elements/ContextBuilderElement.html",
+      "/elements/DiscordElement/index.html",
+      "/elements/HistoryHandlerElement/index.html",
+      "/elements/LLMChatElement/index.html",
+      "/elements/MCPElement/index.html",
+      "/elements/PipeElement/index.html",
+      "/elements/StructuredRouterTransformer/index.html",
+      "/elements/TelegramElement/index.html"
+    ]
+  },
+  {
     "listing": "/recipes/index.html",
     "items": [
-      "/recipes/branch_flow/index.html",
+      "/recipes/branch_chat/index.html",
       "/recipes/chat/index.html",
       "/recipes/discord_chat/index.html",
       "/recipes/multi_chat_flow.html",

@@ -66,6 +66,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
 <link href="..//assets/logo/pyllments_logo_32.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-listing/list.min.js"></script>
+<script src="../site_libs/quarto-listing/quarto-listing.js"></script>
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../site_libs/quarto-html/popper.min.js"></script>
@@ -102,6 +104,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
+<script>
+
+  window.document.addEventListener("DOMContentLoaded", function (_event) {
+    const listingTargetEl = window.document.querySelector('#listing-elements-listing .list');
+    if (!listingTargetEl) {
+      // No listing discovered, do not attach.
+      return; 
+    }
+
+    const options = {
+      valueNames: ['listing-title','listing-description',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-title-sort'] }],
+      
+      searchColumns: ["listing-title","listing-author"],
+    };
+
+    window['quarto-listings'] = window['quarto-listings'] || {};
+    window['quarto-listings']['listing-elements-listing'] = new List('listing-elements-listing', options);
+
+    if (window['quarto-listing-loaded']) {
+      window['quarto-listing-loaded']();
+    }
+  });
+
+  window.addEventListener('hashchange',() => {
+    if (window['quarto-listing-loaded']) {
+      window['quarto-listing-loaded']();
+    }
+  })
+  </script>
 <script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
@@ -122,6 +153,35 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 <link rel="stylesheet" href="../styles.css">
 </head>
@@ -180,7 +240,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">🧩 Elements</li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../elements/index.html">🧩 Elements</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -241,7 +301,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+            <a href="../elements/index.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">🧩 Elements</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -374,7 +434,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+  <a href="../recipes/branch_chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
@@ -416,6 +476,127 @@ document.addEventListener("DOMContentLoaded", function() {
 </header>
 
 
+<div id="listing-elements-listing" class="quarto-listing quarto-listing-container-table">
+<table class="quarto-listing-table table">
+<thead>
+<tr>
+
+<th>
+Title
+</th>
+
+<th>
+Description
+</th>
+
+</tr>
+</thead>
+<tbody class="list">
+
+<tr data-index="0" data-listing-file-modified-sort="1747347052812" data-listing-reading-time-sort="6" data-listing-word-count-sort="1115" data-listing-title-sort="APIElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/APIElement/index.html" class="title listing-title">APIElement</a>
+</td>
+<td>
+<span class="listing-description">This element allows you to define a FastAPI endpoint that responds to a request, structure the type of payload it passes into your flow, and then extract the information…</span>
+</td>
+
+</tr>
+
+<tr data-index="1" data-listing-file-modified-sort="1747347052812" data-listing-reading-time-sort="6" data-listing-word-count-sort="1063" data-listing-title-sort="ChatInterfaceElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/ChatInterfaceElement/index.html" class="title listing-title">ChatInterfaceElement</a>
+</td>
+<td>
+<span class="listing-description">This element is the backbone of flows involving user interaction through the browser by offering multiple Views you are able to compose to create your chat interface…</span>
+</td>
+
+</tr>
+
+<tr data-index="2" data-listing-file-modified-sort="1747347052812" data-listing-reading-time-sort="7" data-listing-word-count-sort="1295" data-listing-title-sort="ContextBuilderElement" data-listing-filename-sort="ContextBuilderElement.qmd">
+<td>
+<a href="../elements/ContextBuilderElement.html" class="title listing-title">ContextBuilderElement</a>
+</td>
+<td>
+<span class="listing-description">The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different…</span>
+</td>
+
+</tr>
+
+<tr data-index="3" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="2" data-listing-word-count-sort="348" data-listing-title-sort="DiscordElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/DiscordElement/index.html" class="title listing-title">DiscordElement</a>
+</td>
+<td>
+<span class="listing-description">The <code>DiscordElement</code> enables real-time direct-message interactions between a Discord bot and users. It uses a <code>DiscordModel</code> to authenticate and listen for incoming messages…<code></code></span>
+</td>
+
+</tr>
+
+<tr data-index="4" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="5" data-listing-word-count-sort="902" data-listing-title-sort="HistoryHandlerElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/HistoryHandlerElement/index.html" class="title listing-title">HistoryHandlerElement</a>
+</td>
+<td>
+<span class="listing-description">This element is responsible for assembling and managing the chat history and context for downstream elements. It handles incoming messages and tool responses, optionally…</span>
+</td>
+
+</tr>
+
+<tr data-index="5" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="3" data-listing-word-count-sort="587" data-listing-title-sort="LLMChatElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/LLMChatElement/index.html" class="title listing-title">LLMChatElement</a>
+</td>
+<td>
+<span class="listing-description">The <code>LLMChatElement</code> is a core component for integrating Large Language Models (LLMs) into chat applications. It handles the communication with LLM providers and generates…<code></code><code></code></span>
+</td>
+
+</tr>
+
+<tr data-index="6" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="5" data-listing-word-count-sort="862" data-listing-title-sort="MCPElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/MCPElement/index.html" class="title listing-title">MCPElement</a>
+</td>
+<td>
+<span class="listing-description">The purpose of this Element is to enable agentic capabilities when coupled with LLMs. It facilitates tool invocation via the Model Context Protocol (MCP). It can start and…<code></code><code></code></span>
+</td>
+
+</tr>
+
+<tr data-index="7" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="3" data-listing-word-count-sort="409" data-listing-title-sort="PipeElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/PipeElement/index.html" class="title listing-title">PipeElement</a>
+</td>
+<td>
+<span class="listing-description">The <code>PipeElement</code> is a utility Element for testing and debugging pyllments flows by capturing and emitting arbitrary payloads. It can function as:</span>
+</td>
+
+</tr>
+
+<tr data-index="8" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="12" data-listing-word-count-sort="2279" data-listing-title-sort="StructuredRouterTransformer" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/StructuredRouterTransformer/index.html" class="title listing-title">StructuredRouterTransformer</a>
+</td>
+<td>
+<span class="listing-description">At a high level, the purpose of this element is twofold. Firstly, it dynamically generates a JSON schema for an LLM to follow, and secondly, it handles the resulting…</span>
+</td>
+
+</tr>
+
+<tr data-index="9" data-listing-file-modified-sort="1747347052813" data-listing-reading-time-sort="2" data-listing-word-count-sort="388" data-listing-title-sort="TelegramElement" data-listing-filename-sort="index.qmd">
+<td>
+<a href="../elements/TelegramElement/index.html" class="title listing-title">TelegramElement</a>
+</td>
+<td>
+<span class="listing-description">The <code>TelegramElement</code> enables real-time chat interactions between a Telegram bot and users using Telethon. It handles authentication, incoming messages based on configurable…</span>
+</td>
+
+</tr>
+
+</tbody>
+</table>
+<div class="listing-no-matching d-none">No matching items</div>
+</div>
 <p>An Element is the eponymous unit of Pyllments that is behind its modularity, composability, and extensibility.</p>
 <p>Each Element is self-contained, and offers a straightfoward and predictable interface for connecting to other Elements. At its core, it is composed of a Model which handles its business logic, and a set of Ports which handle its connectivity. Some elements also contain optional Views, which you are free to compose to generate a GUI.</p>
 <p>Generally speaking, a Payload arrives at one of the Element’s input ports, and in reaction to this, the Element does <strong>something</strong> depending on its intended functionality. It could absorb the Payload, and change its state while not proceeding any further, or it can emit another payload after some processing.</p>
@@ -426,6 +607,7 @@ document.addEventListener("DOMContentLoaded", function() {
 <p>The <code>LLMChatElement</code> receives the MessagePayload, and uses it to create and emit a <code>MessagePayload</code> in return. This is indicated by the <code>_emit_input</code> suffix. It tells us that when this port received a Payload, it will also be reactively emitting something. This naming convention helps us grok the flow of data throughout the program.</p>
 <p>And as we can see, the <code>LLMChatElement</code> is emitting a <code>MessagePayload</code> in return, which is captured by the <code>message_input</code> port of the <code>ChatInterfaceElement</code>, which is meant to receive a <code>MessagePayload</code> and stream it into the chat feed.</p>
 <p>The Model of the <code>ChatInterfaceElement</code> is handling the storage of the received payloads, and the outer Element class is handling the integration of the Model, Ports, and Views.</p>
+
 
 
 
@@ -502,7 +684,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/docs\.prudentpatterns\.com");
+        var filterRegex = new RegExp("https:\/\/docs\.pyllments\.com");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

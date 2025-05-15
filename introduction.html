@@ -206,7 +206,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+            <a href="./elements/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🧩 Elements</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -339,7 +339,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+  <a href="./recipes/branch_chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
@@ -458,7 +458,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/docs\.prudentpatterns\.com");
+        var filterRegex = new RegExp("https:\/\/docs\.pyllments\.com");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

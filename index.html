@@ -6,6 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="description" content="Build Modular, LLM-Powered Applications with Ease.">
 
 <title>Pyllments Documentation</title>
 <style>
@@ -76,6 +77,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-45c2526ed84a0312490eb0414fac66ad.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
+<script src="site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -102,9 +106,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
-<script src="site_libs/quarto-diagram/mermaid.min.js"></script>
-<script src="site_libs/quarto-diagram/mermaid-init.js"></script>
-<link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 <script src="https://unpkg.com/powerglitch@latest/dist/powerglitch.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
@@ -244,7 +245,7 @@ document.addEventListener("DOMContentLoaded", function() {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+            <a href="./elements/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">🧩 Elements</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
@@ -377,7 +378,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./recipes/branch_flow/index.html" class="sidebar-item-text sidebar-link">
+  <a href="./recipes/branch_chat/index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Branching Chat Flow</span></a>
   </div>
 </li>
@@ -446,8 +447,8 @@ LLM + vDB Integrations
 </section>
 </div>
 <p>Pyllments consists of a set of <strong>Elements</strong> with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.</p>
-<p>Pyllments comes with a set of pre-built parameterized application you can run immediately from the command line like so:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pyllments</span> recipe run branch_flow <span class="at">--height</span> 900 <span class="at">--width</span> 700</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>It comes prepackaged with a set of parameterized application you can run immediately from the command line like so:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pyllments</span> recipe run branch_chat <span class="at">--height</span> 900 <span class="at">--width</span> 700</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p><a href="recipes">See Recipes Here</a></p>
 <section id="elements" class="level4">
 <h4 class="anchored" data-anchor-id="elements">Elements:</h4>
@@ -457,6 +458,122 @@ LLM + vDB Integrations
 <li>Can individually or in a flow be served as an API (with limitless endpoints at any given part of the flow)</li>
 </ul>
 </section>
+<section id="chat-app-example" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="chat-app-example">Chat App Example</h2>
+<section id="with-history-a-custom-system-prompt-and-an-interface." class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="with-history-a-custom-system-prompt-and-an-interface.">With history, a custom system prompt, and an interface.</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="assets/introduction/intro_example_flow.jpg" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Chat Flow (Click to Enlarge)"><img src="assets/introduction/intro_example_flow.jpg" class="img-fluid figure-img" alt="Chat Flow (Click to Enlarge)"></a></p>
+<figcaption>Chat Flow (Click to Enlarge)</figcaption>
+</figure>
+</div>
+<div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
+<video autoplay="" loop="" muted="" playsinline="" style="display: block; max-width: 100%; margin: 0 auto;" playbackrate="1">
+<source src="assets/introduction/intro_flow.mp4" type="video/mp4">
+</video>
+<button class="custom-play-button" style="
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 3rem;
+padding: 1rem 1.6rem;
+color: white;
+background: rgba(22, 32, 48, 0.5);
+border: 1px solid #D33A4B;
+border-radius: 30%;
+cursor: pointer;
+z-index: 2;">
+▷
+</button>
+</div>
+<p>In this example, we’ll build a simple chat application using four core Elements from the Pyllments library. Elements are modular components that handle specific functions and connect via ports to form a data flow graph.</p>
+<ol type="1">
+<li><p><strong>ChatInterfaceElement</strong><br>
+Manages the chat GUI, including the input box for typing messages, a send button, and a feed to display the conversation. It emits user messages and renders incoming responses.</p></li>
+<li><p><strong>HistoryHandlerElement</strong><br>
+Maintains a running log of all messages (user and assistant) and tool responses. It can emit the current message history to be used as context for the LLM.</p></li>
+<li><p><strong>ContextBuilderElement</strong><br>
+Combines multiple inputs into a structured list of messages for the LLM. This includes a predefined system prompt (e.g., setting the AI’s personality), the conversation history, and the latest user query.</p></li>
+<li><p><strong>LLMChatElement</strong><br>
+Connects to a Large Language Model (LLM) provider, sends the prepared message list, and generates a response. It also offers a selector to choose different models or providers.</p></li>
+</ol>
+<p>Here’s what happens step by step in the chat flow:</p>
+<ol type="1">
+<li><strong>User Input</strong>: You type a message in the <code>ChatInterfaceElement</code> and click send. This creates a <code>MessagePayload</code> with your text and the role ‘user’.<br>
+</li>
+<li><strong>History Update</strong>: Your message is sent via a port to the <code>HistoryHandlerElement</code>, which adds it to the conversation log.<br>
+</li>
+<li><strong>Context Building</strong>: The <code>ContextBuilderElement</code> receives your message and constructs the full context. It combines:
+<ul>
+<li>A fixed system prompt (e.g., “You are Marvin, a Paranoid Android.”),<br>
+</li>
+<li>The message history from <code>HistoryHandlerElement</code> (if available, up to a token limit),<br>
+</li>
+<li>Your latest query.<br>
+</li>
+</ul></li>
+<li><strong>LLM Request</strong>: This combined list is sent through a port to the <code>LLMChatElement</code>, which forwards it to the selected LLM (like OpenAI’s GPT-4o-mini).<br>
+</li>
+<li><strong>Response Handling</strong>: The LLM’s reply is packaged as a new <code>MessagePayload</code> with the role ‘assistant’ and sent back to the <code>ChatInterfaceElement</code> to be displayed in the chat feed.<br>
+</li>
+<li><strong>History Update (Again)</strong>: The assistant’s response is also sent to the <code>HistoryHandlerElement</code>, updating the log for the next interaction.<br>
+</li>
+<li><strong>Cycle Repeats</strong>: The process loops for each new user message, building context anew each time.</li>
+</ol>
+<p><strong>chat_flow.py</strong></p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyllments <span class="im">import</span> flow</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyllments.elements <span class="im">import</span> ChatInterfaceElement, LLMChatElement, HistoryHandlerElement</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Instantiate the elements</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>chat_interface_el <span class="op">=</span> ChatInterfaceElement()</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>llm_chat_el <span class="op">=</span> LLMChatElement()</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>history_handler_el <span class="op">=</span> HistoryHandlerElement(history_token_limit<span class="op">=</span><span class="dv">3000</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>context_builder_el <span class="op">=</span> ContextBuilderElement(</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    input_map<span class="op">=</span>{</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">'system_prompt_constant'</span>: {</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>            <span class="st">'role'</span>: <span class="st">"system"</span>,</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>            <span class="st">'message'</span>: <span class="st">"You are Marvin, a Paranoid Android."</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        },</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">'history'</span>: {<span class="st">'ports'</span>: [history_handler_el.ports.message_history_output]},</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">'query'</span>: {<span class="st">'ports'</span>: [chat_interface_el.ports.user_message_output]},</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    emit_order<span class="op">=</span>[<span class="st">'system_prompt_constant'</span>, <span class="st">'[history]'</span>, <span class="st">'query'</span>]</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Connect the elements</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>chat_interface_el.ports.user_message_output <span class="op">&gt;</span> history_handler_el.ports.message_input</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>context_builder_el.ports.messages_output <span class="op">&gt;</span> llm_chat_el.ports.messages_input</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>llm_chat_el.ports.message_output <span class="op">&gt;</span> chat_interface_el.ports.message_emit_input</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>chat_interface_el.ports.assistant_message_output <span class="op">&gt;</span> history_handler_el.ports.message_emit_input</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the visual elements and wrap with @flow decorator to serve with pyllments</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="at">@flow</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> interface():</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    width <span class="op">=</span> <span class="dv">950</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    height <span class="op">=</span> <span class="dv">800</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    interface_view <span class="op">=</span> chat_interface_el.create_interface_view(width<span class="op">=</span><span class="bu">int</span>(width<span class="op">*</span><span class="fl">.75</span>))</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    model_selector_view <span class="op">=</span> llm_chat_el.create_model_selector_view(</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        models<span class="op">=</span>config.custom_models, </span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span>config.default_model</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    history_view <span class="op">=</span> history_handler_el.create_context_view(width<span class="op">=</span><span class="bu">int</span>(width<span class="op">*</span><span class="fl">.25</span>))</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    main_view <span class="op">=</span> pn.Row(</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        pn.Column(</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>            model_selector_view,</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>            pn.Spacer(height<span class="op">=</span><span class="dv">10</span>),</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>            interface_view,</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        ),</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        pn.Spacer(width<span class="op">=</span><span class="dv">10</span>),</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        history_view,</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        styles<span class="op">=</span>{<span class="st">'width'</span>: <span class="st">'fit-content'</span>},</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        height<span class="op">=</span>height</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> main_view</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>CLI Command</strong></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pyllments</span> serve chat_flow.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>For more in-depth knowledge, check our <a href="getting_started">Getting Started Tutorial</a></p>
 <section id="elements-are-building-blocks-with-a-consistent-interface" class="level1 column-page">
 <h1>Elements are building blocks with a consistent interface</h1>
 </section>
@@ -549,61 +666,6 @@ cursor: pointer;
 z-index: 2;"> ▷ </button>
 </div>
 </div>
-<div class="cell" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class="figure"><p></p>
-<div>
-<pre class="mermaid mermaid-js">flowchart LR
-subgraph chat_interface_el [ChatInterfaceElement]
-  direction TB
-  subgraph chat_interface_el_views [Views]
-    direction LR
-    chatfeed_view:::View ~~~ chat_input_view:::View ~~~ send_button_view:::View
-  end
-  subgraph chat_interface_el_Ports [Ports]
-      direction LR
-      subgraph chat_interface_el_input [Input]
-          direction TB
-          message_input:::InputPort ~~~ message_emit_input:::InputPort
-      end
-      subgraph chat_interface_el_output [Output]
-          direction TB
-          message_output:::OutputPort
-      end
-      chat_interface_el_input ~~~ chat_interface_el_output
-  end
-  chat_interface_el_views ~~~ chat_interface_el_Ports
-end
-
-subgraph llm_chat_el [LLMChatElement]
-  direction TB
-  subgraph llm_Views [Views]
-    direction LR
-    model_selector_view:::View
-  end
-  subgraph llm_Ports [Ports]
-      direction LR
-      subgraph llm_chat_input [Input]
-          direction TB
-          messages_input:::InputPort
-      end
-      subgraph llm_chat_output [Output]
-          direction TB
-          llm_message_output[message_output]:::OutputPort
-      end
-      llm_chat_input ~~~ llm_chat_output
-  end
-  llm_Views ~~~ llm_Ports
-end
-
-message_output --MessagePayload--&gt; messages_input
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
 <p>Key Features:</p>
 <ul>
 <li><p>Modular Architecture: Build applications using interconnected Elements, each containing its own business logic and visualization components.</p></li>
@@ -649,7 +711,10 @@ video.pause();
 </script>
 
 
-</main></div>
+</section></section></main></div>
+
+
+
 
 
 
@@ -732,7 +797,7 @@ video.pause();
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/docs\.prudentpatterns\.com");
+        var filterRegex = new RegExp("https:\/\/docs\.pyllments\.com");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
@@ -1060,6 +1125,38 @@ video.pause();
   });
   </script>
  <!-- /content -->
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
 
 
 
