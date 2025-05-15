@@ -25,7 +25,7 @@ class Config:
         }
     )
     width: int = field(
-        default=800,
+        default=950,
         metadata={
             "help": "Overall width of the chat interface in pixels."
         }
@@ -100,16 +100,20 @@ chat_interface_el.ports.assistant_message_output > history_handler_el.ports.mess
 
 @flow
 def my_flow():
-    interface_view = chat_interface_el.create_interface_view(width=config.width, height=config.height) # type: ignore
+    interface_view = chat_interface_el.create_interface_view(width=int(config.width*.75))
     model_selector_view = llm_chat_el.create_model_selector_view(models=config.custom_models, model=config.default_model) # type: ignore
     # Add the history view to display past messages
-    # history_view = history_handler_el.create_context_view()
+    history_view = history_handler_el.create_context_view(width=int(config.width*.25))
 
-    main_view = pn.Column(
-        model_selector_view,
-        # history_view,
-        pn.Spacer(height=10),
-        interface_view,
-        styles={'width': 'fit-content'}
+    main_view = pn.Row(
+        pn.Column(
+            model_selector_view,
+            pn.Spacer(height=10),
+            interface_view,
+        ),
+        pn.Spacer(width=10),
+        history_view,
+        styles={'width': 'fit-content'},
+        height=config.height
     )
     return main_view

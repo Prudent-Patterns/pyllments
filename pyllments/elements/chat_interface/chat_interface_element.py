@@ -2,6 +2,7 @@ import asyncio
 from typing import Optional
 from venv import create
 
+from bokeh.palettes import Bright
 import panel as pn
 import param
 from loguru import logger
@@ -218,19 +219,17 @@ class ChatInterfaceElement(Element):
     @Component.view
     def create_interface_view(
         self,
-        height: int = 800,
         input_height: Optional[int] = 120,
         ) -> pn.Column:
         """Creates a column containing the chat feed and chat input row"""
-        margin_top = 10
         return pn.Column(
-            self.create_chatfeed_view(height=height - input_height - margin_top),
+            self.create_chatfeed_view(),
+            pn.Spacer(height=10),
             self.create_chat_input_row_view(
                 height=input_height,
-                margin=(margin_top, 0, 0, 0)
-                ),
-            height=height
-        )
+                margin=(0, 0, 0, 0)
+                )
+            )
     
     async def _on_send(self, event):
         """
