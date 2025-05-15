@@ -2,9 +2,8 @@ name: Publish Quarto Documentation as Part of Release
 on:
   push:
     tags:
-      - 'v*'
-    tags-ignore:
-      - 'docs-v*'
+      - 'v*'         # include all v-style releases
+      - '!docs-v*'   # explicitly exclude docs-v* tags
 jobs:
   quarto-publish:
     name: Build and Publish Quarto Documentation
