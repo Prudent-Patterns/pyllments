@@ -1,6 +1,20 @@
 ---
 title: "🧩 Elements"
+listing:
+    id: elements-listing   
+    contents:
+        - /*.qmd
+        - /*/*.qmd
+    fields:
+        - title
+        - description
+    type: table
+    filter-ui: false
+    sort-ui: false
 ---
+
+::: {#elements-listing}
+:::
 
 An Element is the eponymous unit of Pyllments that is behind its modularity, composability, and extensibility.
 

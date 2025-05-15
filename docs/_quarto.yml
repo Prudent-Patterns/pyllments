@@ -35,6 +35,7 @@ website:
       - section: "📋 How To"
         contents: how_to/*.qmd
       - section: "🧩 Elements"
+        href: elements/index.qmd
         contents:
           - auto: elements/*.qmd
           - auto: elements/*/*.qmd
