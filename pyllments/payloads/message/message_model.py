@@ -5,7 +5,7 @@ from loguru import logger
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 # from pyllments.common.tokenizers import get_token_len
 
 

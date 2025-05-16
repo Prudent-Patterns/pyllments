@@ -10,8 +10,8 @@ from loguru import logger
 
 from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive, log_connect
-from pyllments.common.loop_registry import LoopRegistry
-from pyllments.ports.lifecycle_manager import manager as lifecycle_manager
+from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 
 # Type variable for generic payload types
 T = TypeVar('T', bound=Payload)

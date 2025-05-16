@@ -1,6 +1,7 @@
 import asyncio
 from loguru import logger
 
+
 class LoopRegistry:
     """
     Singleton for managing the application-wide asyncio event loop.

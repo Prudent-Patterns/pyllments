@@ -6,7 +6,7 @@ from pyllments.elements import MCPElement, PipeElement
 from pyllments.payloads import StructuredPayload
 from pyllments.logging import setup_logging
 from loguru import logger
-from pyllments.common.loop_registry import LoopRegistry  # Import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry  # Import LoopRegistry
 setup_logging()
 
 # Helper function to run the loop

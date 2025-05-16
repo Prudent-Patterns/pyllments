@@ -10,7 +10,7 @@ from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from .history_handler_model import HistoryHandlerModel
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 
 # TODO: Allow support of other payload types

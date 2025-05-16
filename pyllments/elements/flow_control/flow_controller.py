@@ -7,7 +7,7 @@ import inspect  # for autodetecting the caller
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.ports.ports import InputPort, OutputPort, Ports
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 
 class FlowPort(param.Parameterized):

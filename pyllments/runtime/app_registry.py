@@ -2,7 +2,7 @@ from fastapi import FastAPI
 # Import necessary components
 from contextlib import asynccontextmanager
 from loguru import logger
-from pyllments.ports.lifecycle_manager import manager as lifecycle_manager
+from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 
 # Define the lifespan context manager
 @asynccontextmanager

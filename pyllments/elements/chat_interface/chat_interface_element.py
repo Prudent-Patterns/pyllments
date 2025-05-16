@@ -11,7 +11,7 @@ from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 class ChatInterfaceElement(Element):
     """

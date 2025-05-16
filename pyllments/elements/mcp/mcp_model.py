@@ -18,7 +18,8 @@ from mcp.client.stdio import stdio_client
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 
 # Wrapper to ensure our Python function calls return a Pydantic model with model_dump()
 class PythonToolResponse(BaseModel):
@@ -121,6 +122,8 @@ class MCPModel(Model):
         atexit.register(self._force_kill_processes)
         # Start async setup in background
         self.loop = LoopRegistry.get_loop()
+        # Register this model for automatic cleanup on shutdown
+        lifecycle_manager.register_resource(self)
         self._setup_task = self.loop.create_task(self.setup())
         self._setup_complete = False
 
@@ -338,7 +341,18 @@ class MCPModel(Model):
                                       stdout=subprocess.DEVNULL)
 
     async def close(self):
-        # Call this when you're done with the model
+        """Clean up MCPModel: exit context stack, kill processes, and shut down executor."""
+        # Exit async context (closes client sessions)
         await self.context_stack.__aexit__(None, None, None)
+        # Force kill any remaining child processes
+        try:
+            self._force_kill_processes()
+        except Exception as e:
+            self.logger.error(f"Error in force-kill processes: {e}")
+        # Shutdown thread pool executor
+        try:
+            self._executor.shutdown(wait=True)
+        except Exception as e:
+            self.logger.error(f"Error shutting down executor: {e}")
         
         

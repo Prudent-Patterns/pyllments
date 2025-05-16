@@ -3,7 +3,7 @@ import signal
 import weakref
 import atexit
 from loguru import logger
-from pyllments.common.loop_registry import LoopRegistry
+from .loop_registry import LoopRegistry
 
 class LifecycleManager:
     _instance = None
@@ -19,6 +19,8 @@ class LifecycleManager:
         if self._initialized:
             return
         self._active_output_ports = weakref.WeakSet()
+        # Track other shutdownable resources (models, executors, etc.)
+        self._active_resources = weakref.WeakSet()
         self._shutdown_started = asyncio.Event()
         self._install_signal_handlers()
         self._initialized = True
@@ -30,6 +32,11 @@ class LifecycleManager:
         """Register an OutputPort for cleanup."""
         logger.trace(f"Registering port {port.name} ({port.id}) for cleanup.")
         self._active_output_ports.add(port)
+
+    def register_resource(self, resource):
+        """Register a generic resource (model, executor, etc.) for cleanup."""
+        logger.trace(f"Registering resource {resource} for cleanup.")
+        self._active_resources.add(resource)
 
     def _signal_handler(self, sig):
         """Internal handler to trigger async shutdown."""
@@ -141,6 +148,24 @@ class LifecycleManager:
                 tasks.append(port.close())
             else:
                  logger.trace(f"Skipping already collected or invalid port reference.")
+
+        # Close other registered resources (models, executors, etc.)
+        resources_to_close = list(self._active_resources)
+        logger.trace(f"Closing {len(resources_to_close)} active resources...")
+        for resource in resources_to_close:
+            if resource is not None:
+                close_fn = getattr(resource, 'close', None)
+                if callable(close_fn):
+                    if asyncio.iscoroutinefunction(close_fn):
+                        logger.trace(f"Adding resource {resource} to close tasks.")
+                        tasks.append(close_fn())
+                    else:
+                        try:
+                            logger.trace(f"Closing resource {resource} synchronously.")
+                            close_fn()
+                        except Exception as e:
+                            errors += 1
+                            logger.trace(f"Error during resource close: {e}")
 
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)

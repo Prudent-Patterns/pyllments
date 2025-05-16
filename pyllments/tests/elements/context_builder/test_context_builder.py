@@ -3,7 +3,7 @@ import re
 import asyncio
 from pyllments.elements import ContextBuilderElement, PipeElement
 from pyllments.payloads import MessagePayload
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 # Helper to flush the event loop so async work completes
 

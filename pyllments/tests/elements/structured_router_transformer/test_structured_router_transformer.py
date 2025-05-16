@@ -5,7 +5,7 @@ from pydantic import RootModel, create_model
 from pyllments.logging import setup_logging
 from pyllments.elements import StructuredRouterTransformer, PipeElement, MCPElement
 from pyllments.payloads import MessagePayload, StructuredPayload
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 from pathlib import Path
 import asyncio

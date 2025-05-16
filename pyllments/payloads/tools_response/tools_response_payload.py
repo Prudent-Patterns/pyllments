@@ -3,7 +3,7 @@ from jinja2 import Template
 from loguru import logger
 from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 from .tools_response_model import ToolsResponseModel
 

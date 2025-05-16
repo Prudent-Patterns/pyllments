@@ -16,10 +16,10 @@ import uvicorn
 
 from pyllments.logging import setup_logging, logger
 from pyllments.common.resource_loader import get_asset
-from pyllments.common.app_registry import AppRegistry
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.app_registry import AppRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 # Import lifecycle manager
-from pyllments.ports.lifecycle_manager import manager as lifecycle_manager
+from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 
 ASSETS_PATH = 'assets'
 ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'

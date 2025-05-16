@@ -6,7 +6,7 @@ import param
 
 from pyllments.base.element_base import Element
 from loguru import logger
-from pyllments.common.loop_registry import LoopRegistry
+from pyllments.runtime.loop_registry import LoopRegistry
 
 
 class PipeElement(Element):
