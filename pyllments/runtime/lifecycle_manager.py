@@ -34,7 +34,10 @@ class LifecycleManager:
         self._active_output_ports.add(port)
 
     def register_resource(self, resource):
-        """Register a generic resource (model, executor, etc.) for cleanup."""
+        """
+        Register a generic resource (model, executor, etc.) for cleanup.
+        Resource should have a close method.
+        """
         logger.trace(f"Registering resource {resource} for cleanup.")
         self._active_resources.add(resource)
 
@@ -175,6 +178,24 @@ class LifecycleManager:
                     logger.trace(f"Error during port close: {result}")
         # Final summary log at info level for visibility
         logger.info(f"LifecycleManager shutdown complete: {len(ports_to_close)} ports closed, {errors} errors encountered.")
+
+    def __enter__(self):
+        """Enter context: return self for managing lifecycle."""
+        # No special setup; resources register themselves with manager
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        """Exit context: perform synchronous shutdown of all resources."""
+        try:
+            # Use existing loop to run shutdown
+            loop = LoopRegistry.get_loop()
+            if loop.is_running():
+                loop.run_until_complete(self.shutdown())
+            else:
+                # Create fresh loop for shutdown
+                asyncio.run(self.shutdown())
+        except Exception as e:
+            logger.error(f"Error during LifecycleManager context shutdown: {e}")
 
 # Instantiate the singleton
 manager = LifecycleManager()
