@@ -1,5 +1,9 @@
 # 🚧pyllments🚧 [Construction In Progress]
-## *Speedrun your Prototyping*
+
+*Speedrun your Prototyping*
+
+[Documentation](https://docs.pyllments.com/)
+
 ## Build Visual AI Workflows with Python
 A batteries-included LLM workbench for helping you integrate complex LLM flows into your projects - built fully in and for Python.
 * Rapid prototyping complex workflows
