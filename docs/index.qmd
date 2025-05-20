@@ -38,7 +38,14 @@ style="display: block; max-width: 100px; margin: 0 auto;">
 # What is Pyllments?
 :::
 
-Pyllments is a Python library that empowers you to build rich, interactive applications powered by large language models. It provides a collection of modular **Elements**, each encapsulating its data, logic, and UI—that communicate through well-defined input and output ports. With simple flow-based programming, you can effortlessly compose, customize, and extend components to create everything from dynamic GUIs to scalable API-driven services.
+```bash
+uv pip install pyllments
+```
+[More info on installation](installation.qmd)
+
+Pyllments is a Python library that empowers you to build rich, interactive applications powered by large language models. 
+It provides a collection of modular **Elements**, each encapsulating its data, logic, and UI—that communicate through well-defined input and output ports. 
+With simple flow-based programming, you can effortlessly compose, customize, and extend components to create everything from dynamic GUIs to scalable API-driven services.
 
 It comes prepackaged with a set of parameterized application you can run immediately from the command line like so:
 ```bash
