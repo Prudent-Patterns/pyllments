@@ -28,7 +28,7 @@ pyllments recipe run branch_chat --height 900 --width 700
 ### With history, a custom system prompt, and an interface.
 ![Chat Flow](https://github.com/Prudent-Patterns/pyllments/blob/main/docs/assets/introduction/intro_example_flow.jpg?raw=true)
 
-**intro chat flow example video placeholder**
+https://github.com/user-attachments/assets/1f9998bf-2dfe-49c6-aec7-0a918ee57246
 
 In this example, we'll build a simple chat application using four core Elements from the Pyllments library. Elements are modular components that handle specific functions and connect via ports to form a data flow graph.
 
