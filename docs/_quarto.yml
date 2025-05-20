@@ -3,6 +3,8 @@ project:
   preview:
     port: 4200
     browser: true
+  resources:
+    - "llms.txt"
 website:
   favicon: /assets/logo/pyllments_logo_32.png
   search:
