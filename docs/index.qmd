@@ -38,7 +38,7 @@ style="display: block; max-width: 100px; margin: 0 auto;">
 # What is Pyllments?
 :::
 
-Pyllments consists of a set of **Elements** with a consistent interface that allows you to connect them in a near infinite amount of ways through their ports using simple flow-based programming.
+Pyllments is a Python library that empowers you to build rich, interactive applications powered by large language models. It provides a collection of modular **Elements**, each encapsulating its data, logic, and UI—that communicate through well-defined input and output ports. With simple flow-based programming, you can effortlessly compose, customize, and extend components to create everything from dynamic GUIs to scalable API-driven services.
 
 It comes prepackaged with a set of parameterized application you can run immediately from the command line like so:
 ```bash
@@ -92,7 +92,7 @@ In this example, we'll build a simple chat application using four core Elements 
 4. **LLMChatElement**  
    Connects to a Large Language Model (LLM) provider, sends the prepared message list, and generates a response. It also offers a selector to choose different models or providers.
 
-Here’s what happens step by step in the chat flow:
+Here's what happens step by step in the chat flow:
 
 1. **User Input**: You type a message in the `ChatInterfaceElement` and click send. This creates a `MessagePayload` with your text and the role 'user'.  
 2. **History Update**: Your message is sent via a port to the `HistoryHandlerElement`, which adds it to the conversation log.  
@@ -161,7 +161,7 @@ def interface():
 pyllments serve chat_flow.py
 ```
 
-For more in-depth knowledge, check our [Getting Started Tutorial](getting_started)
+For more in-depth material, check our [Getting Started Tutorial](getting_started)
 
 ::: {.column-page}
 # Elements are building blocks with a consistent interface
@@ -170,7 +170,7 @@ For more in-depth knowledge, check our [Getting Started Tutorial](getting_starte
 
 <div class="column-page">
 <div class="video-container" style="position: relative; max-width: 100%; margin: 0 auto;">
-<video autoplay loop muted playsinline 
+<video loop muted playsinline 
 style="display: block; max-width: 100%; margin: 0 auto;" 
 playbackRate="1">
 <source src="assets/introduction/pyllments_intro_pg_vid1.mp4" type="video/mp4">
