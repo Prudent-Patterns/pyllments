@@ -239,8 +239,8 @@ def serve(
         server_setup(logging=logging, logging_level=logging_level)
         if env:
             load_dotenv(env)
-        else:
-            load_dotenv()
+        # else:
+        #     load_dotenv()
 
         if find_gui:
             def view_check(obj):

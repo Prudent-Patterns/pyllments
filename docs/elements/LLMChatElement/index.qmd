@@ -3,9 +3,25 @@ title: "LLMChatElement"
 lightbox: true
 ---
 
-The `LLMChatElement` is a core component for integrating Large Language Models (LLMs) into chat applications. It handles the communication with LLM providers and generates responses based on input messages. Its interface is meant to receive `MessagePayloads` and respond with a `MessagePayload` in turn.
+The `LLMChatElement` is a core component for integrating Large Language Models (LLMs) into chat applications. It handles the communication with LLM providers and generates responses based on input messages. Its interface is meant to receive `list[MessagePayload]` and respond with a `MessagePayload` in turn.
 
 ## Instantiation
+
+##### LiteLLM
+
+Under the hood, this element uses [LiteLLM](https://docs.litellm.ai/docs/) and the standardized [model names](https://models.litellm.ai) used by APIs of various providers.
+When this Element is instantiated, unless a `env_path` is provided, it will look in the working directory for an `.env` file.
+
+##### APIs
+
+We rely on the standard API key names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, et al to be present in the `.env` file depending on the model you wish to use. For more on authentication, see the [docs here](https://docs.litellm.ai/docs/set_keys).
+
+##### OpenRouter
+
+If you wish to try out many models with a single API key, we recommend you use [OpenRouter](https://docs.litellm.ai/docs/providers/openrouter), which is supported by LiteLLM. 
+
+##### Local
+Alternatively, you can also run local models(ollama, VLLM, etc), where you need to include the name and the `base_url`. See more on that [here](https://docs.litellm.ai/docs/providers/ollama).
 
 **Arguments:**
 
@@ -16,7 +32,9 @@ The `LLMChatElement` is a core component for integrating Large Language Models (
 `base_url`: str = None<br>
 <span class="tab">The base URL for the model. Optional, to be used with custom endpoints.</span>
 `output_mode`: Literal['atomic', 'stream'] = 'stream'<br>
-<span class="tab">Whether to stream the response or return it all at once.</span>
+<span class="tab">Whether to return the message containing a streaming callback or an atomic one</span>
+`env_path`: str = None<br>
+<span class="tab">Path to the .env file to load. If not provided, the .env file in the current working directory will be used.</span>
 
 ### Input Ports
 

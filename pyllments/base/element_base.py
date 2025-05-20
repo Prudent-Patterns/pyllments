@@ -2,9 +2,9 @@ from pathlib import Path
 from functools import wraps
 import inspect
 from typing import Callable
-import asyncio
 
 import param
+from dotenv import load_dotenv
 from loguru import logger
 
 from pyllments.ports.ports import Ports
@@ -24,6 +24,9 @@ class Element(Component):
         Structure: payload_name: {}""")
     name = param.String(doc="Unique name for this element instance")
     _instance_counters = {}  # class‐level dict to track counts per subclass
+    env_path = param.String(default=None)
+
+    _env_path = ''
 
     def __init__(self, **params):
         cls = type(self)
@@ -34,6 +37,7 @@ class Element(Component):
         if 'name' not in params or not params['name']:
             params['name'] = f"{cls.__name__}{count}"
         super().__init__(**params)
+        type(self).load_env(self.env_path)
 
         # bind logger so every message carries this name
         self.logger = logger.bind(element=self.name)
@@ -193,3 +197,11 @@ class Element(Component):
             model_logger = getattr(self, 'logger', None)
             if model_logger:
                 value.logger = model_logger
+
+    @classmethod
+    def load_env(cls, path: str = None):
+        if path:
+            cls._env_path = path           
+            load_dotenv(cls._env_path)
+        else:
+            cls._env_path = "."

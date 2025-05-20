@@ -7,15 +7,12 @@ from pyllments.base.component_base import Component
 from pyllments.payloads.message import MessagePayload
 from pyllments.payloads.tools_response import ToolsResponsePayload
 from pyllments.elements.llm_chat import LLMChatModel
-from loguru import logger
 
 
 class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
     model_selector_view = param.ClassSelector(class_=(pn.widgets.Select, pn.Column, pn.Row))
     generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
-    
-    
 
     def __init__(self, **params):
         super().__init__(**params)
