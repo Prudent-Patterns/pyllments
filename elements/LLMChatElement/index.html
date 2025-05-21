@@ -395,11 +395,27 @@ document.addEventListener("DOMContentLoaded", function() {
 </header>
 
 
-<p>The <code>LLMChatElement</code> is a core component for integrating Large Language Models (LLMs) into chat applications. It handles the communication with LLM providers and generates responses based on input messages. Its interface is meant to receive <code>MessagePayloads</code> and respond with a <code>MessagePayload</code> in turn.</p>
+<p>The <code>LLMChatElement</code> is a core component for integrating Large Language Models (LLMs) into chat applications. It handles the communication with LLM providers and generates responses based on input messages. Its interface is meant to receive <code>list[MessagePayload]</code> and respond with a <code>MessagePayload</code> in turn.</p>
 <section id="instantiation" class="level2">
 <h2 class="anchored" data-anchor-id="instantiation">Instantiation</h2>
+<section id="litellm" class="level5">
+<h5 class="anchored" data-anchor-id="litellm">LiteLLM</h5>
+<p>Under the hood, this element uses <a href="https://docs.litellm.ai/docs/">LiteLLM</a> and the standardized <a href="https://models.litellm.ai">model names</a> used by APIs of various providers. When this Element is instantiated, unless a <code>env_path</code> is provided, it will look in the working directory for an <code>.env</code> file.</p>
+</section>
+<section id="apis" class="level5">
+<h5 class="anchored" data-anchor-id="apis">APIs</h5>
+<p>We rely on the standard API key names such as <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>XAI_API_KEY</code>, et al to be present in the <code>.env</code> file depending on the model you wish to use. For more on authentication, see the <a href="https://docs.litellm.ai/docs/set_keys">docs here</a>.</p>
+</section>
+<section id="openrouter" class="level5">
+<h5 class="anchored" data-anchor-id="openrouter">OpenRouter</h5>
+<p>If you wish to try out many models with a single API key, we recommend you use <a href="https://docs.litellm.ai/docs/providers/openrouter">OpenRouter</a>, which is supported by LiteLLM.</p>
+</section>
+<section id="local" class="level5">
+<h5 class="anchored" data-anchor-id="local">Local</h5>
+<p>Alternatively, you can also run local models(ollama, VLLM, etc), where you need to include the name and the <code>base_url</code>. See more on that <a href="https://docs.litellm.ai/docs/providers/ollama">here</a>.</p>
 <p><strong>Arguments:</strong></p>
-<p><code>model_name</code>: str = ‘gpt-4o-mini’<br> <span class="tab">The name of the model to use for the LLM.</span> <code>model_args</code>: dict = {}<br> <span class="tab">Additional arguments to pass to the model.</span> <code>base_url</code>: str = None<br> <span class="tab">The base URL for the model. Optional, to be used with custom endpoints.</span> <code>output_mode</code>: Literal[‘atomic’, ‘stream’] = ‘stream’<br> <span class="tab">Whether to stream the response or return it all at once.</span></p>
+<p><code>model_name</code>: str = ‘gpt-4o-mini’<br> <span class="tab">The name of the model to use for the LLM.</span> <code>model_args</code>: dict = {}<br> <span class="tab">Additional arguments to pass to the model.</span> <code>base_url</code>: str = None<br> <span class="tab">The base URL for the model. Optional, to be used with custom endpoints.</span> <code>output_mode</code>: Literal[‘atomic’, ‘stream’] = ‘stream’<br> <span class="tab">Whether to return the message containing a streaming callback or an atomic one</span> <code>env_path</code>: str = None<br> <span class="tab">Path to the .env file to load. If not provided, the .env file in the current working directory will be used.</span></p>
+</section>
 <section id="input-ports" class="level3">
 <h3 class="anchored" data-anchor-id="input-ports">Input Ports</h3>
 <table class="table-hover caption-top table">

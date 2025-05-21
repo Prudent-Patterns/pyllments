@@ -1,0 +1,45 @@
+Motivation:
+Pyllments was built to unify UI, state management, and LLM orchestration into a single reactive, flow-based framework, eliminating fragmented boilerplate and accelerating development of interactive LLM applications.
+
+Synopsis:
+Pyllments is a Python library enabling developers to assemble modular pipelines that integrate large language models with customizable frontends and APIs. Each pipeline is constructed from Elements—self-contained Components that encapsulate a Param-driven Model (logic and state), optional Panel-based Views (UI), and Ports (InputPort/OutputPort) for defining data flows. Payloads, also Components, wrap data exchanged between Elements, while the FlowController Element provides callback-based orchestration across multiple ports. Prebuilt recipes and a CLI offer ready-to-run applications like chat interfaces, branching flows, and multi-agent orchestrations.
+
+Core Concepts:
+- Element: A modular unit combining Model, Views, and Ports for a specific function.
+- Payload: A Component that carries data through Ports and can render itself via Views.
+- Port: Endpoints (InputPort, OutputPort) following an observer pattern for reactive messaging.
+- FlowController: An advanced Element that orchestrates complex workflows via a user-defined flow_map.
+- Recipe: A parameterized, CLI-exposed application template located in `pyllments/recipes`.
+
+Project Structure:
+- `pyllments/base/`: Core abstractions (ComponentBase, ElementBase, ModelBase, PayloadBase).
+- `pyllments/elements/`: Built-in Elements organized by functionality (chat_interface, router, transformer, etc.).
+- `pyllments/ports/`: Definitions and management of Port classes.
+- `pyllments/runtime/`: Execution infrastructure (event loop registry, scheduler).
+- `pyllments/recipes/`: CLI-ready recipes for common LLM workflows.
+- `cli/`, `serve/`, `templates/`: Modules for CLI integration, deployment, and code generation.
+
+Key Dependencies:
+- Param: Defines reactive, type-validated parameters and automatic callbacks.
+- Panel: Builds and styles interactive UI components.
+- asyncio & loguru: Underpin FlowController concurrency and structured logging.
+
+Design Principles:
+- Flow-Based Composition: Connect Elements to form directed graphs of data flow.
+- Reactivity: Leverage Param for automatic state and view updates.
+- Modularity & Extensibility: Encapsulate functionality in reusable Elements and Payloads.
+- Developer-Focused: Intuitive APIs, minimal boilerplate, and comprehensive documentation.
+
+Available Elements:
+- ChatInterfaceElement: Manages chat UI components (input area, feed, send button) and message display/emission.
+- LLMChatElement: Interfaces with LLM providers to generate responses to incoming MessagePayloads.
+- APIElement: Exposes application ports as REST API endpoints using FastAPI and aggregates payloads into responses.
+- Router: Routes incoming payloads to different outputs based on configurable predicates.
+- StructuredRouterTransformer: Validates and routes structured JSON payloads via Pydantic schemas and transforms data fields.
+- TransformElement: Applies custom transformation functions to incoming payloads and emits outputs.
+- ContextBuilderElement: Aggregates and orders message payloads from multiple sources, constants, and templates to build chat context.
+- MCPElement: Implements the Model Context Protocol to provide tools schemas and manage tool calls within flows.
+- PipeElement: Testing utility for piping payloads into and out of flows, capturing and emitting arbitrary data.
+- TelegramElement: Enables Telegram chat interactions, forwarding messages between Telegram and application ports.
+- DiscordElement: Enables Discord DM interactions, forwarding messages between Discord and application ports.
+- HistoryHandlerElement: Manages storage and retrieval of message history as a persistent flow of MessagePayloads. 
