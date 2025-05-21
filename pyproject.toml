@@ -14,6 +14,7 @@ in a flow-based architecture. Pyllments enables developers to create both graphi
 LLM applications by connecting specialized Elements through a flexible port system, with built-in 
 support for UI components and LLM integrations.
 """
+readme = "README.md"
 license = "Apache-2.0"
 license_file = "LICENSE"
 requires-python = ">=3.10"
