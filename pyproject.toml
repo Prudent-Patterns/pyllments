@@ -62,7 +62,7 @@ dev = [
     "ipython",
     "ipywidgets",
     "pytest",
-    "pytest-asyncio"
+    "pytest-asyncio",
     "nbconvert",
 ]
 
