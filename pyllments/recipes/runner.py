@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from pyllments.logging import logger
 from pyllments.serve import serve
+from pyllments.cli.serve_helper import CommonOptions
 
 
 def load_recipe_module(recipe_path: Path):
@@ -77,7 +78,7 @@ def run_recipe(
     no_gui: bool = False,
     port: int = 8000,
     env: Optional[str] = None,
-    host: str = "127.0.0.1",
+    host: str = "0.0.0.0",
     config: Optional[dict[str, Any]] = None
 ) -> None:
     """Run a recipe.
@@ -97,7 +98,7 @@ def run_recipe(
     env : Optional[str], optional
         Path to .env file, by default None
     host : str, optional
-        Network interface to bind the server to, by default "127.0.0.1"
+        Network interface to bind the server to, by default "0.0.0.0"
     config : Optional[dict[str, Any]], optional
         Configuration parameters for the recipe, by default None
     """
@@ -105,18 +106,27 @@ def run_recipe(
         recipe_path = get_recipe_path(recipe_name)
         logger.info(f"Running recipe {recipe_name} from {recipe_path}")
         
-        # Use the serve functionality from pyllments.serve
-        serve(
-            filename=str(recipe_path),
-            inline=False,
+        # Use CommonOptions for consistent parameter conversion
+        common_options = CommonOptions()
+        cli_args = common_options.build_cli_args_dict(
             logging=logging,
             logging_level=logging_level,
-            find_gui=not no_gui,
+            no_gui=no_gui,
             port=port,
             env=env,
-            host=host,
+            host=host
+        )
+        
+        # Build serve kwargs using consolidated utility
+        serve_kwargs = common_options.build_serve_kwargs(
+            cli_args,
+            filename=str(recipe_path),
+            inline=False,
             config=config or {}
         )
+        
+        # Use the serve functionality from pyllments.serve
+        serve(**serve_kwargs)
     except Exception as e:
         logger.error(f"Failed to run recipe {recipe_name}: {str(e)}")
         raise 

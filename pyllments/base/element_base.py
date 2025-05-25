@@ -40,8 +40,7 @@ class Element(Component):
         type(self).load_env(self.env_path)
 
         # bind logger so every message carries this name
-        self.logger = logger.bind(element=self.name)
-
+        self.logger = logger.bind(name=self.__class__.__module__, element=self.name)
         self.ports = Ports(containing_element=self)
 
     def inject_payload_css(self, create_view_method: Callable, name=None, **kwargs):

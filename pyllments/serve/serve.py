@@ -9,17 +9,22 @@ import ast
 
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 import panel as pn
 from panel.io.fastapi import add_application
 # from uvicorn import run as uvicorn_run
 import uvicorn
 
-from pyllments.logging import setup_logging, logger
+from pyllments.logging import setup_logging
 from pyllments.common.resource_loader import get_asset
 from pyllments.runtime.app_registry import AppRegistry
 from pyllments.runtime.loop_registry import LoopRegistry
 # Import lifecycle manager
 from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
+from pyllments.common.type_utils import TypeMapper
+
+
+logger.bind(name=__name__)
 
 ASSETS_PATH = 'assets'
 ASSETS_MOUNT_PATH = f'/{ASSETS_PATH}'
@@ -144,10 +149,10 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
                  for name, info in config_info['fields'].items()
              }
          
-         # Ensure that dictionary fields are properly parsed.
+         # Ensure that dictionary fields are properly parsed using consolidated utility.
          dict_fields = {
              name for name, info in config_info['fields'].items()
-             if info.get("type", "str").lower().startswith("dict")
+             if TypeMapper.is_dict_type(info.get("type", "str"))
          }
          for key in dict_fields:
              if key in config_dict and not isinstance(config_dict[key], dict):
@@ -158,15 +163,14 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
                      raise ValueError(f"Invalid dictionary literal for field '{key}': {config_dict[key]} Error: {e}")
          
          from dataclasses import make_dataclass
-         # Map known type strings to actual Python types.
-         type_mappings = {"int": int, "float": float, "bool": bool, "str": str}
+         # Use consolidated type mapping utility
          fields_list = []
          for field, info in config_info['fields'].items():
              field_type_str = info.get("type", "str")
-             if field_type_str.lower().startswith("dict"):
+             if TypeMapper.is_dict_type(field_type_str):
                  field_type = parse_dict_value  # Use the conversion function as the field type.
              else:
-                 field_type = type_mappings.get(field_type_str.lower(), str)
+                 field_type = TypeMapper.string_to_type(field_type_str)
              default_value = info.get("default")
              fields_list.append((field, field_type, default_value))
          ConfigDynamic = make_dataclass("ConfigDynamic", fields_list)

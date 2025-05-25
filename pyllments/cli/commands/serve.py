@@ -1,9 +1,5 @@
 """Serve command for Pyllments CLI."""
-import cProfile
-import pstats
-from io import StringIO
-import json
-from typing import Optional, List, Annotated
+from typing import Optional
 import typer
 
 from pyllments.serve import serve as serve_file
@@ -15,7 +11,7 @@ app = typer.Typer(
     context_settings={"allow_interspersed_args": True}
 )
 
-# Shared options for serve command
+# Get shared options for serve command
 common_opts = CommonOptions().get_typer_options()
 
 @app.callback()
@@ -37,34 +33,28 @@ def serve(
     """Start a Pyllments server"""
     logger.info(f"Starting Pyllments server for {filename}...")
 
-    # Parse JSON string into a dict
-    try:
-        config_dict = json.loads(config)
-        if not isinstance(config_dict, dict):
-            raise ValueError("config JSON must be a dict")
-    except Exception as e:
-        raise typer.BadParameter(f"Invalid --config JSON: {e}")
+    common_options = CommonOptions()
+    
+    # Parse JSON config using consolidated utility
+    config_dict = common_options.parse_json_config(config)
 
-    if profile:
-        pr = cProfile.Profile()
-        pr.enable()
+    # Build CLI args using consolidated utility
+    cli_args = common_options.build_cli_args_dict(
+        logging=logging,
+        logging_level=logging_level,
+        no_gui=no_gui,
+        port=port,
+        env=env,
+        host=host,
+        profile=profile
+    )
+    
+    serve_kwargs = common_options.build_serve_kwargs(
+        cli_args,
+        filename=filename,
+        inline=False,
+        config=config_dict
+    )
 
-    try:
-        serve_file(
-            filename=filename,
-            inline=False,
-            logging=logging,
-            logging_level=logging_level,
-            find_gui=not no_gui,
-            port=port,
-            env=env,
-            config=config_dict,
-            host=host
-        )
-    finally:
-        if profile:
-            pr.disable()
-            s = StringIO()
-            ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
-            ps.print_stats(30)
-            print(s.getvalue()) 
+    # Execute with profiling using consolidated utility
+    common_options.execute_with_profiling(cli_args, serve_file, **serve_kwargs) 

@@ -2,16 +2,16 @@ from typing import Union, get_origin, get_args, Any, List, Dict, Awaitable, Type
 import inspect
 import asyncio
 from uuid import uuid4
-import signal
-import weakref
 
 import param
-from loguru import logger
+from loguru import logger as _logger
 
 from pyllments.base.payload_base import Payload
 from pyllments.logging import log_staging, log_emit, log_receive, log_connect
 from pyllments.runtime.loop_registry import LoopRegistry
 from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
+
+logger = _logger.bind(name=__name__)
 
 # Type variable for generic payload types
 T = TypeVar('T', bound=Payload)

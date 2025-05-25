@@ -5,6 +5,9 @@
     scrollbar-color: var(--primary-accent-color) transparent;
     border-radius: var(--radius);
     scrollbar-gutter: stable;
-    flex-grow: 1; /* Prevents collapsing when objects are added into it */
+    overflow-y: auto; /* Enable scrolling when content exceeds height */
+    min-height: 0; /* Allow flex item to shrink below content size */
+    flex: 1 1 0;
+    /* Prevents collapsing when objects are added into it and doesn't expand past container size*/
 }
 

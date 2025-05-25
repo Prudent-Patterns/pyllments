@@ -33,10 +33,6 @@ from pydantic import BaseModel
 from pyllments.elements import StructuredRouterTransformer
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 
-# Optional override of the generated schema
-class OverrideSchema(BaseModel):
-    route: Literal['override']
-    override_data: str
 
 srt = StructuredRouterTransformer(
     routing_map={
@@ -67,8 +63,7 @@ srt = StructuredRouterTransformer(
             }
         }
     },
-    incoming_output_port=llm_el.ports.output['message_output'],
-    pydantic_model=OverrideSchema
+    incoming_output_port=llm_el.ports.output['message_output']
 )
 ```
 
