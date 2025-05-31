@@ -108,6 +108,9 @@ class Component(param.Parameterized):
                 - Passed via '_css' parameters.
                 - Can be string or list of strings.
                 - Appended after corresponding file-based CSS.
+            4. Developer stylesheets:
+                - Passed via 'stylesheets' parameter.
+                - Takes priority and is applied last.
 
         CSS File Structure:
             css/
@@ -118,20 +121,22 @@ class Component(param.Parameterized):
         Examples
         --------
 ...     @view
-...     def create_main(self, button_css=None, input_css=['custom.css']):
+...     def create_main(self, button_css=None, input_css=['custom.css'], stylesheets=None):
 ...         '''
 ...         CSS Priority:
 ...         1. main.css (if exists)
 ...         2. main_button.css + button_css parameter.
 ...         3. main_input.css + ['custom.css']
+...         4. Developer stylesheets (highest priority)
 ...         '''
 ...         return pn.Column()
 ...
 ...     @view
-...     def create_button(self, width=100, height=30, custom_attr='value'):
+...     def create_button(self, width=100, height=30, custom_attr='value', stylesheets=None):
 ...         '''
 ...         - width, height → Panel parameters (sizing_mode='fixed').
 ...         - custom_attr → Passed to view creation.
+...         - stylesheets → Applied with highest priority.
 ...         '''
 ...         return pn.widgets.Button()
 
@@ -169,11 +174,19 @@ class Component(param.Parameterized):
             if view_name not in self.css_cache:
                 self.css_cache[view_name] = {}
 
+            # Extract developer stylesheets before splitting parameters
+            developer_stylesheets = merged_kwargs.get('stylesheets', None)
+
             # Split kwargs into Panel params and custom attributes early
             # Panel params are either in PANEL_PARAMS or defined in the signature
             panel_kwargs = {k: v for k, v in merged_kwargs.items() if k in PANEL_PARAMS and v is not None}
             custom_attrs = {k: v for k, v in merged_kwargs.items() 
                           if k not in PANEL_PARAMS}
+
+            # Remove stylesheets from custom_attrs if it's not in the function signature
+            # This prevents passing stylesheets to functions that don't accept it
+            if 'stylesheets' in custom_attrs and 'stylesheets' not in sig_params:
+                del custom_attrs['stylesheets']
 
             # Process _css arguments first
             css_kwargs = [param for param in inspect.signature(func).parameters 
@@ -237,9 +250,10 @@ class Component(param.Parameterized):
             # Create view with function parameters only
             view = func(self, *args, **custom_attrs)
             
-            # Apply Panel parameters to the returned view
+            # Apply Panel parameters to the returned view (except stylesheets, handled below)
             for param_name, param_value in panel_kwargs.items():
-                setattr(view, param_name, param_value)
+                if param_name != 'stylesheets':
+                    setattr(view, param_name, param_value)
             
             # Default view CSS file check (no warning needed if not found)
             if 'default' not in self.css_cache[view_name]:
@@ -254,13 +268,31 @@ class Component(param.Parameterized):
                     logger.warning(f"Error loading CSS: {str(e)}")
                     self.css_cache[view_name]['default'] = ''
 
-            # Apply view-specific CSS if it exists
+            # Build the final stylesheets list with proper priority
+            final_stylesheets = []
+            
+            # 1. Add default view CSS if it exists (lowest priority)
             if self.css_cache[view_name]['default']:
-                current_stylesheets = getattr(view, 'stylesheets', [])
+                final_stylesheets.append(self.css_cache[view_name]['default'])
+            
+            # 2. Add any existing stylesheets from the view
+            current_stylesheets = getattr(view, 'stylesheets', [])
+            if current_stylesheets:
                 if isinstance(current_stylesheets, list):
-                    view.stylesheets = [self.css_cache[view_name]['default']] + current_stylesheets
+                    final_stylesheets.extend(current_stylesheets)
                 else:
-                    view.stylesheets = [self.css_cache[view_name]['default'], current_stylesheets]
+                    final_stylesheets.append(current_stylesheets)
+            
+            # 3. Add developer-specified stylesheets (highest priority)
+            if developer_stylesheets:
+                if isinstance(developer_stylesheets, list):
+                    final_stylesheets.extend(developer_stylesheets)
+                else:
+                    final_stylesheets.append(developer_stylesheets)
+            
+            # Apply the final stylesheets list
+            if final_stylesheets:
+                view.stylesheets = final_stylesheets
 
             # Apply custom attributes
             for attr, value in custom_attrs.items():

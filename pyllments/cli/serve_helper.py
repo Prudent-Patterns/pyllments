@@ -194,11 +194,34 @@ class CommonOptions:
         Dict[str, Any]
             Dictionary containing only the common CLI arguments
         """
-        return {
+        common_args = {
             name: kwargs.get(name)
             for name in self.options.keys()
             if name in kwargs
         }
+        
+        return self._apply_smart_defaults(common_args)
+
+    def _apply_smart_defaults(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply smart defaults like auto-enabling logging when logging_level is non-default.
+        
+        Parameters
+        ----------
+        args : Dict[str, Any]
+            Dictionary containing CLI arguments
+            
+        Returns
+        -------
+        Dict[str, Any]
+            Updated dictionary with smart defaults applied
+        """
+        # Auto-enable logging if non-default logging level is specified
+        if (args.get("logging_level") not in [None, self.options["logging_level"].default] 
+            and not args.get("logging")):
+            args["logging"] = True
+            
+        return args
 
     def to_serve_kwargs(self, cli_args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -365,11 +388,13 @@ class CommonOptions:
         Dict[str, Any]
             CLI arguments dictionary with only known common options
         """
-        return {
+        cli_args = {
             name: kwargs.get(name)
             for name in self.options.keys()
             if name in kwargs
         }
+        
+        return self._apply_smart_defaults(cli_args)
 
 class CommandRegistrar:
     """

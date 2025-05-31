@@ -1,26 +1,28 @@
 from dataclasses import dataclass, field
+import pathlib
+
 from pyllments.elements import (
     ChatInterfaceElement,
     ContextBuilderElement,
     StructuredRouterTransformer,
     MCPElement,
     HistoryHandlerElement,
-    LLMChatElement,
-    PipeElement
+    LLMChatElement
 )
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments import flow
 
+
 @dataclass
 class Config:
     height: int = field(
-        default=800,
+        default=850,
         metadata={
             "help": "Height of the chat interface in pixels."
         }
     )
     width: int = field(
-        default=950,
+        default=800,
         metadata={
             "help": "Overall width of the chat interface in pixels."
         }
@@ -31,27 +33,27 @@ class Config:
             "help": "Number of tokens to keep in the history at any given time."
         }
     )
-    custom_models: dict = field(
+    custom_model: dict = field(
         default_factory=dict,
         metadata={
-            "help": """The custom models you wish to add to the model selector. Will be visible in the Provider dropdown.
-            The format is a dictionary with the keys as the model display names. (On a single line - Use single quotes)
-            '{"LOCAL DEEPSEEK": {"name": "ollama_chat/deepseek-r1:14b", "base_url": "http://172.17.0.3:11434"}, "OpenAI GPT-4o-mini": {"name": "gpt4o-mini"}}'
+            "help": """
+            Model name and base url for the model.
+            '{"name": "ollama_chat/deepseek-r1:14b", "base_url": "http://172.17.0.3:11434"}'
             """
         }
     )
-    default_model: str = field(
-        default='gpt-4o-mini',
+    model_name: str = field(
+        default='gpt-4.1',
         metadata={
-            "help": "The default model to use when loading the interface."
+            "help": "The standard name of the model."
         }
-    )    
-
-initial_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Initial context pipe received: {[p.model.content for p in ps]}")
-
-reply_pipe_el = PipeElement(receive_callback=lambda p: f"Reply pipe received: {p}")
-tools_pipe_el = PipeElement(receive_callback=lambda p: f"Tools pipe received: {p}")
-initial_llm_pipe_el = PipeElement(receive_callback=lambda p: f"LLM output content: {p.model.content}")
+    )
+    mcp_dir: str = field(
+        default='.',
+        metadata={
+            "help": "The directory containing the MCP server."
+        }
+    )
 
 chat_interface_el = ChatInterfaceElement()
 
@@ -103,11 +105,12 @@ initial_context_builder_el = ContextBuilderElement(
     }
 )
 
+llm_chat_args = {
+    'model_name': config.custom_model['name'],
+    'base_url': config.custom_model['base_url']
+} if config.custom_model else {'model_name': config.model_name}
 
-initial_llm_chat_el = LLMChatElement(model_name='gpt-4.1')
-initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.messages_emit_input
-initial_llm_chat_el.ports.message_output > initial_llm_pipe_el.ports.pipe_input
-initial_context_builder_el.ports.messages_output > initial_context_pipe_el.ports.pipe_input
+initial_llm_chat_el = LLMChatElement(**llm_chat_args)
 
 structured_router_el = StructuredRouterTransformer(
     routing_map={
@@ -131,9 +134,10 @@ structured_router_el = StructuredRouterTransformer(
     }
 )
 
-structured_router_el.ports.reply_message > reply_pipe_el.ports.pipe_input
-structured_router_el.ports.tools_tools > tools_pipe_el.ports.pipe_input
+# Connect initial context builder to initial LLM
+initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.messages_emit_input
 
+# Connect initial LLM output to structured router
 initial_llm_chat_el.ports.message_output > structured_router_el.ports.message_input
 
 def check_prime(n: int) -> bool:
@@ -152,42 +156,30 @@ def check_prime(n: int) -> bool:
             return False
         i += 6
     return True
+
 from typing import Optional
 def get_recent_emails(n: int, filter: Optional[str] = None) -> dict[str, dict]:
     """Get the most recent emails from the user's inbox."""
     return {'email_1' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'},
             'email_2' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'}}
 
-mcp_el = MCPElement(mcps={
-    'test_mcp': {
+mcp_dir = pathlib.Path(config.mcp_dir)
+mcp_files = list(mcp_dir.glob('*_mcp.py'))
+
+mcp_args = {
+    f.stem.replace('_mcp', ''): {
         'type': 'script',
-        'script': 'test_mcp_server.py',
-        'tools_requiring_permission': ['generate_random_number']
-    },
-    'test_mcp2': {
-        'type': 'script',
-        'script': 'test_mcp_server2.py',
-    },
-    'custom_functions': {
-        'type': 'functions',
-        'tools': {
-            'check_prime': check_prime,
-            'get_recent_emails': get_recent_emails
-        }
+        'script': str(f)
     }
-})
+    for f in mcp_files
+}
+mcp_el = MCPElement(mcps={**mcp_args})
+
+# Connect MCP schema to structured router and structured router schema to initial context builder
 mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
 structured_router_el.ports.tools_tools > mcp_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
 mcp_el.ports.tools_response_output > chat_interface_el.ports.tools_response_emit_input
-
-#########
-mcp_schema_pipe_el = PipeElement(receive_callback=lambda p: f"Schema from MCP received in pipe: {p.model.schema.model_json_schema()}")
-mcp_el.ports.tools_schema_output > mcp_schema_pipe_el.ports.pipe_input
-#########
-schema_pipe_el = PipeElement(receive_callback=lambda p: f"Schema from StructuredRouterTransformer received in pipe: {p.model.schema.model_json_schema()}")
-structured_router_el.ports.schema_output > schema_pipe_el.ports.pipe_input
-#########
 
 final_context_builder_el = ContextBuilderElement(
     input_map={
@@ -232,9 +224,6 @@ final_context_builder_el = ContextBuilderElement(
     },
 )
 
-final_context_pipe_el = PipeElement(receive_callback=lambda ps: f"Final context pipe received: {[p.model.content for p in ps]}")
-final_context_builder_el.ports.messages_output > final_context_pipe_el.ports.pipe_input
-
 history_handler_el = HistoryHandlerElement()
 history_handler_el.ports.message_history_output > initial_context_builder_el.ports.history
 history_handler_el.ports.message_history_output > final_context_builder_el.ports.history
@@ -242,13 +231,11 @@ chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_
 chat_interface_el.ports.tools_response_output > history_handler_el.ports.tools_responses_input
 structured_router_el.ports.reply_message > history_handler_el.ports.message_emit_input
 
-
-final_llm_chat_el = LLMChatElement(model_name='gpt-4o')
+final_llm_chat_el = LLMChatElement(**llm_chat_args)
 final_context_builder_el.ports.messages_output > final_llm_chat_el.ports.messages_emit_input
 final_llm_chat_el.ports.message_output > history_handler_el.ports.message_emit_input
 final_llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 
 @flow
 def show_chat():
-    # from pyllments.common.loop_registry import LoopRegistry
-    return chat_interface_el.create_interface_view(height=500, width=700)
+    return chat_interface_el.create_interface_view(height=config.height, width=config.width)

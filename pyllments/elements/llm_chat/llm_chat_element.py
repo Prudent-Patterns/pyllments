@@ -176,7 +176,7 @@ class LLMChatElement(Element):
                 'OpenAI': litellm.open_ai_chat_completion_models,
                 'Anthropic': litellm.anthropic_models,
                 'Gemini': litellm.gemini_models,
-                'XAI': litellm.xai_models,
+                'xAI': litellm.xai_models,
                 'Groq': litellm.groq_models,
                 'Mistral': litellm.mistral_chat_models,
                 'OpenRouter': litellm.openrouter_models

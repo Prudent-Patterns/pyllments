@@ -261,5 +261,6 @@ class ChatInterfaceElement(Element):
             mode='atomic')
         await self.model.add_message(new_message)
         
-        # Explicitly stage and emit: history and user stream
+        # Explicitly stage and emit to both role-specific and unified ports
         await self.ports.output['user_message_output'].stage_emit(payload=new_message)
+        await self.ports.output['message_output'].stage_emit(payload=new_message)

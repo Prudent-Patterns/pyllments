@@ -40,5 +40,12 @@
         "8443": {
             "protocol": "https"
         }
-    }
+    },
+    "cursorpyright.analysis.exclude": [
+        "/${workspaceFolder}/dev/**",
+        "/${workspaceFolder}/docs/**"
+    ],
+    "cursorpyright.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ]
 }

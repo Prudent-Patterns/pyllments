@@ -39,6 +39,12 @@ class Config:
         }
     )
 
+# CSS override to prevent chatfeed collapse when empty
+chatfeed_height_fix = """
+/*:host {
+    min-height: 100px !important; /* Ensure minimum height to prevent collapse */
+} */
+"""
 
 @flow
 def create_gui():
@@ -80,20 +86,20 @@ def create_gui():
     col1 = pn.Column(
         llm_el0.create_model_selector_view(models=config.custom_models),
         pn.Spacer(height=10),
-        chat_el0.create_chatfeed_view(height=int(chatfeed_height)),
+        chat_el0.create_chatfeed_view(height=int(chatfeed_height), stylesheets=[chatfeed_height_fix]),
         pn.Spacer(height=10), 
         llm_el1.create_model_selector_view(models=config.custom_models),
         pn.Spacer(height=10),
-        chat_el1.create_chatfeed_view(height=int(chatfeed_height))
+        chat_el1.create_chatfeed_view(height=int(chatfeed_height), stylesheets=[chatfeed_height_fix])
     )
     col2 = pn.Column(
         llm_el2.create_model_selector_view(models=config.custom_models),
         pn.Spacer(height=10),
-        chat_el2.create_chatfeed_view(height=int(chatfeed_height)),
+        chat_el2.create_chatfeed_view(height=int(chatfeed_height), stylesheets=[chatfeed_height_fix]),
         pn.Spacer(height=10),
         llm_el3.create_model_selector_view(models=config.custom_models),
         pn.Spacer(height=10),
-        chat_el3.create_chatfeed_view(height=int(chatfeed_height))
+        chat_el3.create_chatfeed_view(height=int(chatfeed_height), stylesheets=[chatfeed_height_fix])
     )
     main_col = pn.Column(
         pn.Row(

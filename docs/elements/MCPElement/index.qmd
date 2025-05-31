@@ -11,7 +11,7 @@ The purpose of this Element is to enable agentic capabilities when coupled with 
 
 `mcps: dict`<br>
   <span class="tab">A mapping of server names to MCP configurations. Each configuration dict may include the following keys:</span>
-  <span class="tab">`type: str`<br><span class="tab">Protocol type; one of 'script', 'sse', 'mcp_class', or 'functions'.</span></span>
+  <span class="tab">`type`: str<br><span class="tab">Protocol type; one of 'script', 'sse', 'mcp_class', or 'functions'.</span></span>
   <span class="tab">`script`: str (optional)<br><span class="tab">Path to the script for 'script' type servers.</span></span>
   <span class="tab">`command`: str (optional)<br><span class="tab">Executable to run the script (defaults to the Python interpreter).</span></span>
   <span class="tab">`args`: list[str] (optional)<br><span class="tab">Command-line arguments for the script.</span></span>
@@ -56,7 +56,7 @@ mcps = {
 
 | Port Name                         | Payload Type        | Behavior                                                                                  |
 |-----------------------------------|---------------------|-------------------------------------------------------------------------------------------|
-| tool_request_structured_input     | StructuredPayload   | Receives a Payload whose `model.data` is a list of dicts, each containing:<br><span class="tab">`name`: str — hybrid tool name.</span><br><span class="tab">`parameters`: dict — tool arguments (optional).</span><br>Example:<br><code>[<br>{'name': 'todo_add', 'parameters': {'task': 'Buy milk'}}, {'name': 'weather_get', 'parameters': {'city': 'SF'}}<br>]</code><br>Unpacks and forwards these entries to `tools_response_output`. |
+| tool_request_structured_input     | StructuredPayload   | Receives a Payload whose `model.data` is a list of dicts, each containing:<br><span class="tab">`name`: str — hybrid tool name.</span><br><span class="tab">`parameters`: dict — tool arguments (optional).</span><br>[Example](#sec-tool_request_structured_input)<br>Unpacks and forwards these entries to `tools_response_output`. |
 
 : {.hover}
 
@@ -65,8 +65,58 @@ mcps = {
 | Port Name              | Payload Type         | Behavior                                                                        |
 |------------------------|----------------------|---------------------------------------------------------------------------------|
 | tools_schema_output    | SchemaPayload        | Emits a `SchemaPayload` containing the Pydantic schema for available tools.|
-| tools_response_output  | ToolsResponsePayload | Emits a `ToolsResponsePayload` containing tool results mapping tool names to their responses.<br>Example:<br><code>{<br>  'weather_temp_mcp': {<br>   'mcp_name': 'weather_mcp',<br>    'tool_name': 'temp',<br>    'permission_required': False,<br>    'description': 'Get the temperature in a location',<br>    'parameters': {'location': 'San Francisco'},<br>    'response': {<br>      'meta': None,<br>      'content': [{<br>        'type': 'text',<br>        'text': 'The temperature is 54F.',<br>        'annotations': None<br>      }],<br>      'isError': False<br>    }<br>  }<br>}<</code> |
+| tools_response_output  | ToolsResponsePayload | Emits a `ToolsResponsePayload` containing tool results mapping tool names to their responses.<br>[Example](#sec-tools_response_output) |
 
 : {.hover}
+
+## Data Flow Details
+
+### tool_request_structured_input payload {#sec-tool_request_structured_input}
+
+```python
+[
+    {'name': 'todo_add', 'parameters': {'task': 'Buy milk'}},
+    {'name': 'weather_get', 'parameters': {'city': 'SF'}}
+]
+```
+
+### tools_response_output payload {#sec-tools_response_output}
+
+```python
+{
+    'weather_temp_mcp': {
+        'mcp_name': 'weather_mcp',
+        'tool_name': 'temp',
+        'permission_required': False,
+        'description': 'Get the temperature in a location',
+        'parameters': {'location': 'San Francisco'},
+        'response': {
+            'meta': None,
+            'content': [{
+                'type': 'text',
+                'text': 'The temperature is 54F.',
+                'annotations': None
+            }],
+            'isError': False
+        }
+    },
+    'custom_funcs_check_prime': {
+        'mcp_name': 'custom_funcs',
+        'tool_name': 'check_prime',
+        'permission_required': False,
+        'description': 'Check if a number is prime.',
+        'parameters': {'n': 17},
+        'response': {
+            'meta': None,
+            'content': [{
+                'type': 'text',
+                'text': 'True',
+                'annotations': None
+            }],
+            'isError': False
+        }
+    }
+}
+```
 
 <!-- TODO: Add usage examples -->
