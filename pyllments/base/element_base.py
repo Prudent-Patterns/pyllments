@@ -182,7 +182,7 @@ class Element(Component):
             name_str = f" with name='{name}'" if name else ""
             expected_files = " or ".join(attempted_files)
             
-            logger.warning(
+            self.logger.warning(
                 f"No CSS files found for {element_name}'s inject_payload_css call{name_str}. "
                 f"Expected files in {module_path}/css/: {expected_files}"
             )

@@ -153,6 +153,9 @@ class Component(param.Parameterized):
         
         @wraps(func)
         def wrapper(self, *args, **kwargs):
+            # Use element's bound logger if available, otherwise fall back to default logger
+            element_logger = getattr(self, 'logger', logger)
+            
             # Get method signature parameters and their defaults
             sig = inspect.signature(func)
             sig_params = sig.parameters
@@ -168,7 +171,7 @@ class Component(param.Parameterized):
             view_name = func.__name__.replace('create_', '')
             
             # Proceed with creation...
-            logger.debug(f"Creating new view for {view_name}")
+            element_logger.debug(f"Creating new view for {view_name}")
 
             # Initialize CSS cache for this view if needed
             if view_name not in self.css_cache:
@@ -192,7 +195,7 @@ class Component(param.Parameterized):
             css_kwargs = [param for param in inspect.signature(func).parameters 
                          if param.endswith('_css')]
             
-            logger.trace(f"CSS kwargs found in {func.__name__}: {css_kwargs}")
+            element_logger.trace(f"CSS kwargs found in {func.__name__}: {css_kwargs}")
             
             # First load all potential CSS files for this view
             for key in css_kwargs:
@@ -201,16 +204,16 @@ class Component(param.Parameterized):
                     # Get the css folder path
                     css_folder = self._get_module_path() / 'css'
                     css_file_path = css_folder / f"{view_name}_{css_name}.css"
-                    logger.trace(f"Looking for component CSS file: {css_file_path}")
+                    element_logger.trace(f"Looking for component CSS file: {css_file_path}")
                     try:
                         with open(css_file_path, 'r') as f:
                             self.css_cache[view_name][css_name] = f.read()
-                            logger.trace(f"Loaded component CSS from {css_file_path}")
+                            element_logger.trace(f"Loaded component CSS from {css_file_path}")
                     except FileNotFoundError:
-                        logger.trace(f"Component CSS file not found: {css_file_path}")
+                        element_logger.trace(f"Component CSS file not found: {css_file_path}")
                         self.css_cache[view_name][css_name] = ''
                     except Exception as e:
-                        logger.warning(f"Error loading CSS: {str(e)}")
+                        element_logger.warning(f"Error loading CSS: {str(e)}")
                         self.css_cache[view_name][css_name] = ''
 
             # Now handle the CSS parameters
@@ -232,7 +235,7 @@ class Component(param.Parameterized):
                 # Update the custom_attrs with the combined CSS
                 custom_attrs[key] = css_list
 
-            logger.trace(f"Final CSS kwargs: {[(k,v) for k,v in custom_attrs.items() if k.endswith('_css')]}")
+            element_logger.trace(f"Final CSS kwargs: {[(k,v) for k,v in custom_attrs.items() if k.endswith('_css')]}")
 
             # Handle sizing mode
             has_height = 'height' in panel_kwargs
@@ -265,7 +268,7 @@ class Component(param.Parameterized):
                 except FileNotFoundError:
                     self.css_cache[view_name]['default'] = ''
                 except Exception as e:
-                    logger.warning(f"Error loading CSS: {str(e)}")
+                    element_logger.warning(f"Error loading CSS: {str(e)}")
                     self.css_cache[view_name]['default'] = ''
 
             # Build the final stylesheets list with proper priority
