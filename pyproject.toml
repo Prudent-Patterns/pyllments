@@ -24,7 +24,6 @@ dependencies = [
     "bokeh",
     "panel",
     "langchain-text-splitters",
-    "openai",
     "jsonlines",
     "tiktoken",
     "pillow-heif",
