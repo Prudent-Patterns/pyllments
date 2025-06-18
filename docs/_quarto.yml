@@ -22,6 +22,8 @@ website:
         text: Elements
       - href: /api_reference
         text: API Reference
+      - href: /blog
+        text: Blog
     right:
       - icon: github
         href: https://github.com/prudent-patterns/pyllments

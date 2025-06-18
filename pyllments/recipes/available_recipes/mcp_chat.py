@@ -140,29 +140,6 @@ initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.mes
 # Connect initial LLM output to structured router
 initial_llm_chat_el.ports.message_output > structured_router_el.ports.message_input
 
-def check_prime(n: int) -> bool:
-    """Check if a number is prime."""
-    if n <= 1:
-        return False
-    if n <= 3:
-        return True
-    if n % 2 == 0 or n % 3 == 0:
-        return False
-    
-    # Check remaining potential divisors of the form 6k ± 1
-    i = 5
-    while i * i <= n:
-        if n % i == 0 or n % (i + 2) == 0:
-            return False
-        i += 6
-    return True
-
-from typing import Optional
-def get_recent_emails(n: int, filter: Optional[str] = None) -> dict[str, dict]:
-    """Get the most recent emails from the user's inbox."""
-    return {'email_1' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'},
-            'email_2' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'}}
-
 mcp_dir = pathlib.Path(config.mcp_dir)
 mcp_files = list(mcp_dir.glob('*_mcp.py'))
 

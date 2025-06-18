@@ -103,11 +103,22 @@ def check_prime(n: int) -> bool:
             return False
         i += 6
     return True
+    
 from typing import Optional
 def get_recent_emails(n: int, filter: Optional[str] = None) -> dict[str, dict]:
     """Get the most recent emails from the user's inbox."""
-    return {'email_1' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'},
-            'email_2' :{'content': 'Hello, how are you?', 'sender': 'John Doe', 'date': '2021-01-01'}}
+    return {
+        'email_1': {
+            'content': 'Hi there! Just checking in to see how you are doing.',
+            'sender': 'Alice Smith',
+            'date': '2021-01-02'
+        },
+        'email_2': {
+            'content': 'Don’t forget about our meeting tomorrow at 10 AM. Looking forward to it!',
+            'sender': 'Bob Johnson',
+            'date': '2021-01-03'
+        }
+    }
 
 mcp_el = MCPElement(mcps={
     'test_mcp': {

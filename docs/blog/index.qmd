@@ -1,0 +1,19 @@
+---
+title: "Blog"
+listing:
+    id: blog-listing
+    contents:
+        - /*/*.qmd
+        - /*.qmd
+    # fields:
+    #     - date
+    #     - title
+    #     - description
+    type: default
+    sort: "date"
+---
+
+Bloggity blog blog goes here
+
+::: {#blog-listing}
+:::
