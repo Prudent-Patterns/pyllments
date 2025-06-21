@@ -2,6 +2,7 @@
 A simple chat recipe with history handling and model selection.
 """
 from dataclasses import dataclass, field
+from typing import Optional
 
 import panel as pn
 from pyllments import flow
@@ -51,7 +52,7 @@ class Config:
             "help": "The default model to use when loading the interface."
         }
     )
-    system_prompt: str = field(
+    system_prompt: Optional[str] = field(
         default=None,
         metadata={
             "help": "The system prompt to use when loading the interface."

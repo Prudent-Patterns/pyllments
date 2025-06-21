@@ -98,3 +98,37 @@ fallback-version = "0.0.1"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "pyllments/_version.py"
+
+[tool.basedpyright]
+pythonVersion = "3.11"
+reportAttributeAccessIssue = false
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnusedExpression = false
+reportImplicitStringConcatenation = false
+reportMissingTypeArgument = false
+reportCallIssue = false
+reportPrivateLocalImportUsage = false
+deprecateTypingAliases = false
+reportUnannotatedClassAttribute = false
+reportMissingParameterType = false
+reportUnknownParameterType = false
+reportUnknownArgumentType = false
+reportUnusedCallResult = false
+reportIndexIssue = false
+reportUnknownVariableType = false
+reportGeneralTypeIssues = false
+reportArgumentType = false
+reportPossiblyUnboundVariable = false
+reportOperatorIssue = false
+reportUnusedParameter = false
+reportReturnType = false
+reportExplicitAny = false
+reportAny = false
+reportUnknownLambdaType = false
+
+[[tool.basedpyright.executionEnvironments]]
+root = "pyllments/recipes/available_recipes"
+reportUndefinedVariable = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false

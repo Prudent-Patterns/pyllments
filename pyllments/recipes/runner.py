@@ -2,11 +2,8 @@
 Core functionality for running pyllments recipes.
 """
 import importlib.util
-import os
-import sys
 from pathlib import Path
-from typing import Optional, Dict, Any, Type
-from dataclasses import dataclass
+from typing import Optional, Any
 
 from pyllments.logging import logger
 from pyllments.serve import serve
@@ -30,8 +27,14 @@ def load_recipe_module(recipe_path: Path):
         f"pyllments.recipes.{recipe_path.stem}",
         recipe_path
     )
+    if spec is None or spec.loader is None:
+        # Gracefully handle the rare case where the spec or its loader couldn't be created.
+        # Raising here makes the failure explicit and satisfies static type checkers.
+        raise ImportError(f"Unable to load recipe module from {recipe_path}")
+
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # At this point mypy understands spec.loader is not None, but add a runtime assert for safety.
+    spec.loader.exec_module(module)  # type: ignore[assignment]
     return module
 
 

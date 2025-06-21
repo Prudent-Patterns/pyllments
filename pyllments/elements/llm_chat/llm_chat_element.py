@@ -148,7 +148,7 @@ class LLMChatElement(Element):
                             "model": value,
                             "base_url": None
                         })
-            elif isinstance(models_input, list):
+            else:
                 for item in models_input:
                     if isinstance(item, dict):
                         model_val = item.get("model") or item.get("name")
