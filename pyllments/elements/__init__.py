@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from .pipe import PipeElement
     from .transform import TransformElement
     from .mcp import MCPElement
+    from .text import TextElement
     from .structured_router_transformer import StructuredRouterTransformer
+    from .structured_output import StructuredOutputElement
     
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
@@ -36,7 +38,9 @@ ELEMENT_MAPPING = {
     "PipeElement": ".pipe",
     "TransformElement": ".transform",
     "MCPElement": ".mcp",
+    "TextElement": ".text",
     "StructuredRouterTransformer": ".structured_router_transformer",
+    "StructuredOutputElement": ".structured_output",
 }
 
 def __getattr__(name):

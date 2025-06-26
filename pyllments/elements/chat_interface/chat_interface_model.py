@@ -38,5 +38,6 @@ class ChatInterfaceModel(Model):
             )
             if not payload.model.called and not payload.model.calling and not requires_perm:
                 await payload.model.call_tools()
+
         self.message_list.append(payload)
         self.param.trigger('message_list')

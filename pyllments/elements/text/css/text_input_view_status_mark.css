@@ -1,0 +1,8 @@
+:host {
+    position: absolute;
+    bottom: -31px;
+    right: -1px;
+    font-size: 25px;
+    color: var(--tertiary-accent-color);
+    pointer-events: none;
+}

@@ -1,0 +1,18 @@
+:host {
+    --surface-color: var(--primary-accent-color);
+    --surface-text-color: var(--white);
+    margin: 0;
+}
+
+.bk-btn {
+    font-size: 1.1em;
+}
+
+.bk-btn.bk-btn-default {
+    padding: 2px 3px 2px 3px
+}
+
+.bk-btn:hover {
+    background-color: var(--primary-accent-color);
+    color: var(--primary-background-color);
+}

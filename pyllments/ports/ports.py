@@ -1,4 +1,4 @@
-from typing import Union, get_origin, get_args, Any, List, Dict, Awaitable, TypeVar, Generic, Optional
+from typing import Union, get_origin, get_args, Any, TypeVar
 import inspect
 import asyncio
 from uuid import uuid4
@@ -15,7 +15,6 @@ logger = _logger.bind(name=__name__)
 
 # Type variable for generic payload types
 T = TypeVar('T', bound=Payload)
-
 
 class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""

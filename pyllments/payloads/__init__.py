@@ -6,8 +6,6 @@ if TYPE_CHECKING:
     from .message import MessagePayload
     from .chunk import ChunkPayload
     from .file import FilePayload
-    from .tool_list import ToolListPayload
-    from .tool_call import ToolCallPayload
     from .tools_response import ToolsResponsePayload
     from .schema import SchemaPayload
     from .structured import StructuredPayload

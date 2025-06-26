@@ -126,6 +126,7 @@ reportReturnType = false
 reportExplicitAny = false
 reportAny = false
 reportUnknownLambdaType = false
+reportImplicitOverride = false
 
 [[tool.basedpyright.executionEnvironments]]
 root = "pyllments/recipes/available_recipes"

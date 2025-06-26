@@ -1,0 +1,21 @@
+:host {
+    margin: 0;
+}
+
+.bk-input {
+    font-size: var(--bokeh-font-size);
+    background-color: var(--light-outline-color);
+    border: 1px solid var(--faded-text-color);
+    color: var(--white);
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-accent-color) transparent;
+}
+ 
+.bk-input::placeholder {
+    color: var(--primary-background-color);
+    font-size: 1.6em;
+}
+
+:host(.sent) .bk-input{
+    border: 1px solid var(--tertiary-accent-color);
+}

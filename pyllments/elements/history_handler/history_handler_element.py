@@ -136,7 +136,7 @@ class HistoryHandlerElement(Element):
                 # Only include tool response views when enabled
                 views.append(entry.create_collapsible_view())
         # Create the context container column
-        self.context_container = pn.Column(
+        context_container = pn.Column(
             *views,
             scroll=True,
             sizing_mode='stretch_both',
@@ -150,18 +150,18 @@ class HistoryHandlerElement(Element):
                 stylesheets=title_css,
                 sizing_mode='stretch_width'
             ),
-            self.context_container,
+            context_container,
             stylesheets=column_css,
             scroll=False
         )
 
         async def _update_context_view(event):
             current_len = len(self.model.context)
-            container_len = len(self.context_container.objects)
+            container_len = len(context_container[1].objects)
             
             # If entries were removed from the start (sliding window)
             while container_len > current_len:
-                del self.context_container.objects[0]  # Remove from start
+                del context_container[1].objects[0]  # Remove from start
                 container_len -= 1
             
             # Add any new entries at the end
@@ -173,10 +173,10 @@ class HistoryHandlerElement(Element):
                         new_views.append(entry.create_collapsible_view())
                     elif self.show_tool_responses and isinstance(entry, ToolsResponsePayload):
                         new_views.append(entry.create_collapsible_view())
-                self.context_container.extend(new_views)
+                context_container[1].extend(new_views)
             
             # Ensure visual update
-            self.context_container.param.trigger('objects')
+            context_container[1].param.trigger('objects')
 
         self.model.param.watch(_update_context_view, 'context')
         return self.context_view
