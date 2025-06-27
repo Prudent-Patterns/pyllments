@@ -16,6 +16,16 @@
     font-size: 1.6em;
 }
 
-:host(.sent) .bk-input{
+.bk-input:focus {
+    outline: none;
+    border: 1px solid var(--faded-text-color);
+}
+
+:host(.sent) .bk-input {
+    border: 1px solid var(--tertiary-accent-color);
+}
+
+:host(.sent) .bk-input:focus {
+    outline: none;
     border: 1px solid var(--tertiary-accent-color);
 }

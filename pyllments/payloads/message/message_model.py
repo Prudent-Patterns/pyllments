@@ -41,9 +41,12 @@ class MessageModel(Model):
 
     timestamp = param.Number(default=None, doc="Unix timestamp when the message was created")
 
+    loop = param.Parameter(default=None, doc="Asyncio event loop associated with this message model")
 
     def __init__(self, **params):
         super().__init__(**params)
+        if params.get('loop', None) is None:
+            params['loop'] = LoopRegistry.get_loop()
         self.timestamp = time.time() if not self.timestamp else self.timestamp
 
         # Used to ensure only one streaming task is started for stream messages.
@@ -138,8 +141,7 @@ class MessageModel(Model):
         """
         if self.mode == 'atomic' and self.message_coroutine is not None:
             # Create a future to wait for coroutine resolution
-            loop = LoopRegistry.get_loop()
-            future = loop.create_future()
+            future = self.loop.create_future()
             def on_resolved(event):
                 if event.new is None:  # Coroutine has been resolved
                     future.set_result(self)
@@ -148,8 +150,7 @@ class MessageModel(Model):
             await future
         elif self.mode == 'stream' and not self.streamed:
             # Create a future to wait for streaming completion
-            loop = LoopRegistry.get_loop()
-            future = loop.create_future()
+            future = self.loop.create_future()
             def on_streamed(event):
                 if event.new:  # Streaming is complete
                     future.set_result(self)

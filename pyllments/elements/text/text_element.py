@@ -1,3 +1,5 @@
+from typing import Optional
+
 import panel as pn
 import param
 
@@ -24,13 +26,19 @@ class TextElement(Element):
     """
 
     text_input_view   = param.ClassSelector(class_=pn.layout.Row, is_instance=True)
-    markdown_view     = param.ClassSelector(class_=pn.pane.Markdown,         is_instance=True)
+    # View that displays the current text in a read-only form.  We render a
+    # ``MessagePayload`` but the container is generic enough to show other
+    # payload types in the future.
+    display_view     = param.ClassSelector(class_=pn.layout.Column,        is_instance=True)
     send_button_view  = param.ClassSelector(class_=pn.widgets.Button,        is_instance=True)
 
     sent = param.Boolean(default=False, doc="Whether the text input is marked as sent.")
 
     # Whether the text input should be cleared after the Send button is pressed.
     clear_after_send = param.Boolean(default=False, doc="Clear textarea after emit if True.")
+
+    # Track watcher tied to the text input so we can detach it when payload changes
+    _input_content_watcher = None
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -40,9 +48,6 @@ class TextElement(Element):
         self._message_output_setup()
         self._message_input_setup()
         self._message_emit_input_setup()
-
-        # React to changes of the `sent` flag to keep CSS classes & check-mark in sync
-        self.param.watch(self._on_sent_change, "sent")
 
         # Flag used to distinguish programmatic text updates from user input
         self._internal_update: bool = False
@@ -63,8 +68,8 @@ class TextElement(Element):
         """Input port that only displays an incoming MessagePayload."""
 
         async def unpack_display(payload: MessagePayload):
-            # Show the incoming text but do *not* mark it as sent nor re-emit.
-            self._update_text(payload.model.content, mark_sent=False)
+            # Store and load the incoming payload (no re-emit)
+            await self.model.handle_payload(payload)
 
         self.ports.add_input("message_input", unpack_payload_callback=unpack_display)
 
@@ -72,8 +77,8 @@ class TextElement(Element):
         """Input port that displays and then re-emits the MessagePayload."""
 
         async def unpack_emit(payload: MessagePayload):
-            # Display the incoming text, then forward it through the output port.
-            self._update_text(payload.model.content, mark_sent=False)
+            # Display the incoming payload, then forward it downstream.
+            await self.model.handle_payload(payload)
             await self.ports.output["message_output"].stage_emit(payload=payload)
 
         self.ports.add_input("message_emit_input", unpack_payload_callback=unpack_emit)
@@ -117,14 +122,11 @@ class TextElement(Element):
             new_text = event.new or ""
 
             if self.sent and new_text.strip() == "":
-                # Front-end auto-clear after sending; restore previous content
-                self._internal_update = True
-                try:
-                    # Restore both .value and .value_input to keep UI & state in sync
-                    event.obj.value = self.model.text
-                    event.obj.value_input = self.model.text
-                finally:
-                    self._internal_update = False
+                # Browser auto-cleared after submission; restore text
+                self._internal_update = True          # <- guard OUR watchers only
+                event.obj.value        = self.model.text
+                event.obj.value_input  = self.model.text
+                self._internal_update = False
                 return
 
             # Regular user typing before sending
@@ -135,7 +137,57 @@ class TextElement(Element):
         text_area_input.param.watch(_on_input, "value_input")
 
         # Watch for Enter submissions (ChatAreaInput fires 'value' when the user presses Enter)
-        text_area_input.param.watch(self._on_send, "value")
+        text_area_input.param.watch(self._on_send, 'value')
+
+        # Watch `sent` to toggle ✓ and CSS locally to this view
+        def _update_sent(event):
+            sent_state = event.new
+            text_area_input.css_classes = ["sent"] if sent_state else []
+            status_mark.object = "✓" if sent_state else ""
+            status_mark.css_classes = ["sent"] if sent_state else []
+
+        self.param.watch(_update_sent, "sent")
+
+        # --------------------------------------------------------------
+        # Watch for payload changes to preload & stream into textarea
+        # --------------------------------------------------------------
+
+        def _on_payload_change(event):
+            payload = event.new
+            if not isinstance(payload, MessagePayload):
+                return
+
+            # Load initial content
+            self._internal_update = True
+            try:
+                text_area_input.value = payload.model.content
+                text_area_input.value_input = payload.model.content
+                self.model.text = payload.model.content
+            finally:
+                self._internal_update = False
+
+            # Detach previous watcher on content
+            if self._input_content_watcher is not None:
+                try:
+                    event.old.model.param.unwatch(self._input_content_watcher)
+                except Exception:
+                    pass
+
+            # Sync as content streams
+            def _on_content(event2):
+                new_txt = event2.new or ""
+                self._internal_update = True
+                try:
+                    text_area_input.value = new_txt
+                    text_area_input.value_input = new_txt
+                    self.model.text = new_txt
+                finally:
+                    self._internal_update = False
+
+            self._input_content_watcher = payload.model.param.watch(_on_content, 'content')
+
+        # Attach payload watcher once
+        self.model.param.watch(_on_payload_change, 'payload')
 
         # Return a Row containing the textarea and the status mark
         self.text_input_view = pn.Row(
@@ -145,31 +197,99 @@ class TextElement(Element):
         return self.text_input_view
 
     @Component.view
-    def create_markdown_view(self) -> pn.pane.Markdown:
-        self.markdown_view = pn.pane.Markdown(self.model.text, sizing_mode="stretch_width")
-        return self.markdown_view
+    def create_display_view(
+        self,
+        title: Optional[str] = None,
+        title_css: list[str] = [],
+        payload: Optional[MessagePayload] = None,
+        **kwargs,
+    ) -> pn.Column:
+        """Return a Column that shows the text as a **MessagePayload**.
+
+        Parameters
+        ----------
+        title : str, optional
+            Optional title rendered above the message (e.g. "Output").
+        title_css : list[str]
+            Extra CSS stylesheets for the title pane.
+        payload : MessagePayload, optional
+            The payload to render. If None, the current model text is used.
+        **kwargs
+            Forwarded to :py:meth:`MessagePayload.create_static_view`.
+        """
+
+        # Ensure *payload* is a MessagePayload instance
+        if not isinstance(payload, MessagePayload):
+            if not isinstance(self.model.payload, MessagePayload):
+                self.model.payload = MessagePayload(
+                    role="assistant",  # role hidden by default; irrelevant here
+                    content=self.model.text,
+                    mode="atomic",
+                )
+            payload = self.model.payload
+
+        payload_row = payload.create_static_view(show_role=False, **kwargs)
+
+        if self.display_view is None:
+            # Build column with optional title and the payload row as last item
+            children = []
+            if title:
+                children.append(pn.pane.Str(title, stylesheets=title_css))
+            children.append(payload_row)
+            self.display_view = pn.Column(*children)
+
+            # Reactive watcher defined *inside* the view scope
+            def _on_payload_change(event):
+                new_pl = event.new
+                if not isinstance(new_pl, MessagePayload):
+                    return
+                new_row = new_pl.create_static_view(show_role=False)
+                # Replace the last child (current payload row)
+                self.display_view[-1] = new_row
+
+            self.model.param.watch(_on_payload_change, 'payload')
+        else:
+            # Replace last child (payload row)
+            self.display_view[-1] = payload_row
+
+        return self.display_view
 
     @Component.view
     def create_send_button_view(self, icon: str = "arrow-up", label: str = "Send"):
         self.send_button_view = pn.widgets.Button(name=label, icon=icon, icon_size="1.2em")
-        self.send_button_view.on_click(self._on_send)
+        btn = self.send_button_view
+        text_widget = self.text_input_view[0]
+        btn.on_click(lambda *_: text_widget.param.trigger('value'))
         return self.send_button_view
 
     @Component.view
-    def create_input_view(self):
-        return pn.Column(
-            self.create_text_input_view(),
+    def create_input_view(self, title: Optional[str] = None, title_css: list[str] = []):
+        input_col = pn.Column(self.create_text_input_view(),
             pn.Spacer(height=5),
-            self.create_send_button_view(height=30),
-        )
+            self.create_send_button_view(height=30))
+        if title:
+            title_str = pn.pane.Str(
+                title,
+                stylesheets=title_css
+            )
+            input_col.insert(0, title_str)
+        return input_col
 
     @Component.view
-    def create_interface_view(self):
+    def create_interface_view(
+        self,
+        input_title: Optional[str] = None,
+        display_title: Optional[str] = None,
+        **kwargs,
+    ):
         """Column with input row on top and markdown view below."""
+        # Backwards-compat: accept old keyword ``message_title``
+        display_ttl = kwargs.pop("message_title", display_title)
+
         return pn.Column(
-            self.create_input_view(),
+            self.create_input_view(title=input_title),
             pn.Spacer(height=6),
-            self.create_markdown_view()
+            self.create_display_view(title=display_ttl)
         )
 
     # ------------------------------------------------------------------
@@ -183,8 +303,16 @@ class TextElement(Element):
             return
 
         # Safety-check: ensure we have the input widget
-        input_widget = self.text_input_view[0] if self.text_input_view else None
+        input_widget = self.text_input_view[0]
         if input_widget is None:
+            return
+
+        # Only process genuine submissions once per cycle
+        if self.sent:
+            return  # already processed this submission
+
+        # Ensure we are handling the ChatAreaInput submission
+        if event.obj is not input_widget:
             return
 
         # Distinguish between the two trigger sources (button vs. Enter key)
@@ -200,16 +328,20 @@ class TextElement(Element):
 
         content = str(input_text).strip()
 
-        # Emit the payload downstream
-        payload = MessagePayload(role="user", content=content, mode="atomic")
-        await self.ports.output["message_output"].stage_emit(payload=payload)
+        # Emit once
+        payload = MessagePayload(role='user', content=content, mode='atomic')
+        await self.ports.output['message_output'].stage_emit(payload=payload)
+        self.model.payload = payload
 
-        # Update markdown & mark as sent
+        # --- restore text so it stays visible ---
+        if not self.clear_after_send:
+            event.obj.value        = content
+            event.obj.value_input  = content
+
         self._update_text(content, mark_sent=True)
 
-        # Optionally clear the textarea afterwards to mimic chat behaviour
         if self.clear_after_send:
-            input_widget.value_input = ''
+            event.obj.value_input = ''
             self.model.text = ''
 
     # ------------------------------------------------------------------
@@ -235,25 +367,8 @@ class TextElement(Element):
                         self._internal_update = False
             else:
                 self.text_input_view[0].value = content
-        if self.markdown_view is not None:
-            self.markdown_view.object = content
+        # Update placeholder payload content if it exists and has atomic mode
+        if isinstance(self.model.payload, MessagePayload):
+            self.model.payload.model.content = content
         # Let the watcher take care of updating CSS & check-mark
         self.sent = mark_sent
-
-    # ------------------------------------------------------------------
-    # Watchers
-    # ------------------------------------------------------------------
-    def _on_sent_change(self, event):
-        """Synchronise CSS classes and ✓ symbol whenever `sent` changes."""
-        sent_state = event.new
-
-        # TextAreaInput widget is at index 0 in the Row
-        if self.text_input_view is not None:
-            text_widget = self.text_input_view[0]
-            text_widget.css_classes = ["sent"] if sent_state else []
-
-        # Check-mark markdown pane is at index 1 in the Row
-        if self.text_input_view is not None and len(self.text_input_view) > 1:
-            status_mark = self.text_input_view[1]
-            status_mark.object = "✓" if sent_state else ""
-            status_mark.css_classes = ["sent"] if sent_state else []

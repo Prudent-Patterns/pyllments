@@ -5,4 +5,4 @@ text_el = TextElement()
 
 @flow
 def main():
-    return text_el.create_interface_view(height=800, width=500)
+    return text_el.create_interface_view(height=800, width=500, input_title="Input")

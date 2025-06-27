@@ -157,11 +157,12 @@ class HistoryHandlerElement(Element):
 
         async def _update_context_view(event):
             current_len = len(self.model.context)
-            container_len = len(context_container[1].objects)
+            # Access the objects list of the context container directly
+            container_len = len(context_container.objects)
             
             # If entries were removed from the start (sliding window)
             while container_len > current_len:
-                del context_container[1].objects[0]  # Remove from start
+                del context_container.objects[0]  # Remove from start
                 container_len -= 1
             
             # Add any new entries at the end
@@ -173,10 +174,10 @@ class HistoryHandlerElement(Element):
                         new_views.append(entry.create_collapsible_view())
                     elif self.show_tool_responses and isinstance(entry, ToolsResponsePayload):
                         new_views.append(entry.create_collapsible_view())
-                context_container[1].extend(new_views)
+                context_container.extend(new_views)
             
             # Ensure visual update
-            context_container[1].param.trigger('objects')
+            context_container.param.trigger('objects')
 
         self.model.param.watch(_update_context_view, 'context')
         return self.context_view
