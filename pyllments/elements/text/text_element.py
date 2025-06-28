@@ -70,6 +70,8 @@ class TextElement(Element):
         async def unpack_display(payload: MessagePayload):
             # Store and load the incoming payload (no re-emit)
             await self.model.handle_payload(payload)
+            if self.text_input_view is not None:
+                self._bind_payload_to_textarea(payload, self.text_input_view[0])
 
         self.ports.add_input("message_input", unpack_payload_callback=unpack_display)
 
@@ -80,6 +82,8 @@ class TextElement(Element):
             # Display the incoming payload, then forward it downstream.
             await self.model.handle_payload(payload)
             await self.ports.output["message_output"].stage_emit(payload=payload)
+            if self.text_input_view is not None:
+                self._bind_payload_to_textarea(payload, self.text_input_view[0])
 
         self.ports.add_input("message_emit_input", unpack_payload_callback=unpack_emit)
 
@@ -134,10 +138,10 @@ class TextElement(Element):
             if self.sent:
                 # Any *non-empty* user edit marks message as not sent
                 self.sent = False
-        text_area_input.param.watch(_on_input, "value_input")
+        self.watch(text_area_input, "value_input", _on_input)
 
         # Watch for Enter submissions (ChatAreaInput fires 'value' when the user presses Enter)
-        text_area_input.param.watch(self._on_send, 'value')
+        self.watch(text_area_input, 'value', self._on_send)
 
         # Watch `sent` to toggle ✓ and CSS locally to this view
         def _update_sent(event):
@@ -146,48 +150,18 @@ class TextElement(Element):
             status_mark.object = "✓" if sent_state else ""
             status_mark.css_classes = ["sent"] if sent_state else []
 
-        self.param.watch(_update_sent, "sent")
+        self.watch(self, 'sent', _update_sent)
 
-        # --------------------------------------------------------------
-        # Watch for payload changes to preload & stream into textarea
-        # --------------------------------------------------------------
-
-        def _on_payload_change(event):
-            payload = event.new
-            if not isinstance(payload, MessagePayload):
-                return
-
-            # Load initial content
+        # If a payload already exists (e.g., after refresh), load it now
+        if isinstance(self.model.payload, MessagePayload):
+            # Direct population - no watchers needed
             self._internal_update = True
             try:
-                text_area_input.value = payload.model.content
-                text_area_input.value_input = payload.model.content
-                self.model.text = payload.model.content
+                text_area_input.value_input = self.model.payload.model.content
+                self.model.text = self.model.payload.model.content
+                self.sent = False
             finally:
                 self._internal_update = False
-
-            # Detach previous watcher on content
-            if self._input_content_watcher is not None:
-                try:
-                    event.old.model.param.unwatch(self._input_content_watcher)
-                except Exception:
-                    pass
-
-            # Sync as content streams
-            def _on_content(event2):
-                new_txt = event2.new or ""
-                self._internal_update = True
-                try:
-                    text_area_input.value = new_txt
-                    text_area_input.value_input = new_txt
-                    self.model.text = new_txt
-                finally:
-                    self._internal_update = False
-
-            self._input_content_watcher = payload.model.param.watch(_on_content, 'content')
-
-        # Attach payload watcher once
-        self.model.param.watch(_on_payload_change, 'payload')
 
         # Return a Row containing the textarea and the status mark
         self.text_input_view = pn.Row(
@@ -218,39 +192,16 @@ class TextElement(Element):
             Forwarded to :py:meth:`MessagePayload.create_static_view`.
         """
 
-        # Ensure *payload* is a MessagePayload instance
-        if not isinstance(payload, MessagePayload):
-            if not isinstance(self.model.payload, MessagePayload):
-                self.model.payload = MessagePayload(
-                    role="assistant",  # role hidden by default; irrelevant here
-                    content=self.model.text,
-                    mode="atomic",
-                )
-            payload = self.model.payload
-
-        payload_row = payload.create_static_view(show_role=False, **kwargs)
-
+        # Build display column if it doesn't exist
         if self.display_view is None:
-            # Build column with optional title and the payload row as last item
             children = []
             if title:
-                children.append(pn.pane.Str(title, stylesheets=title_css))
-            children.append(payload_row)
+                fresh_title_css = list(title_css) if title_css else []
+                children.append(pn.pane.Str(title, stylesheets=fresh_title_css))
             self.display_view = pn.Column(*children)
 
-            # Reactive watcher defined *inside* the view scope
-            def _on_payload_change(event):
-                new_pl = event.new
-                if not isinstance(new_pl, MessagePayload):
-                    return
-                new_row = new_pl.create_static_view(show_role=False)
-                # Replace the last child (current payload row)
-                self.display_view[-1] = new_row
-
-            self.model.param.watch(_on_payload_change, 'payload')
-        else:
-            # Replace last child (payload row)
-            self.display_view[-1] = payload_row
+        # Render the payload (or clear view if None)
+        self._render_payload_in_display(payload)
 
         return self.display_view
 
@@ -372,3 +323,68 @@ class TextElement(Element):
             self.model.payload.model.content = content
         # Let the watcher take care of updating CSS & check-mark
         self.sent = mark_sent
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _bind_payload_to_textarea(self, payload: MessagePayload, widget):
+        """Populate *widget* with payload text and stream subsequent updates."""
+
+        if not isinstance(payload, MessagePayload):
+            return
+
+        # If the same payload is already bound, do nothing.
+        if payload is self._input_content_watcher:
+            return
+
+        # Detach watcher from previously bound payload (if any)
+        if self._input_content_watcher is not None:
+            try:
+                self._input_content_watcher.model.param.unwatch(self._input_content_watcher)
+            except Exception:
+                pass
+            self._input_content_watcher = None
+
+        # Initial content load (do NOT touch .value to avoid triggering send)
+        self._internal_update = True
+        try:
+            widget.value_input = payload.model.content
+            self.model.text = payload.model.content
+            self.sent = False  # external load is not a local send
+        finally:
+            self._internal_update = False
+
+        # Watch content stream
+        def _on_content(ev):
+            new_txt = ev.new or ""
+            self._internal_update = True
+            try:
+                widget.value_input = new_txt
+                self.model.text = new_txt
+            finally:
+                self._internal_update = False
+
+        self._input_content_watcher = self.watch(payload.model, 'content', _on_content)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _render_payload_in_display(self, payload):
+        """Render *payload* inside the existing ``display_view``.
+
+        If *payload* is None, the display is cleared.
+        """
+        if self.display_view is None:
+            return
+
+        # Remove previous payload row(s) – assume the last child holds content
+        if self.display_view.objects:
+            # If there is a title, payload row is last; else only child.
+            if len(self.display_view.objects) == 1:
+                self.display_view.objects.pop()
+            else:
+                self.display_view.objects.pop()
+
+        if isinstance(payload, MessagePayload):
+            row = payload.create_static_view(show_role=False)
+            self.display_view.append(row)

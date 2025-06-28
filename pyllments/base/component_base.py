@@ -1,6 +1,5 @@
 import sys
 import inspect
-import warnings
 from functools import wraps
 from pathlib import Path
 from uuid import uuid4
@@ -24,7 +23,8 @@ class Component(param.Parameterized):
         self.id = str(uuid4())
         known_params = {k: v for k, v in params.items() if k in self.param}
         super().__init__(**known_params)
-        
+        # Mapping: view_name -> list[(owner, watcher)]
+        self._view_watchers: dict[str, list] = {}
 
     @classmethod
     def _get_module_path(cls):
@@ -173,6 +173,27 @@ class Component(param.Parameterized):
             # Proceed with creation...
             element_logger.debug(f"Creating new view for {view_name}")
 
+            # ------------------------------------------------------------------
+            # 🧹 1. Detach watchers from the *previous* build of this view
+            # ------------------------------------------------------------------
+            if not hasattr(self, "_view_watchers"):
+                self._view_watchers = {}
+
+            for owner, wid in self._view_watchers.get(view_name, []):
+                try:
+                    owner.param.unwatch(wid)
+                except Exception as exc:
+                    element_logger.debug(f"Component: failed to unwatch {wid}: {exc}")
+            # Reset entry ready for this build
+            self._view_watchers[view_name] = []
+
+            # ------------------------------------------------------------------
+            # 📌 2. Prepare container to store watchers created during *this*
+            #        view build.  ``self.watch`` will append into this list.
+            # ------------------------------------------------------------------
+            prev_build_list = getattr(self, "_building_watchers", None)
+            self._building_watchers = []
+
             # Initialize CSS cache for this view if needed
             if view_name not in self.css_cache:
                 self.css_cache[view_name] = {}
@@ -301,6 +322,15 @@ class Component(param.Parameterized):
             for attr, value in custom_attrs.items():
                 setattr(view, attr, value)
             
+            # ------------------------------------------------------------------
+            #  🔗 3. Persist watchers registered during this build
+            # ------------------------------------------------------------------
+            if getattr(self, "_building_watchers", None):
+                self._view_watchers[view_name] = self._building_watchers
+
+            # Restore previous build list (supports nested view creation)
+            self._building_watchers = prev_build_list
+            
             return view
 
         return wrapper
@@ -315,10 +345,48 @@ class Component(param.Parameterized):
         if parameterized_class is None:
             parameterized_class = self.model
         # Get the name of the calling method (e.g., 'create_chatfeed_view')
-        caller = inspect.currentframe().f_back.f_code.co_name
+        current_frame = inspect.currentframe()
+        caller_frame = current_frame.f_back if current_frame else None
+        caller = caller_frame.f_code.co_name if caller_frame else "<unknown>"
         # Create a unique key combining the method name and parameter
         key = f"{caller}_{parameter_name}"
         # Only set up the watcher if it doesn't already exist
         if key not in self._watchers:
             watcher = parameterized_class.param.watch(callback, parameter_name, **kwargs)
             self._watchers[key] = watcher
+
+    # ------------------------------------------------------------------
+    # Developer-facing watcher helper (preferred replacement for session_watch)
+    # ------------------------------------------------------------------
+    def watch(self, obj: param.Parameterized, name: str, callback, **kwargs):
+        """Register a Param watcher.
+
+        If called *inside* a view factory (i.e. while the decorator is
+        building a view) the watcher is automatically associated with that
+        specific build and will be detached the next time the same view
+        factory is invoked.
+
+        If called *outside* any view build the watcher is stored in an
+        internal dict to prevent duplicate registrations.
+        """
+        wid = obj.param.watch(callback, name, **kwargs)
+
+        # During view construction the decorator sets up `_building_watchers`.
+        if getattr(self, "_building_watchers", None) is not None:
+            self._building_watchers.append((obj, wid))
+        else:
+            # Global scope watcher — ensure we only attach once.
+            key = ("global", id(obj), name)
+            old = self._watchers.pop(key, None)
+            if old is not None:
+                try:
+                    obj.param.unwatch(old)
+                except Exception:
+                    pass
+            self._watchers[key] = wid
+
+        return wid
+
+    # ------------------------------------------------------------------
+    # Legacy helpers removed: cleanup now handled internally via dict
+    # ------------------------------------------------------------------

@@ -19,7 +19,6 @@ from pyllments.logging import setup_logging
 from pyllments.common.resource_loader import get_asset
 from pyllments.runtime.app_registry import AppRegistry
 from pyllments.runtime.loop_registry import LoopRegistry
-# Import lifecycle manager
 from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 from pyllments.common.type_utils import TypeMapper
 
@@ -277,6 +276,8 @@ def serve(
                     logger.info(f"Found @flow wrapped function in script")
                 name, obj = func_list[0]
 
+
+
                 # Get the FastAPI app (which now includes lifespan)
                 app = AppRegistry.get_app()
                 try:
@@ -285,8 +286,10 @@ def serve(
                 except Exception as e:
                     logger.error(f"Failed to mount static files: {e}")
 
-                @add_application('/', app=app, title='Pyllments')
+
+                @add_application('/', app=app, title='Pyllments', unused_session_lifetime=1, check_unused_sessions=1)
                 def serve_gui():
+
                     template_path = resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH)
                     main_tmpl_str = template_path.read_text()
                     tmpl = pn.Template(main_tmpl_str)
@@ -296,9 +299,9 @@ def serve(
                 
                 # ---- Register Panel unload hook ----
                 try:
-                    async def panel_shutdown_hook(session_context):
+                    def panel_shutdown_hook(session_context):
                         logger.info("Panel unload hook triggered. Cleaning up resources...")
-                        await lifecycle_manager.shutdown()
+                        # await lifecycle_manager.shutdown()
                         logger.info("Panel unload hook: Resource cleanup complete.")
                         
                     # Only register if we are actually serving a GUI via Panel

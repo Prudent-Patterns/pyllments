@@ -178,8 +178,7 @@ class ChatInterfaceElement(Element):
                 # Append the dynamic tool response view, which has its own prompt logic
                 self.chatfeed_view.append(new_item.create_tools_response_view())
 
-        # This watcher should be called before the payload starts streaming.
-        self.watch_once(_update_chatfeed, 'message_list', precedence=0)
+        self.watch(self.model, 'message_list', _update_chatfeed)
         return self.chatfeed_view
 
     @Component.view

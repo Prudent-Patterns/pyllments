@@ -50,7 +50,7 @@ class MessagePayload(Payload):
         def _update_message_view(event):
             view[0].object = event.new if event.new is not None else ""
             
-        self.model.param.watch(_update_message_view, 'content')
+        self.watch(self.model, 'content', _update_message_view)
         
         if show_role:
             role_md = pn.pane.Markdown(role_str, stylesheets=role_css)
@@ -111,7 +111,7 @@ class MessagePayload(Payload):
                 markdown.object = (current_content if len(current_content) <= truncation_length 
                                 else f"{current_content[:truncation_length]}...")
 
-        self.model.param.watch(_update_message_view, 'content')
+        self.watch(self.model, 'content', _update_message_view)
 
         def toggle_visibility(event):
             if event.new:  # If the toggle is activated

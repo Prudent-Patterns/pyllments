@@ -19,6 +19,7 @@ class MessageModel(Model):
     role = param.Selector(
         default='user', 
         objects=['system', 'assistant', 'user', 'function', 'tool', 'developer'],
+        instantiate=True,
         doc="Message role - matches OpenAI/LiteLLM format"
     )
     
@@ -27,6 +28,7 @@ class MessageModel(Model):
     mode = param.Selector(
         objects=['atomic', 'stream'],
         default='atomic',
+        instantiate=True,
         doc="Determines whether the message is captured atomically or via streaming"
     )
     

@@ -179,5 +179,6 @@ class HistoryHandlerElement(Element):
             # Ensure visual update
             context_container.param.trigger('objects')
 
-        self.model.param.watch(_update_context_view, 'context')
+        # Track updates to context; decorator handles cleanup on rebuild
+        self.watch(self.model, 'context', _update_context_view)
         return self.context_view

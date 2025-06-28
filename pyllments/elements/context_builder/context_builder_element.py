@@ -27,6 +27,11 @@ class ContextBuilderElement(Element):
     Uses conversion functions (see `payload_message_mapping`) to transform
     incoming payloads into the standard `MessagePayload` format.
 
+    Role Assignment:
+    - Ports without explicit 'role': Preserves original message roles (no mutation)
+    - Ports with explicit 'role': Overrides all messages with specified role
+    - Constants/Templates: Use specified role or defaults ('user'/'system')
+
     Key Concepts:
     - Input Sources: Defined via `input_map`. Can be:
         - Regular Ports: Receive payloads dynamically. Can be marked `persist=True`.
@@ -229,7 +234,7 @@ class ContextBuilderElement(Element):
 
     def _register_constant(self, name, config):
         """Register a constant message."""
-        role = config.get('role', 'user')
+        role = config.get('role', 'user')  # Default to 'user' for new messages
         message = config.get('message', '')
         
         self.port_types[name] = 'constant'
@@ -238,7 +243,7 @@ class ContextBuilderElement(Element):
 
     def _register_template(self, name, config):
         """Register a template and its dependencies."""
-        role = config.get('role', 'system')
+        role = config.get('role', 'system')  # Default to 'system' for new template messages
         template_str = config.get('template', '')
         
         self.port_types[name] = 'template'
@@ -254,7 +259,12 @@ class ContextBuilderElement(Element):
     def _register_port(self, name, config):
         """Register a regular port configuration."""
         self.port_types[name] = 'regular'
-        self.port_roles[name] = config.get('role', 'user')
+        # For ports, only store role if explicitly specified (to override received messages)
+        # If no role is specified, received messages keep their original roles
+        if 'role' in config:
+            self.port_roles[name] = config['role']
+        else:
+            self.port_roles[name] = None  # No role override for received messages
         
         if name != 'messages_output' and name not in self.required_ports:
             self.required_ports.append(name)
