@@ -71,12 +71,11 @@ class Component(param.Parameterized):
         (for example, "stretch_both") to take effect.
 
         **Caching Behavior:**
-        By default the first call to a view factory caches the resulting view on the instance under
-        ``f"{view_name}_view"`` (e.g. ``chatfeed_view``).  Subsequent calls will return this cached object so that
-        widgets and Param/Panel watchers are not created more than once.
-
-        If a caller needs a *fresh* instance, they can pass ``disable_caching=True`` when invoking the view factory.
-        In that case the cache lookup is skipped and the newly-created view is **not** stored.
+        The decorated view is not automatically stored as a special Panel parameter or persistent attribute.
+        The decorator checks for an existing view attribute (e.g., `myview_view`) on the instance and returns it if found.
+        However, if the view does not exist, it is created on demand and returned without being automatically assigned
+        to the instance. If persistent caching is desired, the view should be explicitly assigned to the instance,
+        for example: setattr(self, view_attr_name, view).
 
         Parameters
         ----------
@@ -157,10 +156,6 @@ class Component(param.Parameterized):
             # Use element's bound logger if available, otherwise fall back to default logger
             element_logger = getattr(self, 'logger', logger)
             
-            # Pop disable_caching flag early so it is *not* forwarded to the
-            # underlying view factory nor treated as a custom attribute.
-            disable_caching = kwargs.pop('disable_caching', False)
-            
             # Get method signature parameters and their defaults
             sig = inspect.signature(func)
             sig_params = sig.parameters
@@ -171,22 +166,11 @@ class Component(param.Parameterized):
                 for name, param in sig_params.items() 
                 if param.default is not inspect.Parameter.empty
             }
-            # Remove potential default for disable_caching so it isn't forwarded
-            defaults.pop('disable_caching', None)
             merged_kwargs = {**defaults, **kwargs}
 
             view_name = func.__name__.replace('create_', '')
             
-            # ----------------------------------------------------------
-            # View caching
-            # ----------------------------------------------------------
-            cached_attr_name = f"{view_name}_view"
-            if not disable_caching:
-                cached_view = getattr(self, cached_attr_name, None)
-                if cached_view is not None:
-                    return cached_view
-
-            # Proceed with creation of a *new* view instance.
+            # Proceed with creation...
             element_logger.debug(f"Creating new view for {view_name}")
 
             # Initialize CSS cache for this view if needed
@@ -316,13 +300,6 @@ class Component(param.Parameterized):
             # Apply custom attributes
             for attr, value in custom_attrs.items():
                 setattr(view, attr, value)
-            
-            # ----------------------------------------------------------
-            # Cache the newly created view for future reuse unless the
-            # caller explicitly disabled caching for this invocation.
-            # ----------------------------------------------------------
-            if not disable_caching:
-                setattr(self, cached_attr_name, view)
             
             return view
 
