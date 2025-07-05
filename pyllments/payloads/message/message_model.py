@@ -38,6 +38,8 @@ class MessageModel(Model):
     )
     
     streamed = param.Boolean(default=False, doc="Indicates whether the message has been fully streamed")
+    
+    ready = param.Boolean(default=False, doc="Indicates if the message is fully processed and ready for use")
         
     embedding = param.Parameter(doc="Message embedding if generated")
 
@@ -82,6 +84,7 @@ class MessageModel(Model):
                 
         logger.info("Completed message stream")
         self.streamed = True
+        self.ready = True
 
         # Clean up any watchers on 'streamed' if they exist.
         if (streamed_watchers := self.param.watchers.get('streamed')) is not None:
@@ -124,6 +127,7 @@ class MessageModel(Model):
                 response = await self.message_coroutine
                 self.content = response['choices'][0]['message']['content']
                 self.message_coroutine = None
+                self.ready = True
             return self.content
         elif self.mode == 'stream':
             if not self.streamed:
@@ -132,6 +136,7 @@ class MessageModel(Model):
                     self._stream_task = asyncio.create_task(self.stream())
                 # Wait for the streaming to complete.
                 await self._stream_task
+                self.ready = True
             return self.content
         else:
             raise ValueError(f"Unsupported mode: {self.mode}")
@@ -141,25 +146,23 @@ class MessageModel(Model):
         Passively await until the message is fully processed (streamed or coroutine resolved) without triggering the process.
         Returns the model instance for chaining.
         """
-        if self.mode == 'atomic' and self.message_coroutine is not None:
-            # Create a future to wait for coroutine resolution
-            future = self.loop.create_future()
-            def on_resolved(event):
-                if event.new is None:  # Coroutine has been resolved
-                    future.set_result(self)
-                    self.param.unwatch(watcher)
-            watcher = self.param.watch(on_resolved, 'message_coroutine')
-            await future
-        elif self.mode == 'stream' and not self.streamed:
-            # Create a future to wait for streaming completion
-            future = self.loop.create_future()
-            def on_streamed(event):
-                if event.new:  # Streaming is complete
-                    future.set_result(self)
-                    self.param.unwatch(watcher)
-            watcher = self.param.watch(on_streamed, 'streamed')
-            await future
+        if not self.ready:
+            if self.mode == 'atomic' and self.message_coroutine is not None:
+                # Create a future to wait for coroutine resolution
+                future = self.loop.create_future()
+                def on_resolved(event):
+                    if event.new is None:  # Coroutine has been resolved
+                        future.set_result(self)
+                        self.param.unwatch(watcher)
+                watcher = self.param.watch(on_resolved, 'message_coroutine')
+                await future
+            elif self.mode == 'stream' and not self.streamed:
+                # Create a future to wait for streaming completion
+                future = self.loop.create_future()
+                def on_streamed(event):
+                    if event.new:  # Streaming is complete
+                        future.set_result(self)
+                        self.param.unwatch(watcher)
+                watcher = self.param.watch(on_streamed, 'ready')
+                await future
         return self
-
-
-

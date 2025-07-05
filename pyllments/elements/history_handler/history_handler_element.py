@@ -15,9 +15,6 @@ from pyllments.runtime.loop_registry import LoopRegistry
 
 # TODO: Allow support of other payload types
 class HistoryHandlerElement(Element):
-    # TODO Add filtering support
-    # Whether to include tool response payload views in the context view
-    show_tool_responses = param.Boolean(default=False, doc="Whether to include tool response views in the context view")
     """
     Responsible for building the context that is sent to the LLM, handling both messages and tool responses.
     
@@ -38,6 +35,8 @@ class HistoryHandlerElement(Element):
     - output:
         - message_history_output: List[MessagePayload] - Current message context
     """
+    # TODO Add filtering support
+    show_tool_responses = param.Boolean(default=False, doc="Whether to include tool response views in the context view")
     context_view = param.ClassSelector(class_=pn.Column)
 
     def __init__(self, **params):

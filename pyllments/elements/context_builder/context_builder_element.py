@@ -48,7 +48,7 @@ class ContextBuilderElement(Element):
         - Trigger/Order: All non-optional items in the active trigger list
           must satisfy their requirements for emission to occur.
         - Explicit (`depends_on`): Any item (port, constant, template) can
-          have a `depends_on` list in its `input_map` config. This item
+          have a `depends_on` list/str in its `input_map` config. This item
           will *only* be included (even if optional in the order) if all
           ports listed in its `depends_on` clause have payloads.
         - Template Variables: Templates implicitly depend on non-optional
@@ -104,7 +104,9 @@ class ContextBuilderElement(Element):
         - Ports: Input ports with 'role' and 'payload_type' keys.
             Optional 'persist' flag (defaults to False) - determines if payload persists in flow controller.
             Optional 'callback' function to transform the payload when it is received by the port.
+                The callback function can be asynchronous and will be awaited before the next port is processed.
                 e.g. 'callback': lambda payload: do_something(payload.model.content)
+                e.g. 'callback': lambda payload: asyncio.create_task(do_something(payload.model.content))
             Optional 'depends_on' to specify dependencies on other ports.
         - Constants: Keys ending with '_constant' with 'role' and 'message' keys.
             Optional 'depends_on' to only include the constant when specified ports have data.
@@ -329,7 +331,11 @@ class ContextBuilderElement(Element):
             )
 
             if active_name in self.callbacks and active_port.payload is not None:
-                active_port.payload = self.callbacks[active_name](active_port.payload)
+                result = self.callbacks[active_name](active_port.payload)
+                if asyncio.iscoroutine(result) or isinstance(result, asyncio.Task):
+                    active_port.payload = await result
+                else:
+                    active_port.payload = result
             if active_port.payload is not None:
                 self._update_template_storage(active_name, active_port.payload)
 

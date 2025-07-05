@@ -133,6 +133,8 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
         The loaded module with config injected into its globals.
     """
     spec = spec_from_file_location(module_name, filename)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not create spec for module {module_name} from file {filename}")
     module = module_from_spec(spec)
     # Extract Config information from the module source code using AST.
     config_info = extract_config_class(filename)
@@ -287,7 +289,7 @@ def serve(
                     logger.error(f"Failed to mount static files: {e}")
 
 
-                @add_application('/', app=app, title='Pyllments', unused_session_lifetime=1, check_unused_sessions=1)
+                @add_application('/', app=app, title='Pyllments')
                 def serve_gui():
 
                     template_path = resources.files('pyllments').joinpath(MAIN_TEMPLATE_PATH)

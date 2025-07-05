@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Union, Tuple
 
 import param
-from loguru import logger
 from sqlite_utils import Database
 
 from pyllments.base.model_base import Model

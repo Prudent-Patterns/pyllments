@@ -37,9 +37,6 @@ class TextElement(Element):
     # Whether the text input should be cleared after the Send button is pressed.
     clear_after_send = param.Boolean(default=False, doc="Clear textarea after emit if True.")
 
-    # Track watcher tied to the text input so we can detach it when payload changes
-    _input_content_watcher = None
-
     def __init__(self, **params):
         super().__init__(**params)
         self.model = TextModel(**params)
@@ -70,8 +67,6 @@ class TextElement(Element):
         async def unpack_display(payload: MessagePayload):
             # Store and load the incoming payload (no re-emit)
             await self.model.handle_payload(payload)
-            if self.text_input_view is not None:
-                self._bind_payload_to_textarea(payload, self.text_input_view[0])
 
         self.ports.add_input("message_input", unpack_payload_callback=unpack_display)
 
@@ -82,8 +77,6 @@ class TextElement(Element):
             # Display the incoming payload, then forward it downstream.
             await self.model.handle_payload(payload)
             await self.ports.output["message_output"].stage_emit(payload=payload)
-            if self.text_input_view is not None:
-                self._bind_payload_to_textarea(payload, self.text_input_view[0])
 
         self.ports.add_input("message_emit_input", unpack_payload_callback=unpack_emit)
 
@@ -103,6 +96,7 @@ class TextElement(Element):
             auto_grow=True,
             sizing_mode="stretch_both",
             stylesheets=text_area_input_css,
+            value=self.model.text  # Persist unsent text across refreshes
         )
 
         # Create the status mark (✓ shown once content is sent)
@@ -152,16 +146,57 @@ class TextElement(Element):
 
         self.watch(self, 'sent', _update_sent)
 
-        # If a payload already exists (e.g., after refresh), load it now
-        if isinstance(self.model.payload, MessagePayload):
-            # Direct population - no watchers needed
+        # ------------------------------------------------------------------
+        # Helper: push current payload content into the ChatAreaInput
+        # ------------------------------------------------------------------
+        def _sync_from_payload(payload):
+            if payload is None:
+                return
             self._internal_update = True
             try:
-                text_area_input.value_input = self.model.payload.model.content
-                self.model.text = self.model.payload.model.content
+                txt = payload.model.content or ""
+                text_area_input.value_input = txt
+                self.model.text = txt
                 self.sent = False
             finally:
                 self._internal_update = False
+
+        # ------------------------------------------------------------------
+        # Streaming handler – updates textarea as tokens arrive
+        # ------------------------------------------------------------------
+        def _on_content_stream(ev):
+            if self._internal_update:
+                return  # ignore updates we triggered ourselves
+            self._internal_update = True
+            try:
+                new_txt = ev.new or ""
+                text_area_input.value_input = new_txt
+                self.model.text = new_txt
+            finally:
+                self._internal_update = False
+
+        # ------------------------------------------------------------------
+        # Helper to attach content watcher using Component's automatic system
+        # ------------------------------------------------------------------
+        def _attach_content_watcher(payload):
+            if payload is not None:
+                # Use self.watch so it gets automatically cleaned up by the decorator
+                self.watch(payload.model, "content", _on_content_stream)
+
+        # ------------------------------------------------------------------
+        # Payload change handler (auto-cleaned because created with self.watch)
+        # ------------------------------------------------------------------
+        def _on_payload_change(event):
+            new_pl = event.new
+            _sync_from_payload(new_pl)
+            _attach_content_watcher(new_pl)
+
+        self.watch(self.model, 'payload', _on_payload_change)
+
+        # First load (if a payload already exists)
+        if self.model.payload is not None:
+            _sync_from_payload(self.model.payload)
+            _attach_content_watcher(self.model.payload)
 
         # Return a Row containing the textarea and the status mark
         self.text_input_view = pn.Row(
@@ -192,16 +227,21 @@ class TextElement(Element):
             Forwarded to :py:meth:`MessagePayload.create_static_view`.
         """
 
-        # Build display column if it doesn't exist
-        if self.display_view is None:
-            children = []
-            if title:
-                fresh_title_css = list(title_css) if title_css else []
-                children.append(pn.pane.Str(title, stylesheets=fresh_title_css))
-            self.display_view = pn.Column(*children)
+        children: list[pn.viewable.Viewable] = []
+        if title:
+            fresh_title_css = list(title_css) if title_css else []
+            children.append(pn.pane.Str(title, stylesheets=fresh_title_css))
+        self.display_view = pn.Column(*children)
 
-        # Render the payload (or clear view if None)
-        self._render_payload_in_display(payload)
+        def _on_payload_change(event):
+            """Update display when payload changes"""
+            self._render_payload_in_display(event.new)
+        
+        self.watch(self.model, 'payload', _on_payload_change)
+        
+        # Initialize from current state
+        display_payload = payload if payload is not None else self.model.payload
+        self._render_payload_in_display(display_payload)
 
         return self.display_view
 
@@ -279,92 +319,27 @@ class TextElement(Element):
 
         content = str(input_text).strip()
 
-        # Emit once
+        # Create and emit payload
         payload = MessagePayload(role='user', content=content, mode='atomic')
         await self.ports.output['message_output'].stage_emit(payload=payload)
+        
+        # Update model - this will trigger reactive updates in views
         self.model.payload = payload
+        self.model.text = content
+        self.sent = True  # Mark as sent
 
-        # --- restore text so it stays visible ---
-        if not self.clear_after_send:
-            event.obj.value        = content
-            event.obj.value_input  = content
-
-        self._update_text(content, mark_sent=True)
-
+        # Handle clearing behavior
         if self.clear_after_send:
             event.obj.value_input = ''
             self.model.text = ''
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-    def _update_text(self, content: str, mark_sent: bool):
-        """Push `content` into model, textarea, markdown and optionally mark as sent."""
-        self.model.text = content
-        is_chat_input = (
-            self.text_input_view is not None and
-            isinstance(self.text_input_view[0], pn.chat.ChatAreaInput)
-        )
-
-        if self.text_input_view is not None:
-            if is_chat_input:
-                if not self.clear_after_send:
-                    # For ChatAreaInput the frontend clears .value on submit.
-                    # Restore it so the text remains visible.
-                    self._internal_update = True
-                    try:
-                        self.text_input_view[0].value = content
-                    finally:
-                        self._internal_update = False
-            else:
-                self.text_input_view[0].value = content
-        # Update placeholder payload content if it exists and has atomic mode
-        if isinstance(self.model.payload, MessagePayload):
-            self.model.payload.model.content = content
-        # Let the watcher take care of updating CSS & check-mark
-        self.sent = mark_sent
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-    def _bind_payload_to_textarea(self, payload: MessagePayload, widget):
-        """Populate *widget* with payload text and stream subsequent updates."""
-
-        if not isinstance(payload, MessagePayload):
-            return
-
-        # If the same payload is already bound, do nothing.
-        if payload is self._input_content_watcher:
-            return
-
-        # Detach watcher from previously bound payload (if any)
-        if self._input_content_watcher is not None:
-            try:
-                self._input_content_watcher.model.param.unwatch(self._input_content_watcher)
-            except Exception:
-                pass
-            self._input_content_watcher = None
-
-        # Initial content load (do NOT touch .value to avoid triggering send)
-        self._internal_update = True
-        try:
-            widget.value_input = payload.model.content
-            self.model.text = payload.model.content
-            self.sent = False  # external load is not a local send
-        finally:
-            self._internal_update = False
-
-        # Watch content stream
-        def _on_content(ev):
-            new_txt = ev.new or ""
+        else:
+            # Keep text visible - restore value that frontend clears on submit
             self._internal_update = True
             try:
-                widget.value_input = new_txt
-                self.model.text = new_txt
+                event.obj.value = content
+                event.obj.value_input = content
             finally:
                 self._internal_update = False
-
-        self._input_content_watcher = self.watch(payload.model, 'content', _on_content)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -374,8 +349,8 @@ class TextElement(Element):
 
         If *payload* is None, the display is cleared.
         """
-        if self.display_view is None:
-            return
+        if self.display_view is None or not hasattr(self.display_view, 'objects'):
+            return  # Skip update if display_view is invalid (possibly post-refresh)
 
         # Remove previous payload row(s) – assume the last child holds content
         if self.display_view.objects:
@@ -385,6 +360,6 @@ class TextElement(Element):
             else:
                 self.display_view.objects.pop()
 
-        if isinstance(payload, MessagePayload):
+        if payload:  # Port contract guarantees MessagePayload
             row = payload.create_static_view(show_role=False)
             self.display_view.append(row)

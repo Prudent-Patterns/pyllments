@@ -1,0 +1,10 @@
+:host {
+    margin: 0 0 4px 0;
+
+    pre {
+        font-size: 1.2em;
+        font-weight: bold;
+        font-family: var(--title-font);
+    }
+}
+
