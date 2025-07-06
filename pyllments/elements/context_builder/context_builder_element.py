@@ -115,6 +115,7 @@ class ContextBuilderElement(Element):
         
         The 'depends_on' field can be a string (single dependency) or a list of strings (multiple dependencies).
         This ensures the item is only included when all its dependencies have payloads.
+        Made to work with optional items.
         
         Example:
         input_map = {

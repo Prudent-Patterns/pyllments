@@ -18,6 +18,8 @@ class LLMChatModel(Model):
     
     base_url = param.String(doc="Base URL for the model", allow_None=True)
 
+    response_format = param.Parameter(default=None, doc="Response format to pass to the model")
+
     def __init__(self, **params):
         super().__init__(**params)
         if self.base_url:
@@ -51,6 +53,7 @@ class LLMChatModel(Model):
                 response = await litellm.acompletion(
                     model=self.model_name,
                     messages=litellm_messages,
+                    response_format=self.response_format,
                     **self.model_args
                 )
                 return response
@@ -66,6 +69,7 @@ class LLMChatModel(Model):
             response_stream = litellm.acompletion(
                 model=self.model_name,
                 messages=litellm_messages,
+                response_format=self.response_format,
                 stream=True,
                 **self.model_args
             )
