@@ -235,13 +235,27 @@ class TextElement(Element):
 
         def _on_payload_change(event):
             """Update display when payload changes"""
-            self._render_payload_in_display(event.new)
+            new_payload = event.new
+            if self.display_view is None or not hasattr(self.display_view, 'objects'):
+                return  # Skip update if display_view is invalid (possibly post-refresh)
+
+            # Remove previous payload row(s) – assume the last child holds content
+            if len(self.display_view.objects) > 1:
+                self.display_view.objects.pop()
+            elif len(self.display_view.objects) == 1 and not title:
+                self.display_view.objects.pop()
+
+            if new_payload:  # Port contract guarantees MessagePayload
+                row = new_payload.create_static_view(show_role=False, assistant_row_css=[":host { max-height: 95%; overflow-y: auto; padding-right: 0px;}"])
+                self.display_view.append(row)
         
         self.watch(self.model, 'payload', _on_payload_change)
         
         # Initialize from current state
         display_payload = payload if payload is not None else self.model.payload
-        self._render_payload_in_display(display_payload)
+        if display_payload:  # Port contract guarantees MessagePayload
+            row = display_payload.create_static_view(show_role=False)
+            self.display_view.append(row)
 
         return self.display_view
 
@@ -265,24 +279,6 @@ class TextElement(Element):
             )
             input_col.insert(0, title_str)
         return input_col
-
-    @Component.view
-    def create_interface_view(
-        self,
-        input_title: Optional[str] = None,
-        display_title: Optional[str] = None,
-        **kwargs,
-    ):
-        """Column with input row on top and markdown view below."""
-        # Backwards-compat: accept old keyword ``message_title``
-        display_ttl = kwargs.pop("message_title", display_title)
-
-        return pn.Column(
-            self.create_input_view(title=input_title),
-            pn.Spacer(height=6),
-            self.create_display_view(title=display_ttl)
-        )
-
     # ------------------------------------------------------------------
     # Event handler
     # ------------------------------------------------------------------
@@ -344,22 +340,4 @@ class TextElement(Element):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _render_payload_in_display(self, payload):
-        """Render *payload* inside the existing ``display_view``.
-
-        If *payload* is None, the display is cleared.
-        """
-        if self.display_view is None or not hasattr(self.display_view, 'objects'):
-            return  # Skip update if display_view is invalid (possibly post-refresh)
-
-        # Remove previous payload row(s) – assume the last child holds content
-        if self.display_view.objects:
-            # If there is a title, payload row is last; else only child.
-            if len(self.display_view.objects) == 1:
-                self.display_view.objects.pop()
-            else:
-                self.display_view.objects.pop()
-
-        if payload:  # Port contract guarantees MessagePayload
-            row = payload.create_static_view(show_role=False)
-            self.display_view.append(row)
+    # Method merged into create_display_view

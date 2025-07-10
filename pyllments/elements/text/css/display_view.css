@@ -1,0 +1,5 @@
+:host {
+    border: 1px solid var(--faded-text-color);
+    border-radius: var(--radius);
+    padding: 12px;
+}

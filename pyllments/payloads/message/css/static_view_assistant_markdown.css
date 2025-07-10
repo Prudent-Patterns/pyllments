@@ -2,6 +2,8 @@
     line-height: var(--line-height);
     flex: 0 1 auto; /* Used to fix row's padding being ignored */
     margin-right: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-accent-color) transparent;
 }
 
 :host p {

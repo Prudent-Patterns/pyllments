@@ -3,4 +3,6 @@
   justify-content: left;
   padding-right: 66px;
   align-items: center;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-accent-color) transparent;
 }
