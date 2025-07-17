@@ -16,21 +16,15 @@ class Router(Element):
         The payload type for all ports in the router. All ports will use the same payload type.""")
 
     output_map = param.Dict(default={}, doc="""
-        A dict mapping the output port name to a predicate function that returns True if
-        the payload should be routed to that output port. Predicates are evaluated in the
-        order they are defined in the dictionary.
-        Example: {'some_output': lambda payload: payload.model.content == "Yes"}""")
-    
-    connected_output_map = param.Dict(default={}, doc="""
-        A dict mapping the output port name to a dictionary of ports to connect and a
-        predicate function that returns True if the payload should be routed to that output port.
+        A dict mapping the output port name to a config dict with 'predicate' (required) and optional 'ports' list.
+        Predicates are evaluated in the order they are defined in the dictionary.
         Example: {
-            'output_port_a': {
-                'ports': [el1.ports.some_input],
-                'predicate': lambda payload: payload.model.content == "Yes"
+            'some_output': {
+                'predicate': lambda payload: payload.model.content == "Yes",
+                'ports': [el1.ports.input['some_input']]
             }
         }""")
-
+    
     flow_controller = param.ClassSelector(class_=FlowController, doc="""
         The underlying FlowController managing the routing logic.""")
     
@@ -50,34 +44,32 @@ class Router(Element):
         Set up the flow controller with the appropriate flow map and function.
         This method is called during initialization.
         """
-        if not (self.output_map or self.connected_output_map):
-            raise ValueError("At least one of output_map or connected_output_map must be provided.")
+        if not self.output_map:
+            raise ValueError("output_map must be provided.")
         
         # Setup flow map with input port and output ports using the explicit payload_type
         flow_map = {
             'input': {
-                'payload_input': self.payload_type,
+                'payload_input': {
+                    'payload_type': self.payload_type,
+                }
             },
             'output': {}
         }
         
-        # Add output ports to the flow map
-        for port_name in self.output_map:
-            flow_map['output'][port_name] = self.payload_type
-        
-        # Setup connected flow map
-        connected_flow_map = {'input': {}, 'output': {}}
-        
-        # Add incoming_output_port to the connected_flow_map if provided
+        # Add incoming_output_port to the flow_map if provided
         if self.incoming_output_port is not None:
-            connected_flow_map['input']['payload_input'] = [self.incoming_output_port]
+            flow_map['input']['payload_input']['ports'] = [self.incoming_output_port]
             
-        # Add output connections from connected_output_map
-        if self.connected_output_map:
-            for port_name, config in self.connected_output_map.items():
-                ports = config.get('ports', [])
-                if ports:
-                    connected_flow_map['output'][port_name] = ports if isinstance(ports, list) else [ports]
+        # Add output ports to the flow map
+        for port_name, config in self.output_map.items():
+            if 'predicate' not in config:
+                raise ValueError(f"Predicate missing for output port '{port_name}'")
+            output_config = {'payload_type': self.payload_type}
+            ports = config.get('ports')
+            if ports:
+                output_config['ports'] = ports if isinstance(ports, list) else [ports]
+            flow_map['output'][port_name] = output_config
         
         # Create the flow function
         flow_fn = self._flow_fn_setup()
@@ -86,7 +78,6 @@ class Router(Element):
         flow_controller_kwargs = {
             'flow_fn': flow_fn,
             'flow_map': flow_map,
-            'connected_flow_map': connected_flow_map,
             'containing_element': self
         }
             
@@ -104,18 +95,9 @@ class Router(Element):
         def flow_fn(payload_input, c, active_input_port, **kwargs):
             payload = active_input_port.payload
             
-            # First check predicates from output_map
-            for port_name, predicate in self.output_map.items():
+            for port_name, config in self.output_map.items():
+                predicate = config['predicate']
                 if predicate(payload):
-                    if port_name in kwargs:
-                        output_port = kwargs[port_name]
-                        output_port.emit(payload)
-                        return
-            
-            # Then check predicates from connected_output_map
-            for port_name, config in self.connected_output_map.items():
-                predicate = config.get('predicate')
-                if predicate and predicate(payload):
                     if port_name in kwargs:
                         output_port = kwargs[port_name]
                         output_port.emit(payload)

@@ -233,6 +233,7 @@ class TextElement(Element):
             children.append(pn.pane.Str(title, stylesheets=fresh_title_css))
         self.display_view = pn.Column(*children)
 
+        row_css = [":host { max-height: calc(100% - 20px); overflow-y: auto; padding-right: 0px;}"]
         def _on_payload_change(event):
             """Update display when payload changes"""
             new_payload = event.new
@@ -246,7 +247,8 @@ class TextElement(Element):
                 self.display_view.objects.pop()
 
             if new_payload:  # Port contract guarantees MessagePayload
-                row = new_payload.create_static_view(show_role=False, assistant_row_css=[":host { max-height: 95%; overflow-y: auto; padding-right: 0px;}"])
+                row = new_payload.create_static_view(show_role=False, assistant_row_css=row_css, user_row_css=row_css)
+
                 self.display_view.append(row)
         
         self.watch(self.model, 'payload', _on_payload_change)
@@ -254,7 +256,7 @@ class TextElement(Element):
         # Initialize from current state
         display_payload = payload if payload is not None else self.model.payload
         if display_payload:  # Port contract guarantees MessagePayload
-            row = display_payload.create_static_view(show_role=False)
+            row = display_payload.create_static_view(show_role=False, assistant_row_css=row_css, user_row_css=row_css)
             self.display_view.append(row)
 
         return self.display_view
