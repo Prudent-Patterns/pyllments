@@ -1,5 +1,5 @@
 from loguru import logger
-from pyllments.serve import flow
+from pyllments._flow import flow
 
 try:
     from ._version import __version__  # noqa: F401

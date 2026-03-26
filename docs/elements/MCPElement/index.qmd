@@ -73,6 +73,8 @@ mcps = {
 
 ### tool_request_structured_input payload {#sec-tool_request_structured_input}
 
+**payload.model.data**:
+
 ```python
 [
     {'name': 'todo_add', 'parameters': {'task': 'Buy milk'}},
@@ -82,6 +84,7 @@ mcps = {
 
 ### tools_response_output payload {#sec-tools_response_output}
 
+**payload.model.tool_responses**:
 ```python
 {
     'weather_temp_mcp': {
@@ -119,4 +122,55 @@ mcps = {
 }
 ```
 
-<!-- TODO: Add usage examples -->
+### tools_schema_output payload {#sec-tools_schema_output}
+
+**payload.model.schema**:
+
+```json
+{
+  "title": "tool_array",
+  "type": "array",
+  "items": {
+    "anyOf": [
+      {
+        "title": "todo_add",
+        "type": "object",
+        "properties": {
+          "name": {
+            "const": "todo_add"
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "task": {
+                "type": "string"
+              }
+            },
+            "required": ["task"]
+          }
+        },
+        "required": ["name"]
+      },
+      {
+        "title": "weather_get",
+        "type": "object",
+        "properties": {
+          "name": {
+            "const": "weather_get"
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": ["city"]
+          }
+        },
+        "required": ["name"]
+      }
+    ]
+  }
+}
+```

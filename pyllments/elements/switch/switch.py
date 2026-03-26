@@ -1,6 +1,7 @@
-from typing import Literal, Optional, Any
+from __future__ import annotations
 
-from panel.widgets import RadioButtonGroup
+from typing import Literal, Optional, Any, TYPE_CHECKING
+
 import param
 
 from pyllments.base.element_base import Element
@@ -8,6 +9,9 @@ from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
 from pyllments.elements.flow_control import FlowController
 from pyllments.ports import OutputPort, InputPort, Ports
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class Switch(Element):
@@ -86,10 +90,9 @@ class Switch(Element):
     flow_controller = param.ClassSelector(class_=FlowController, doc="FlowController object")
     ports = param.ClassSelector(class_=Ports, allow_None=False, doc="Ports object")
 
-    switch_view = param.ClassSelector(class_=RadioButtonGroup, allow_None=True, is_instance=True)
-
     def __init__(self, **params):
         super().__init__(**params)
+        self.switch_view = None
         self._flow_controller_setup()
 
     def _flow_controller_setup(self):
@@ -139,8 +142,8 @@ class Switch(Element):
         self,
         orientation: Literal['horizontal', 'vertical'] = 'horizontal',
         margin: Optional[str] = 0,
-        ) -> RadioButtonGroup:
-        self.switch_view = RadioButtonGroup(
+        ) -> pn.widgets.RadioButtonGroup:
+        self.switch_view = pn.widgets.RadioButtonGroup(
             options=self.outputs,
             orientation=orientation,
             value=self.current_output,

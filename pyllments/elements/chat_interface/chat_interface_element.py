@@ -1,13 +1,17 @@
-import asyncio
-from typing import Optional
+from __future__ import annotations
 
-import panel as pn
+import asyncio
+from typing import Optional, TYPE_CHECKING
+
 import param
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class ChatInterfaceElement(Element):
@@ -34,12 +38,11 @@ class ChatInterfaceElement(Element):
         - tools_response_output: ToolsResponsePayload
     """
 
-    chatfeed_view = param.ClassSelector(class_=pn.Column, is_instance=True)
-    chat_input_view = param.ClassSelector(class_=pn.chat.ChatAreaInput, is_instance=True)
-    send_button_view = param.ClassSelector(class_=pn.widgets.Button, is_instance=True)
-
     def __init__(self, **params):
         super().__init__(**params)
+        self.chatfeed_view = None
+        self.chat_input_view = None
+        self.send_button_view = None
         self.model = ChatInterfaceModel(**params)
         
         # Set up ports for messages and tool responses
@@ -52,6 +55,7 @@ class ChatInterfaceElement(Element):
         self._tools_response_output_setup()
         # Unified output port for both user and assistant messages
         self._message_output_setup()
+        self._tool_message_output_setup()
 
     def _user_message_output_setup(self):
         """Sets up an output port for user-originated MessagePayloads."""
@@ -86,6 +90,8 @@ class ChatInterfaceElement(Element):
             await self.ports.output[port].stage_emit(payload=payload)
             # Emit unified message port
             await self.ports.output['message_output'].stage_emit(payload=payload)
+            if payload.model.tool_calls:
+                await self.ports.output['tool_message_output'].stage_emit(payload=payload)
         self.ports.add_input(
             name='message_emit_input',
             unpack_payload_callback=unpack)
@@ -117,6 +123,13 @@ class ChatInterfaceElement(Element):
             return payload
         self.ports.add_output(
             name='message_output',
+            pack_payload_callback=pack)
+
+    def _tool_message_output_setup(self):
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
+        self.ports.add_output(
+            name='tool_message_output',
             pack_payload_callback=pack)
 
     @Component.view
@@ -154,6 +167,8 @@ class ChatInterfaceElement(Element):
                 return
             new_item = updated_list[-1]
             if isinstance(new_item, MessagePayload):
+                if not new_item.model.content and new_item.model.tool_calls:
+                    return  # Skip rendering messages with only tool calls
                 fake_it = (
                     new_item.model.role == 'assistant' and 
                     (new_item.model.mode == 'atomic' or new_item.model.streamed)
@@ -182,7 +197,7 @@ class ChatInterfaceElement(Element):
         return self.chatfeed_view
 
     @Component.view
-    def create_chat_input_view(self, placeholder: str = 'Yap Here'):
+    def create_chat_input_view(self, placeholder: str = 'Yap Here') -> pn.chat.ChatAreaInput:
         """
         Creates and returns a new instance of ChatAreaInput view.
         """

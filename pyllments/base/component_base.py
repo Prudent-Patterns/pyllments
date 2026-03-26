@@ -8,6 +8,7 @@ import param
 from loguru import logger
 
 from pyllments.base.model_base import Model
+from pyllments.common.panel_optional import import_panel
 
 
 class Component(param.Parameterized):
@@ -155,6 +156,8 @@ class Component(param.Parameterized):
         def wrapper(self, *args, **kwargs):
             # Use element's bound logger if available, otherwise fall back to default logger
             element_logger = getattr(self, 'logger', logger)
+            pn = import_panel()
+            func.__globals__['pn'] = pn
             
             # Get method signature parameters and their defaults
             sig = inspect.signature(func)
@@ -169,7 +172,7 @@ class Component(param.Parameterized):
             merged_kwargs = {**defaults, **kwargs}
 
             view_name = func.__name__.replace('create_', '')
-            
+
             # Proceed with creation...
             element_logger.debug(f"Creating new view for {view_name}")
 

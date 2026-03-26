@@ -26,6 +26,7 @@ It provides the essential component of user interaction through receiving `Messa
 | `user_message_output`     | MessagePayload          | Emits processed user messages.                                                                    |
 | `assistant_message_output`| MessagePayload          | Emits processed assistant messages.                                                               |
 | `message_output`          | MessagePayload          | Emits both user and assistant messages from their respective emit inputs.                        |
+| `tool_message_output`     | MessagePayload          | Emits messages containing tool calls.                                                             |
 | `tools_response_output`   | ToolsResponsePayload    | Emits processed tool response messages.                                                          |
 
 : {.hover}

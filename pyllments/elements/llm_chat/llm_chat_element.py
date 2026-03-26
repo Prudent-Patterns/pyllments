@@ -1,25 +1,29 @@
-from typing import Literal, Union, Optional, List
+from __future__ import annotations
 
-import panel as pn
+from typing import Literal, Union, Optional, List, TYPE_CHECKING
+
 import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
-from pyllments.payloads.message import MessagePayload
-from pyllments.payloads.tools_response import ToolsResponsePayload
+from pyllments.payloads import MessagePayload, ToolsResponsePayload, StructuredPayload
 from pyllments.elements.llm_chat import LLMChatModel
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
-    model_selector_view = param.ClassSelector(class_=(pn.widgets.Select, pn.Column, pn.Row))
     generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
 
     def __init__(self, **params):
         super().__init__(**params)
+        self.model_selector_view = None
 
         self.model = LLMChatModel(**params)
         self._message_output_setup()
         self._messages_emit_input_setup()
+        self._tools_input_setup()
         
     def _message_output_setup(self):
         async def pack(message_payload: MessagePayload) -> MessagePayload:
@@ -56,6 +60,16 @@ class LLMChatElement(Element):
             payload_type=Union[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]]
         )
 
+    def _tools_input_setup(self):
+        async def unpack(payload: StructuredPayload):
+            self.model.tools = payload.model.data
+
+        self.ports.add_input(
+            name='tools_input',
+            unpack_payload_callback=unpack,
+            payload_type=StructuredPayload
+        )
+
     @Component.view
     def create_model_selector_view(
         self,
@@ -68,7 +82,7 @@ class LLMChatElement(Element):
         provider_selector_width: int = None,
         selector_css: list[str] = [],
         height: int = 57
-    ) -> Union[pn.widgets.Select, pn.Column, pn.Row]:
+    ) -> pn.widgets.Select | pn.Column | pn.Row:
         """
         Creates a view for selecting an LLM model, optionally including a provider selector.
 

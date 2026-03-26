@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 from collections import deque
 from itertools import islice
-from typing import Union, List
+from typing import Union, List, TYPE_CHECKING
 import asyncio
 
 import param
-import panel as pn
 
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from .history_handler_model import HistoryHandlerModel
 from pyllments.runtime.loop_registry import LoopRegistry
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 # TODO: Allow support of other payload types
@@ -37,10 +41,10 @@ class HistoryHandlerElement(Element):
     """
     # TODO Add filtering support
     show_tool_responses = param.Boolean(default=False, doc="Whether to include tool response views in the context view")
-    context_view = param.ClassSelector(class_=pn.Column)
 
     def __init__(self, **params):
         super().__init__(**params)
+        self.context_view = None
         self.model = HistoryHandlerModel(**params)
         
         # Message ports

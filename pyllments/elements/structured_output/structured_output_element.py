@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-import panel as pn
 import param
 from loguru import logger
 
@@ -14,6 +13,9 @@ from pyllments.payloads.schema import SchemaPayload
 from pyllments.payloads.structured import StructuredPayload
 
 from .structured_output_model import StructuredOutputModel
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class StructuredOutputElement(Element):
@@ -30,14 +32,11 @@ class StructuredOutputElement(Element):
         • **structured_output** (StructuredPayload) – validated dict emitted after each message.
     """
 
-    json_view = param.ClassSelector(class_=pn.pane.JSON, allow_None=True)
-
     def __init__(self, schema: type | None = None, auto_emit_schema: bool = True, **params):
         super().__init__(**params)
         # store schema in the model
         self.model = StructuredOutputModel(schema=schema)
 
-        # internal view placeholder
         self.json_view = None
 
         # setup ports *before* auto-emitting

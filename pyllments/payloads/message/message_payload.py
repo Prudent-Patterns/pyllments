@@ -1,9 +1,13 @@
-import panel as pn
-from typing import Literal
+from __future__ import annotations
+
+from typing import Literal, TYPE_CHECKING
 
 from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
 from pyllments.payloads.message.message_model import MessageModel
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class MessagePayload(Payload):
@@ -25,6 +29,7 @@ class MessagePayload(Payload):
         sizing_mode: Literal['fixed', 'stretch_width', 'stretch_height', 'stretch_both'] = 'stretch_width'
         ) -> pn.Row:
         """Creates a message container"""
+
         match self.model.role:
             case 'user':
                 markdown_css = user_markdown_css
@@ -72,6 +77,7 @@ class MessagePayload(Payload):
         sizing_mode = 'stretch_width'
         ) -> pn.Row:
         """Creates a message container"""
+
         match self.model.role:
             case 'user':
                 row_css = user_row_css

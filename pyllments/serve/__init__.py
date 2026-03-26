@@ -1,2 +1,3 @@
 """Serve functionality for pyllments."""
-from .serve import flow, serve
+from pyllments._flow import flow
+from .serve import serve

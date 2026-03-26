@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from typing import Optional
 from pathlib import Path
-
-import panel as pn
+from typing import TYPE_CHECKING
 
 from pyllments.base.payload_base import Payload
 from pyllments.payloads.file.file_model import FileModel
 from pyllments.base.component_base import Component
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 icon_css_map = {
@@ -25,8 +29,9 @@ class FilePayload(Payload):
         icon_css: list = [],
         markdown_css: list = [],
         row_css: list = [],
-        char_limit: Optional[int] = None):
+        char_limit: Optional[int] = None) -> pn.Row:
         """View Responsible for displaying the file icon and filename"""
+
         # Extract the file suffix from the filename
         file_suffix = self.model.filename.split('.')[-1] if '.' in self.model.filename else ''
         # Default to generic icon if suffix not in mapping

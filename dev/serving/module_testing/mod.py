@@ -4,7 +4,7 @@ test_var = "Who dis"
 
 def super_decorator(func):
     """A decorator that does nothing and simply returns the function."""
-    func.contains_view = True
+    func.pyllments_flow = True
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         print('Wrappity Wrapped')

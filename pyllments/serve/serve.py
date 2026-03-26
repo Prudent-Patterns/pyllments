@@ -1,5 +1,4 @@
 """Core serve functionality."""
-import functools
 from importlib import resources
 from importlib.util import spec_from_file_location, module_from_spec
 import inspect
@@ -10,9 +9,6 @@ import ast
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
-import panel as pn
-from panel.io.fastapi import add_application
-# from uvicorn import run as uvicorn_run
 import uvicorn
 
 from pyllments.logging import setup_logging
@@ -64,9 +60,11 @@ def parse_dict_value(value):
         raise ValueError(f"Invalid dictionary literal: {value}. Error: {e}")
 
 
-def server_setup(logging: bool = False, logging_level: str = 'INFO'): 
+def server_setup(logging: bool = False, logging_level: str = 'INFO'):
     if logging:
         setup_logging(log_file='file_loader.log', stdout_log_level=logging_level, file_log_level=logging_level)
+    import panel as pn
+
     pn.config.css_files = [GLOBAL_CSS_MOUNT_PATH, FILE_ICONS_MOUNT_PATH]
 
 
@@ -186,20 +184,6 @@ def load_module_with_config(module_name: str, filename: str, config: Optional[Di
     spec.loader.exec_module(module)
     return module
 
-# TODO: Consider adding a profiler singleton class to handle profiling of the application.
-def flow(func):
-    """
-    A decorator that adds the contains_view attribute to the function and wraps it.
-    It is used to indicate that the function being wrapped returns a view and can be
-    served as a GUI.
-    """
-    func.contains_view = True
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-    return wrapper
-
-
 def serve(
     filename: str = None,
     inline: bool = False,
@@ -249,7 +233,7 @@ def serve(
 
         if find_gui:
             def view_check(obj):
-                return inspect.isfunction(obj) and hasattr(obj, 'contains_view')
+                return inspect.isfunction(obj) and hasattr(obj, 'pyllments_flow')
             
             func_list = []
             if not inline:
@@ -288,6 +272,8 @@ def serve(
                 except Exception as e:
                     logger.error(f"Failed to mount static files: {e}")
 
+                import panel as pn
+                from panel.io.fastapi import add_application
 
                 @add_application('/', app=app, title='Pyllments')
                 def serve_gui():
@@ -298,14 +284,14 @@ def serve(
                     tmpl.add_variable('app_favicon', ASSETS_MOUNT_PATH + '/favicon.ico')
                     tmpl.add_panel('app_main', obj())
                     return tmpl
-                
+
                 # ---- Register Panel unload hook ----
                 try:
                     def panel_shutdown_hook(session_context):
                         logger.info("Panel unload hook triggered. Cleaning up resources...")
                         # await lifecycle_manager.shutdown()
                         logger.info("Panel unload hook: Resource cleanup complete.")
-                        
+
                     # Only register if we are actually serving a GUI via Panel
                     pn.state.onload(lambda: logger.info("Pyllments Lifecycle Manager active with Panel."))
                     pn.state.on_session_destroyed(panel_shutdown_hook)

@@ -1,4 +1,7 @@
-import panel as pn
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from jinja2 import Template
 from loguru import logger
 from pyllments.base.component_base import Component
@@ -6,6 +9,9 @@ from pyllments.base.payload_base import Payload
 from pyllments.runtime.loop_registry import LoopRegistry
 
 from .tools_response_model import ToolsResponseModel
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class ToolsResponsePayload(Payload):
@@ -32,7 +38,7 @@ class ToolsResponsePayload(Payload):
         str_css: list = [],
         parameters_css: list = [],
         response_md_css: list = []
-    ):
+    ) -> pn.Column:
         # Create a placeholder column that will be updated dynamically
         # max-height: none is NEEDED to avoid weird placement in columns
         placeholder = pn.Column(pn.pane.Str('Loading tool responses...'), styles={'flex': '0 0 auto', 'height': 'fit-content', 'max-height': 'none'})
@@ -150,7 +156,7 @@ class ToolsResponsePayload(Payload):
         str_css: list = [],
         parameters_css: list = [],
         response_md_css: list = []
-    ):
+    ) -> pn.Column:
         """Creates a collapsible view of the tool response for use in history."""
         return self.create_tools_response_view(
             card_css=card_css,

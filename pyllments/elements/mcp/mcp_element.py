@@ -1,4 +1,4 @@
-from typing import Union, Literal
+from typing import Any, Union, Literal
 
 import param
 from pydantic import Field, create_model, RootModel, BaseModel
@@ -22,11 +22,12 @@ class MCPElement(Element):
         self._tools_schema_output_setup()
         self._tool_request_structured_input_setup()
         self._tools_response_output_setup()
+        self._tools_output_setup()
 
         # self._tools_response_output_setup()
     
     def _tools_schema_output_setup(self):
-        async def pack(tools_schema: type(BaseModel)) -> SchemaPayload:
+        async def pack(tools_schema: type[BaseModel]) -> SchemaPayload:
             return SchemaPayload(schema=tools_schema)
 
         async def on_connect(port, input_port):
@@ -82,6 +83,32 @@ class MCPElement(Element):
             return ToolsResponsePayload(tool_responses=tool_responses)
             
         self.ports.add_output(name='tools_response_output', pack_payload_callback=pack)
+
+    def _tools_output_setup(self):
+        async def pack(tools_list: list[dict[str, Any]]) -> StructuredPayload:
+            return StructuredPayload(data=tools_list)
+
+        async def on_connect(port, input_port):
+            await self.model.await_ready()
+            tools_list = []
+            for name, data in self.model.tools.items():
+                parameters = data["parameters"].copy()
+                parameters.pop("title", None)
+                tool = {
+                    "name": name,
+                    "description": data["description"],
+                    "parameters": parameters
+                }
+                tools_list.append(tool)
+            self.logger.debug(f"tools_output connected, emitting tools: {[t['name'] for t in tools_list]}")
+            await port.stage_emit(tools_list=tools_list)
+
+        self.ports.add_output(
+            name="tools_output",
+            pack_payload_callback=pack,
+            on_connect_callback=on_connect,
+            readiness_check=self.model.await_ready
+        )
 
     @property
     def tools_schema(self) -> BaseModel:

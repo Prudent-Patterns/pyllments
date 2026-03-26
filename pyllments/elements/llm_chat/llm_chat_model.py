@@ -18,7 +18,13 @@ class LLMChatModel(Model):
     
     base_url = param.String(doc="Base URL for the model", allow_None=True)
 
-    response_format = param.Parameter(default=None, doc="Response format to pass to the model")
+    response_format = param.Parameter(default=None, doc="""
+        Response format to pass to the model. Pydantic model or dictionary definition""")
+
+    functions = param.Dict(default=None, doc="""
+        Functions to pass to the model. Dictionary of function definitions""")
+
+    tools = param.List(default=None, doc="List of tools for function calling")
 
     def __init__(self, **params):
         super().__init__(**params)

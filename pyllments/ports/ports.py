@@ -619,10 +619,11 @@ class OutputPort(Port):
         # Log the emission
         log_emit(self, payload)
         
-        # Queue the emission for ordered processing
+        # Queue the emission for ordered processing using the LoopRegistry event loop
+        loop = LoopRegistry.get_loop()
         await self._emission_queue.put({
             'payload': payload,
-            'timestamp': asyncio.get_event_loop().time()
+            'timestamp': loop.time()
         })
         
         # Reset state
@@ -682,7 +683,7 @@ class OutputPort(Port):
             try:
                 # Get the loop the task runs on and the current loop
                 task_loop = self._emission_task.get_loop()
-                current_loop = asyncio.get_running_loop()
+                current_loop = LoopRegistry.get_loop()
                 
                 # Only await if the task is on the currently running loop and that loop isn't closed
                 if task_loop is current_loop and not current_loop.is_closed():

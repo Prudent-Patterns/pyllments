@@ -47,6 +47,8 @@ class MessageModel(Model):
 
     loop = param.Parameter(default=None, doc="Asyncio event loop associated with this message model")
 
+    tool_calls = param.List(default=[], class_=dict, doc="List of tool calls from the model")
+
     def __init__(self, **params):
         super().__init__(**params)
         if params.get('loop', None) is None:
@@ -63,22 +65,34 @@ class MessageModel(Model):
         """
         if self.mode != 'stream':
             raise ValueError("Cannot stream: Mode is not set to 'stream'")
+        if self.message_coroutine is None:
+            raise ValueError("Cannot stream: Message coroutine is not set")
             
         self.content = ''
+        self.tool_calls = []
         buffer = ''
         
-        # Trigger the external coroutine that yields the message stream.
-        message_stream = await self.message_coroutine
-        async for chunk in message_stream:
-            delta = chunk['choices'][0].get('delta', {}).get('content', '')
-            if delta:
-                buffer += delta
-                # Flush the buffer if it's large enough or contains a newline.
-                if len(buffer) >= 10 or '\n' in buffer:  
+        async for chunk in self.message_coroutine:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                buffer += delta.content
+                if len(buffer) >= 10 or '\n' in buffer:
                     self.content += buffer
                     buffer = ''
+            for tc_delta in delta.tool_calls or []:
+                index = tc_delta.index
+                if index >= len(self.tool_calls):
+                    self.tool_calls.append({'id': '', 'type': 'function', 'function': {'name': '', 'arguments': ''}})
+                if tc_delta.id:
+                    self.tool_calls[index]['id'] += tc_delta.id
+                if tc_delta.type:
+                    self.tool_calls[index]['type'] = tc_delta.type
+                if tc_delta.function:
+                    if tc_delta.function.name:
+                        self.tool_calls[index]['function']['name'] += tc_delta.function.name
+                    if tc_delta.function.arguments:
+                        self.tool_calls[index]['function']['arguments'] += tc_delta.function.arguments
         
-        # Append any last remaining content.
         if buffer:
             self.content += buffer
                 
@@ -123,9 +137,11 @@ class MessageModel(Model):
         """
         if self.mode == 'atomic':
             if self.message_coroutine is not None:
-                # Await the stored atomic coroutine and extract message content from ModelResponse
                 response = await self.message_coroutine
-                self.content = response['choices'][0]['message']['content']
+                message = response.choices[0].message
+                self.content = message.content or ''
+                if hasattr(message, 'tool_calls') and message.tool_calls:
+                    self.tool_calls = [tc.model_dump() for tc in message.tool_calls]
                 self.message_coroutine = None
                 self.ready = True
             return self.content

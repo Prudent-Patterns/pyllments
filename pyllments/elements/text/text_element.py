@@ -1,12 +1,16 @@
-from typing import Optional
+from __future__ import annotations
 
-import panel as pn
+from typing import Optional, TYPE_CHECKING
+
 import param
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads.message import MessagePayload
 from .text_model import TextModel
+
+if TYPE_CHECKING:
+    import panel as pn
 
 
 class TextElement(Element):
@@ -25,13 +29,6 @@ class TextElement(Element):
         - message_output      : MessagePayload
     """
 
-    text_input_view   = param.ClassSelector(class_=pn.layout.Row, is_instance=True)
-    # View that displays the current text in a read-only form.  We render a
-    # ``MessagePayload`` but the container is generic enough to show other
-    # payload types in the future.
-    display_view     = param.ClassSelector(class_=pn.layout.Column,        is_instance=True)
-    send_button_view  = param.ClassSelector(class_=pn.widgets.Button,        is_instance=True)
-
     sent = param.Boolean(default=False, doc="Whether the text input is marked as sent.")
 
     # Whether the text input should be cleared after the Send button is pressed.
@@ -39,6 +36,9 @@ class TextElement(Element):
 
     def __init__(self, **params):
         super().__init__(**params)
+        self.text_input_view = None
+        self.display_view = None
+        self.send_button_view = None
         self.model = TextModel(**params)
 
         # Set up ports individually for clarity
@@ -226,8 +226,7 @@ class TextElement(Element):
         **kwargs
             Forwarded to :py:meth:`MessagePayload.create_static_view`.
         """
-
-        children: list[pn.viewable.Viewable] = []
+        children: list = []
         if title:
             fresh_title_css = list(title_css) if title_css else []
             children.append(pn.pane.Str(title, stylesheets=fresh_title_css))
@@ -262,7 +261,7 @@ class TextElement(Element):
         return self.display_view
 
     @Component.view
-    def create_send_button_view(self, icon: str = "arrow-up", label: str = "Send"):
+    def create_send_button_view(self, icon: str = "arrow-up", label: str = "Send") -> pn.widgets.Button:
         self.send_button_view = pn.widgets.Button(name=label, icon=icon, icon_size="1.2em")
         btn = self.send_button_view
         text_widget = self.text_input_view[0]
@@ -270,7 +269,7 @@ class TextElement(Element):
         return self.send_button_view
 
     @Component.view
-    def create_input_view(self, title: Optional[str] = None, title_css: list[str] = []):
+    def create_input_view(self, title: Optional[str] = None, title_css: list[str] = []) -> pn.Column:
         input_col = pn.Column(self.create_text_input_view(),
             pn.Spacer(height=5),
             self.create_send_button_view(height=30))

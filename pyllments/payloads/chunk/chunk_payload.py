@@ -1,8 +1,13 @@
-import panel as pn
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from pyllments.base.payload_base import Payload
 from pyllments.base.component_base import Component
 from pyllments.payloads.chunk.chunk_model import ChunkModel
+
+if TYPE_CHECKING:
+    import panel as pn
 
 class ChunkPayload(Payload):
     def __init__(self, **params):
@@ -16,8 +21,7 @@ class ChunkPayload(Payload):
         markdown_css: list = [],
         row_css: list = [],
         truncation_length: int = 40
-        ):
-
+        ) -> pn.Row:
         expand_button = pn.widgets.Toggle(
             icon='plus',
             icon_size='1.1em',

@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import time
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
 from loguru import logger
-import panel as pn
 import param
 
 from pyllments.base.element_base import Element
@@ -11,12 +12,14 @@ from pyllments.payloads.chunk import ChunkPayload
 from pyllments.payloads.message import MessagePayload
 from pyllments.elements.retriever.retriever_model import RetrieverModel
 
-class RetrieverElement(Element):
-    retrieved_chunks_view = param.ClassSelector(class_=pn.Column)
-    created_chunks_view = param.ClassSelector(class_=pn.Column)
+if TYPE_CHECKING:
+    import panel as pn
 
+class RetrieverElement(Element):
     def __init__(self, **params):
         super().__init__(**params)
+        self.retrieved_chunks_view = None
+        self.created_chunks_view = None
         self.model = RetrieverModel(**params)
 
         self._chunk_input_setup()

@@ -2,7 +2,6 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/universal
 {
 	"name": "pyllments",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"build": {
 		"dockerfile": "./Dockerfile",
 		"context": "../"
@@ -22,15 +21,13 @@
 			]
 		}
 	},
-	"forwardPorts": [8000, 8200]
+	"forwardPorts": [8000, 8200],
+	"postCreateCommand": "uv sync --active --frozen --extra full --extra dev"
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "uv pip install -e .[dev] --no-build"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
