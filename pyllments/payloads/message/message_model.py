@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import time
 
 from loguru import logger
@@ -71,8 +72,20 @@ class MessageModel(Model):
         self.content = ''
         self.tool_calls = []
         buffer = ''
-        
-        async for chunk in self.message_coroutine:
+
+        stream_source = self.message_coroutine
+        # LiteLLM stream mode can now arrive as a coroutine that resolves to an
+        # async iterator, so normalize it before consuming chunks.
+        if inspect.isawaitable(stream_source) and not hasattr(stream_source, '__aiter__'):
+            stream_source = await stream_source
+            self.message_coroutine = stream_source
+        if not hasattr(stream_source, '__aiter__'):
+            raise TypeError(
+                "Stream messages require an async iterator or an awaitable that "
+                f"resolves to one, got {type(stream_source).__name__}"
+            )
+
+        async for chunk in stream_source:
             delta = chunk.choices[0].delta
             if delta.content:
                 buffer += delta.content

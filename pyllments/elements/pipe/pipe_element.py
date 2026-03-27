@@ -1,6 +1,5 @@
 from typing import Any
 import asyncio
-import concurrent.futures
 
 import param
 
@@ -79,9 +78,9 @@ class PipeElement(Element):
         # Schedule the coroutine to run on the loop, but don't wait here.
         loop.create_task(coro)
 
-    def send_and_receive(self, payload: Any, timeout: float = None) -> Any:
+    async def async_send_and_receive(self, payload: Any, timeout: float = None) -> Any:
         """
-        Send a payload and block until a response arrives on this pipe.
+        Send a payload and await the first response that arrives on this pipe.
 
         Parameters
         ----------
@@ -104,15 +103,28 @@ class PipeElement(Element):
         self._receive_future = loop.create_future()
         # send payload into the flow
         self.send_payload(payload)
-        # wrap the future in a coroutine so we can thread-safely wait on it
-        async def _await_future():
-            return await self._receive_future
-        # schedule and block until the future is set or timeout expires
-        future = asyncio.run_coroutine_threadsafe(_await_future(), loop)
         try:
-            return future.result(timeout)
-        except concurrent.futures.TimeoutError:
+            if timeout is None:
+                return await self._receive_future
+            return await asyncio.wait_for(self._receive_future, timeout=timeout)
+        except asyncio.TimeoutError:
             return None
         finally:
             # clean up the internal future reference
             self._receive_future = None
+
+    def send_and_receive(self, payload: Any, timeout: float = None) -> Any:
+        """
+        Backward-compatible sync wrapper around :meth:`async_send_and_receive`.
+
+        This wrapper is only valid when called outside a running event loop.
+        For async contexts (including worker runtimes), use ``await async_send_and_receive(...)``.
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.async_send_and_receive(payload=payload, timeout=timeout))
+        raise RuntimeError(
+            "PipeElement.send_and_receive() cannot block inside a running event loop. "
+            "Use `await pipe.async_send_and_receive(...)` instead."
+        )

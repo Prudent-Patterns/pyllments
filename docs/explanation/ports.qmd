@@ -67,7 +67,7 @@ For developers extending pyllments or debugging, here's how ports ensure determi
   - Use `stage(**kwargs)` to prepare data (fills `required_items` dict, inferred from callback annotations).
   - When ready (`emit_ready=True`), call `emit()` or auto-emit if `emit_when_ready=True`.
   - Packs via `pack_payload_callback` (can be async, returns Payload).
-  - Optional `readiness_check` (awaitable) runs before each emit.
+  - Optional `readiness_check` (awaitable) can gate explicit `stage_emit` flows.
 
 - **Queue for Ordering**:
   - Emissions are queued in an `asyncio.Queue` (FIFO).
@@ -81,6 +81,8 @@ For developers extending pyllments or debugging, here's how ports ensure determi
             self._emission_queue.task_done()  # Moves to next item
     ```
   - Advances to next item only after all connected inputs complete their `receive()` (including unpacks).
+  - `stage_emit` returns after enqueueing, not after downstream delivery completes.
+  - Use `await output_port.drain()` (or `await lifecycle_manager.drain()`) when you need a hard completion boundary.
 
 - **Predictability**: FIFO queue + sequential awaits ensure no out-of-order emissions.
 
@@ -108,6 +110,7 @@ For developers extending pyllments or debugging, here's how ports ensure determi
 ### Edge Cases and Best Practices
 - **Concurrency**: Queues/locks prevent races; slow unpacks delay but preserve order.
 - **Readiness**: Use checks to defer processing/emission until ready.
+- **Completion boundaries**: For short-lived request handlers (e.g., workers), call `drain` before returning if queued emissions must finish first.
 - **Debugging**: Enable logging (e.g., `log_emit`, `log_receive`) for timestamps.
 - **Performance**: Avoid long-running callbacks to prevent bottlenecks.
 

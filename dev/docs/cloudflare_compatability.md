@@ -207,6 +207,14 @@ Key outcome:
 - fewer hidden assumptions,
 - cleaner portability between local servers, notebooks, and Workers.
 
+Adopted runtime decisions for this workstream:
+
+- keep the existing queue-backed `OutputPort` contract as the single default behavior across environments,
+- slim lifecycle management to explicit async primitives (`drain` and `shutdown`) rather than POSIX signal/`atexit` hooks,
+- keep server teardown on FastAPI lifespan hooks instead of runtime-level signal handlers,
+- keep loop ownership simple and generic (single asyncio loop via existing runtime behavior),
+- keep unsupported integrations importable and fail fast at runtime with clear errors.
+
 ### 6. Preserve Developer Experience Across Modes
 
 A developer should not have to learn two different frameworks just because one deployment target is Cloudflare. The same concepts should remain valid across local prototyping and lightweight production.

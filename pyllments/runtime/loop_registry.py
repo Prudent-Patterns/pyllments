@@ -12,7 +12,7 @@ class LoopRegistry:
     @classmethod
     def get_loop(cls):
         """
-        Get the event loop, creating one if necessary.
+        Get the application event loop.
         
         Returns
         -------
@@ -20,21 +20,20 @@ class LoopRegistry:
             The event loop instance.
         """
         # Return cached loop if we have one
-        if cls._loop is not None:
+        if cls._loop is not None and not cls._loop.is_closed():
             # logger.debug(f"LoopRegistry: Using cached loop {id(cls._loop)}")
             return cls._loop
-            
-        # Try to get the existing loop or create a new one
-        policy = asyncio.get_event_loop_policy()
+
+        # Prefer running loop from current context.
         try:
-            cls._loop = policy.get_event_loop()
-            if cls._loop is None or cls._loop.is_closed():
-                cls._loop = policy.new_event_loop()
-                policy.set_event_loop(cls._loop)
-                # logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")
-            # else:
-                # logger.debug(f"LoopRegistry: Using existing loop {id(cls._loop)}")
+            cls._loop = asyncio.get_running_loop()
+            return cls._loop
         except RuntimeError:
+            pass
+
+        # Fall back to creating a loop for non-running contexts.
+        policy = asyncio.get_event_loop_policy()
+        if cls._loop is None or cls._loop.is_closed():
             cls._loop = policy.new_event_loop()
             policy.set_event_loop(cls._loop)
             logger.debug(f"LoopRegistry: Created new loop {id(cls._loop)}")

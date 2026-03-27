@@ -15,7 +15,6 @@ from pyllments.logging import setup_logging
 from pyllments.common.resource_loader import get_asset
 from pyllments.runtime.app_registry import AppRegistry
 from pyllments.runtime.loop_registry import LoopRegistry
-from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 from pyllments.common.type_utils import TypeMapper
 
 

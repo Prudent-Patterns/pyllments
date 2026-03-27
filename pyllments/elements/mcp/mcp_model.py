@@ -115,10 +115,15 @@ class MCPModel(Model):
         self.context_stack = AsyncExitStack()
         self._child_processes = []
         # Shared thread pool for executing sync tools efficiently
-        self._executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=os.cpu_count() or 4,
-            thread_name_prefix=f"{self.__class__.__name__}-tool-exec"
-        )
+        try:
+            self._executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=os.cpu_count() or 4,
+                thread_name_prefix=f"{self.__class__.__name__}-tool-exec"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                "MCPModel could not initialize thread-backed tool execution in this runtime."
+            ) from e
         atexit.register(self._force_kill_processes)
         # Start async setup in background
         self.loop = LoopRegistry.get_loop()
@@ -174,13 +179,19 @@ class MCPModel(Model):
             env=mcp_spec.get('env', {})
         )
 
-        mcp_spec['read_write_streams'] = await self.context_stack.enter_async_context(
-            stdio_client(server_params)
-        )
-        mcp_spec['session'] = await self.context_stack.enter_async_context(
-            ClientSession(*mcp_spec['read_write_streams'])
-        )
-        await mcp_spec['session'].initialize()
+        try:
+            mcp_spec['read_write_streams'] = await self.context_stack.enter_async_context(
+                stdio_client(server_params)
+            )
+            mcp_spec['session'] = await self.context_stack.enter_async_context(
+                ClientSession(*mcp_spec['read_write_streams'])
+            )
+            await mcp_spec['session'].initialize()
+        except Exception as e:
+            raise RuntimeError(
+                f"MCP '{mcp_name}' failed to start its subprocess transport. "
+                "This runtime may not support child processes/stdio transports."
+            ) from e
 
         # Store process for forced termination
         if hasattr(mcp_spec['read_write_streams'], 'process'):

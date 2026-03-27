@@ -1,4 +1,5 @@
 import pytest
+import concurrent.futures
 
 from pyllments.elements.mcp import MCPModel
 from pyllments.logging import setup_logging
@@ -24,4 +25,14 @@ def test_tools(mcp_model):
     tools = mcp_model.tools  # Now using the new property name
     print(f"DEBUG: Tools: {tools}")
     print("DEBUG: Exiting test_tools")
+
+
+def test_mcp_fails_fast_when_executor_unavailable(monkeypatch):
+    def _raise(*args, **kwargs):
+        raise RuntimeError("executor unavailable")
+
+    monkeypatch.setattr(concurrent.futures, "ThreadPoolExecutor", _raise)
+
+    with pytest.raises(RuntimeError, match="thread-backed tool execution"):
+        MCPModel(mcps={})
 

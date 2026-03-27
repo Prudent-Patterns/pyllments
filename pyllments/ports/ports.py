@@ -1,4 +1,4 @@
-from typing import Union, get_origin, get_args, Any, TypeVar
+from typing import Union, get_origin, get_args, get_type_hints, Any, TypeVar
 import inspect
 import asyncio
 from uuid import uuid4
@@ -15,6 +15,15 @@ logger = _logger.bind(name=__name__)
 
 # Type variable for generic payload types
 T = TypeVar('T', bound=Payload)
+
+
+def _resolve_callback_annotations(callback):
+    """Resolve deferred annotations into runtime types for port validation."""
+    try:
+        return get_type_hints(callback)
+    except Exception as exc:
+        logger.debug(f"Falling back to raw annotations for {callback}: {exc}")
+        return inspect.getfullargspec(callback).annotations.copy()
 
 class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
@@ -177,10 +186,11 @@ class InputPort(Port):
             raise ValueError(f"unpack_payload_callback must have at least one parameter")
             
         first_param = params[0]
-        if first_param.annotation is inspect._empty:
+        annotations = _resolve_callback_annotations(self.unpack_payload_callback)
+        if first_param.name not in annotations:
             raise ValueError(f"First parameter of unpack_payload_callback must have a type annotation")
-            
-        self.payload_type = first_param.annotation
+
+        self.payload_type = annotations[first_param.name]
     
     async def receive(self, payload: Payload, output_port: 'OutputPort') -> None:
         """
@@ -352,6 +362,10 @@ class OutputPort(Port):
     on_connect_callback = param.Callable(default=None, doc="""
         Callback executed when a port is connected.
         Can be a regular function or a coroutine function.""")
+
+    queue_maxsize = param.Integer(default=0, bounds=(0, None), doc="""
+        Optional maxsize for the internal emission queue.
+        0 means unbounded queue behavior (default).""")
     
     # State tracking
     emit_ready = param.Boolean(default=False, doc="""
@@ -362,7 +376,7 @@ class OutputPort(Port):
         self.readiness_check = readiness_check  # Optional coroutine to await before emit
         
         # Queue for ordered emission processing
-        self._emission_queue = asyncio.Queue()
+        self._emission_queue = asyncio.Queue(maxsize=self.queue_maxsize)
         self._emission_task = None
         
         # Connected input ports in order of connection
@@ -388,10 +402,10 @@ class OutputPort(Port):
                 self.required_items = {'payload': {'value': None, 'type': Any}}
             return
         
-        annotations = inspect.getfullargspec(self.pack_payload_callback).annotations
+        annotations = _resolve_callback_annotations(self.pack_payload_callback)
         if not annotations:
             raise ValueError("pack_payload_callback must have annotations for inference")
-        
+
         return_annotation = annotations.pop('return', None)
         if return_annotation is None:
             raise ValueError("pack_payload_callback must have a return type annotation")
@@ -692,7 +706,7 @@ class OutputPort(Port):
                     await asyncio.gather(self._emission_task, return_exceptions=True)
                     logger.trace(f"Emission task for port {self.name} finished cancellation.")
                 else:
-                    logger.trace(f"Emission task for port {self.name} is on a different or closed loop. Cannot confirm cancellation (expected during atexit). Task Loop ID: {id(task_loop)}, Current Loop ID: {id(current_loop)}")
+                    logger.trace(f"Emission task for port {self.name} is on a different or closed loop. Cannot confirm cancellation. Task Loop ID: {id(task_loop)}, Current Loop ID: {id(current_loop)}")
                     
             except asyncio.CancelledError:
                 # This is expected when the task is successfully cancelled on the current loop
@@ -713,6 +727,15 @@ class OutputPort(Port):
             item['value'] = None
         
         logger.trace(f"Port {self.name} ({self.id}) closed successfully.")
+
+    async def drain(self):
+        """
+        Wait for all currently queued emissions to be processed.
+
+        This does not stop future emits; it only flushes work already enqueued when
+        this method is awaited.
+        """
+        await self._emission_queue.join()
 
     async def stage_emit_to(self, input_port, **kwargs):
         """
