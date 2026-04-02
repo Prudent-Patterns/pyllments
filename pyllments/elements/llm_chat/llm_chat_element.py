@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Literal, Union, Optional, List, TYPE_CHECKING
+from typing import Literal, Union, Optional, List, TYPE_CHECKING, cast
 
 import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads import MessagePayload, ToolsResponsePayload, StructuredPayload
-from pyllments.elements.llm_chat import LLMChatModel
+from pyllments.elements.llm_chat.openrouter_chat_model import OpenRouterChatModel
+from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
 
 if TYPE_CHECKING:
     import panel as pn
@@ -14,21 +15,69 @@ if TYPE_CHECKING:
 
 class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
+
+    backend = param.Selector(
+        objects=['openrouter', 'litellm'],
+        default='openrouter',
+        doc="Chat backend model implementation")
     generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
 
     def __init__(self, **params):
         super().__init__(**params)
         self.model_selector_view = None
 
-        self.model = LLMChatModel(**params)
+        # Keep model construction explicit so backend swapping remains transparent.
+        self._model_init_params = self._extract_model_params(params)
+        self.model = self._create_model(self.backend, self._model_init_params)
+        self.param.watch(self._on_backend_change, 'backend')
         self._message_output_setup()
         self._messages_emit_input_setup()
         self._tools_input_setup()
-        
+
+    def _extract_model_params(self, params: dict) -> dict:
+        element_param_names = {'backend', 'generate_content_on_emit'}
+        return {
+            key: value
+            for key, value in params.items()
+            if key not in element_param_names
+        }
+
+    def _capture_model_state(self) -> dict:
+        state = {}
+        for key in ['model_name', 'model_args', 'output_mode', 'response_format', 'functions', 'tools', 'api_key', 'client_args']:
+            if hasattr(self.model, key):
+                state[key] = getattr(self.model, key)
+        if hasattr(self.model, 'base_url'):
+            state['base_url'] = getattr(self.model, 'base_url')
+        return state
+
+    def _filter_model_params(self, model_cls, model_params: dict) -> dict:
+        accepted_params = set(model_cls.param.objects().keys())
+        return {
+            key: value
+            for key, value in model_params.items()
+            if key in accepted_params
+        }
+
+    def _create_model(self, backend: str, model_params: dict):
+        if backend == 'openrouter':
+            params = dict(model_params)
+            params.pop('base_url', None)
+            return OpenRouterChatModel(**self._filter_model_params(OpenRouterChatModel, params))
+        if backend == 'litellm':
+            return LiteLLMChatModel(**self._filter_model_params(LiteLLMChatModel, model_params))
+        raise ValueError(f"Unsupported LLM backend: {backend}")
+
+    def _on_backend_change(self, event):
+        replacement_params = dict(self._model_init_params)
+        replacement_params.update(self._capture_model_state())
+        self.model = self._create_model(event.new, replacement_params)
+        self.model_selector_view = None
+
     def _message_output_setup(self):
         async def pack(message_payload: MessagePayload) -> MessagePayload:
             return message_payload
-            
+
         self.ports.add_output(name='message_output', pack_payload_callback=pack)
 
     def _messages_emit_input_setup(self):
@@ -46,7 +95,7 @@ class LLMChatElement(Element):
             else:
                 # It's already a list
                 payloads = payload
-            
+
             # Directly generate and emit response from all incoming payloads
             response = self.model.generate_response(payloads)
             if self.generate_content_on_emit:
@@ -76,7 +125,7 @@ class LLMChatElement(Element):
         models: Optional[Union[list[Union[str, dict]], dict]] = None,
         show_provider_selector: bool = True,
         provider: str = 'OpenAI',
-        model: Union[str, dict] = 'gpt-4o-mini',
+        model: Union[str, dict] = 'openai/gpt-4o-mini',
         orientation: Literal['vertical', 'horizontal'] = 'horizontal',
         model_selector_width: int = None,
         provider_selector_width: int = None,
@@ -183,134 +232,86 @@ class LLMChatElement(Element):
                 entry["display_name"]: {"model": entry["model"], "base_url": entry["base_url"]}
                 for entry in normalized
             }
+        provider_model_map = self.model.get_provider_model_catalog(models=models, max_providers=6)
+        provider_options = {
+            self.model.provider_display_name(provider_key): provider_key
+            for provider_key in provider_model_map.keys()
+        }
+        if not provider_options:
+            provider_options = {'Default': 'default'}
+            provider_model_map = {'default': []}
 
-        if show_provider_selector:
-            import litellm
-            provider_map = {
-                'OpenAI': litellm.open_ai_chat_completion_models,
-                'Anthropic': litellm.anthropic_models,
-                'Gemini': litellm.gemini_models,
-                'xAI': litellm.xai_models,
-                'Groq': litellm.groq_models,
-                'Mistral': litellm.mistral_chat_models,
-                'OpenRouter': litellm.openrouter_models
-            }
-            # Allow for custom models via the passed-in models argument.
-            if models:
-                provider_map['Custom'] = models
+        normalized_default_model = self.model.normalize_model_name(model) if isinstance(model, str) else None
+        default_provider_key = self.model.provider_key_for_label(provider)
+        if normalized_default_model and '/' in normalized_default_model:
+            default_provider_key = normalized_default_model.split('/', 1)[0].lower()
+        if default_provider_key not in provider_model_map:
+            default_provider_key = next(iter(provider_model_map.keys()))
 
-            # NEW: Determine the default provider based on the provided default model string.
-            default_provider = provider  # Fallback to the provided 'provider'
-            default_model_config = None
-            if isinstance(model, str):
-                for prov, models_list in provider_map.items():
-                    processed_models = process_models(models_list)
-                    if model in processed_models:
-                        default_provider = prov
-                        default_model_config = processed_models[model]
-                        break
+        def build_model_options(provider_key: str) -> dict:
+            return process_models(provider_model_map.get(provider_key, []))
 
-            # Create a provider selector widget using the determined default_provider.
-            provider_selector = pn.widgets.Select(
-                name='Provider Selector',
-                value=default_provider,
-                options=list(provider_map.keys()),
-                stylesheets=selector_css,
-                width=provider_selector_width,
-                sizing_mode='stretch_width',
-                margin=0
-            )
+        model_selector = pn.widgets.Select(
+            name='Model Selector',
+            options=build_model_options(default_provider_key),
+            stylesheets=selector_css,
+            width=model_selector_width,
+            sizing_mode='stretch_width',
+            margin=0
+        )
 
-            # Initialize model options based on the selected provider.
-            initial_options = process_models(provider_map.get(default_provider, {}))
-            model_selector = pn.widgets.Select(
-                name='Model Selector',
-                options=initial_options,
-                stylesheets=selector_css,
-                width=model_selector_width,
-                sizing_mode='stretch_width',
-                margin=0,
-            )
+        def select_default_model(options: dict, preferred_model: Optional[str]) -> Optional[dict]:
+            if preferred_model and preferred_model in options:
+                return options[preferred_model]
+            if isinstance(model, dict):
+                for cfg in options.values():
+                    if cfg == model:
+                        return cfg
+            if options:
+                return next(iter(options.values()))
+            return None
 
-            # Function to set the default model selection—matching by default_model_config if available.
-            def set_model_defaults():
-                if default_model_config is not None:
-                    model_selector.value = default_model_config
-                    self.model.model_name = default_model_config["model"]
-                    self.model.base_url = default_model_config["base_url"]
-                else:
-                    selected_config = None
-                    if isinstance(model, dict):
-                        # Try to find a configuration that matches the provided dict.
-                        for config in initial_options.values():
-                            if config == model:
-                                selected_config = config
-                                break
-                    else:
-                        selected_config = initial_options.get(model)
-                    
-                    if selected_config:
-                        model_selector.value = selected_config
-                        self.model.model_name = selected_config["model"]
-                        self.model.base_url = selected_config["base_url"]
-
-            set_model_defaults()
-
-            # Update available models when the provider changes.
-            def on_provider_change(event):
-                new_options = process_models(provider_map.get(event.new, {}))
-                model_selector.options = new_options
-                # Try to set the default model for this new provider.
-                default_cfg = None
-                for cfg in new_options.values():
-                    if cfg["model"] == model:
-                        default_cfg = cfg
-                        break
-                if default_cfg is None and new_options:
-                    default_cfg = next(iter(new_options.values()))
-                model_selector.value = default_cfg
-                if default_cfg:
-                    self.model.model_name = default_cfg["model"]
-                    self.model.base_url = default_cfg["base_url"]
-
-            provider_selector.param.watch(on_provider_change, 'value')
-
-            # Update the underlying model when model selection changes.
-            def on_model_change(event):
-                self.model.model_name = event.new["model"]
-                self.model.base_url = event.new["base_url"]
-
-            model_selector.param.watch(on_model_change, 'value')
-
-            # Construct the overall layout based on requested orientation.
-            if orientation == 'vertical':
-                self.model_selector_view = pn.Column(provider_selector, model_selector)
-            else:
-                self.model_selector_view = pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
-
-            return self.model_selector_view
-        else:
-            import litellm
-            if models is None:
-                models = litellm.open_ai_chat_completion_models
-            options = process_models(models)
-            model_selector = pn.widgets.Select(
-                name='Model Selector',
-                options=options,
-                stylesheets=selector_css,
-                sizing_mode='stretch_width',
-                margin=0
-            )
-            # NEW: Set the default model based on the passed 'model' argument.
-            default_config = options.get(model)
-            if default_config is not None:
-                model_selector.value = default_config
-                self.model.model_name = default_config["model"]
+        default_config = select_default_model(model_selector.options, normalized_default_model)
+        if default_config is not None:
+            model_selector.value = default_config
+            self.model.model_name = default_config["model"]
+            if hasattr(self.model, 'base_url'):
                 self.model.base_url = default_config["base_url"]
 
-            def on_model_change(event):
-                self.model.model_name = event.new["model"]
+        def on_model_change(event):
+            self.model.model_name = event.new["model"]
+            if hasattr(self.model, 'base_url'):
                 self.model.base_url = event.new["base_url"]
 
-            model_selector.param.watch(on_model_change, 'value')
-            return pn.Row(model_selector)    
+        model_selector.param.watch(on_model_change, 'value')
+
+        if not show_provider_selector:
+            return pn.Row(model_selector)
+
+        provider_selector = pn.widgets.Select(
+            name='Provider Selector',
+            value=default_provider_key,
+            options=provider_options,
+            stylesheets=selector_css,
+            width=provider_selector_width,
+            sizing_mode='stretch_width',
+            margin=0
+        )
+
+        def on_provider_change(event):
+            new_options = build_model_options(event.new)
+            model_selector.options = new_options
+            default_cfg = select_default_model(new_options, normalized_default_model if event.new == default_provider_key else None)
+            if default_cfg is not None:
+                model_selector.value = default_cfg
+                self.model.model_name = default_cfg["model"]
+                if hasattr(self.model, 'base_url'):
+                    self.model.base_url = default_cfg["base_url"]
+
+        provider_selector.param.watch(on_provider_change, 'value')
+
+        if orientation == 'vertical':
+            self.model_selector_view = pn.Column(provider_selector, model_selector)
+        else:
+            self.model_selector_view = pn.Row(provider_selector, pn.Spacer(width=10), model_selector)
+        return self.model_selector_view

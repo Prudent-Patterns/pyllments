@@ -33,6 +33,7 @@ dependencies = [
     "loguru",
     "typer",
     "litellm>=1.57.3",
+    "openrouter",
     "discord-py>=2.4.0",
     "python-telegram-bot>=21.10",
     "telethon>=1.38.1",

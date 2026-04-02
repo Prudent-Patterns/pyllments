@@ -47,7 +47,7 @@ class Config:
         }
     )
     default_model: str = field(
-        default='gpt-4o-mini',
+        default='openai/gpt-4o-mini',
         metadata={
             "help": "The default model to use when loading the interface."
         }

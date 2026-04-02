@@ -22,6 +22,8 @@ WORKDIR /workspaces/pyllments
 RUN mkdir -p /opt/venv && uv venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Keep uv aligned to the single container venv to avoid .venv vs /opt/venv drift.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # Set UV link mode to avoid hardlink warning (Fix for second warning)
 ENV UV_LINK_MODE=copy

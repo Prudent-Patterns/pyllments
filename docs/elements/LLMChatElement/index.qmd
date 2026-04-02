@@ -7,30 +7,35 @@ The `LLMChatElement` is a core component for integrating Large Language Models (
 
 ## Instantiation
 
-##### LiteLLM
+##### OpenRouter (default)
 
-Under the hood, this element uses [LiteLLM](https://docs.litellm.ai/docs/) and the standardized [model names](https://models.litellm.ai) used by APIs of various providers.
+By default, this element uses the [OpenRouter Python SDK](https://openrouter.ai/docs/sdks/python) and OpenRouter model names such as `openai/gpt-4o-mini`.
 When this Element is instantiated, unless a `env_path` is provided, it will look in the working directory for an `.env` file.
 
 ##### APIs
 
-We rely on the standard API key names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, et al to be present in the `.env` file depending on the model you wish to use. For more on authentication, see the [docs here](https://docs.litellm.ai/docs/set_keys).
+For OpenRouter-backed requests, set `OPENROUTER_API_KEY` in your `.env` file (or process environment).  
+The OpenRouter backend explicitly loads `.env` at runtime and then reads `OPENROUTER_API_KEY`.
+If this key is missing, `LLMChatElement` raises a clear credential error before sending the request.
+When running recipes, pass your env file explicitly (for example `pyllments recipe run chat --env .env`) so process-level environment values are available consistently.
 
-##### OpenRouter
+##### LiteLLM (alternate backend)
 
-If you wish to try out many models with a single API key, we recommend you use [OpenRouter](https://docs.litellm.ai/docs/providers/openrouter), which is supported by LiteLLM. 
+If you need broad provider routing via LiteLLM model registries or custom local endpoints, switch backend to `litellm`. LiteLLM uses its [standard model naming system](https://models.litellm.ai) and API key setup documented [here](https://docs.litellm.ai/docs/set_keys).
 
 ##### Local
-Alternatively, you can also run local models(ollama, VLLM, etc), where you need to include the name and the `base_url`. See more on that [here](https://docs.litellm.ai/docs/providers/ollama).
+Local model endpoints (`ollama`, `vLLM`, etc.) are supported through the `litellm` backend by supplying `model_name` and `base_url`. See [LiteLLM local provider docs](https://docs.litellm.ai/docs/providers/ollama).
 
 **Arguments:**
 
-`model_name`: str = 'gpt-4o-mini'<br>
+`backend`: Literal['openrouter', 'litellm'] = 'openrouter'<br>
+<span class="tab">Selects which concrete chat backend model implementation is used under the hood.</span>
+`model_name`: str = 'openai/gpt-4o-mini'<br>
 <span class="tab">The name of the model to use for the LLM.</span>
 `model_args`: dict = {}<br>
 <span class="tab">Additional arguments to pass to the model.</span>
 `base_url`: str = None<br>
-<span class="tab">The base URL for the model. Optional, to be used with custom endpoints.</span>
+<span class="tab">LiteLLM-only. Base URL for custom/local model endpoints.</span>
 `output_mode`: Literal['atomic', 'stream'] = 'stream'<br>
 <span class="tab">Whether to return the message containing a streaming callback or an atomic one</span>
 `env_path`: str = None<br>
@@ -57,7 +62,7 @@ Alternatively, you can also run local models(ollama, VLLM, etc), where you need 
 
 | View Name            | Description                                                                 | Image                                      |
 |----------------------|-----------------------------------------------------------------------------|--------------------------------------------|
-| model_selector_view  | Allows selection of LLM provider and model for generating responses.<br>**Args:**<br>`models: list or dict, optional`<br><span class="tab">A list or dict of models. If a dict, the keys are used as display names.</span><br>`show_provider_selector: bool, default True`<br><span class="tab">Whether to include a provider selection widget.</span><br>`provider: str, default 'OpenAI'`<br><span class="tab">The default provider value.</span><br>`model: str or dict, default 'gpt-4o-mini'`<br><span class="tab">The default model (this update assumes it is a string to be pre-selected).</span><br>`orientation: {'vertical', 'horizontal'}, default 'horizontal'`<br><span class="tab">Layout orientation for the provider and model selectors.</span><br>`model_selector_width: int = None`<br>`provider_selector_width: int = None`<br>`selector_css: list[str] = []`<br>`height: int = 57` | With provider:<br>![ModelSelectorView](model_selector_model.jpg){.lightbox}<br>Without provider:<br>![ModelSelectorView](model_selector_provider_model.jpg){.lightbox} |
+| model_selector_view  | Allows selection of backend model names for generating responses.<br>On `litellm`, provider + model selection remains available.<br>On `openrouter`, the selector shows a curated set of major providers (max 6) and updates models by selected provider (for example OpenAI, Anthropic, Google, xAI, Mistral, Meta).<br>**Args:**<br>`models: list or dict, optional`<br><span class="tab">A list or dict of models. If a dict, the keys are used as display names.</span><br>`show_provider_selector: bool, default True`<br><span class="tab">Whether to include a provider selection widget.</span><br>`provider: str, default 'OpenAI'`<br><span class="tab">Used by LiteLLM provider selection.</span><br>`model: str or dict, default 'openai/gpt-4o-mini'`<br><span class="tab">The default model to pre-select.</span><br>`orientation: {'vertical', 'horizontal'}, default 'horizontal'`<br><span class="tab">Layout orientation for the provider and model selectors.</span><br>`model_selector_width: int = None`<br>`provider_selector_width: int = None`<br>`selector_css: list[str] = []`<br>`height: int = 57` | With provider:<br>![ModelSelectorView](model_selector_model.jpg){.lightbox}<br>Without provider:<br>![ModelSelectorView](model_selector_provider_model.jpg){.lightbox} |
 
 
 

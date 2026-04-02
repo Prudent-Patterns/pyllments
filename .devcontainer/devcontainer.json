@@ -6,6 +6,9 @@
 		"dockerfile": "./Dockerfile",
 		"context": "../"
 	},
+	"containerEnv": {
+		"UV_PROJECT_ENVIRONMENT": "/opt/venv"
+	},
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -22,7 +25,7 @@
 		}
 	},
 	"forwardPorts": [8000, 8200],
-	"postCreateCommand": "uv sync --active --frozen --extra full --extra dev"
+	"postCreateCommand": "uv sync --active --frozen --extra full --extra dev",
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
