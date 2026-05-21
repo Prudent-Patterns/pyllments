@@ -5,5 +5,4 @@ __pycache__/
 *.py[cod]
 dev/
 docs/
-vtest/
 file_loader.log

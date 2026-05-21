@@ -6,7 +6,7 @@ Pyllments is a Python library enabling developers to assemble modular pipelines 
 
 Core Concepts:
 - Element: A modular unit combining Model, Views, and Ports for a specific function.
-- Payload: A Component that carries data through Ports and can render itself via Views.
+- Payload: A Component that carries data through Ports and can render itself via Views. MessagePayload supports atomic and stream modes with aiter_events(), cancellation, and MessageStreamEvent for token/tool streaming.
 - Port: Endpoints (InputPort, OutputPort) following an observer pattern for reactive messaging.
 - FlowController: An advanced Element that orchestrates complex workflows via a user-defined flow_map.
 - Recipe: A parameterized, CLI-exposed application template located in `pyllments/recipes`.
@@ -32,6 +32,7 @@ Design Principles:
 
 Available Elements:
 - ChatInterfaceElement: Manages chat UI components (input area, feed, send button) and message display/emission.
+- ChatGatewayElement: Production boundary for programmatic submit/stream/cancel of chat turns without Panel or blocking HTTP futures; pairs with TurnHandle and MessageStreamEvent.
 - LLMChatElement: Interfaces with LLM providers to generate responses to incoming MessagePayloads.
 - APIElement: Exposes application ports as REST API endpoints using FastAPI and aggregates payloads into responses.
 - Router: Routes incoming payloads to different outputs based on configurable predicates.

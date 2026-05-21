@@ -1,0 +1,133 @@
+---
+title: "MessagePayload"
+description: "Chat message payloads, atomic vs stream modes, and event-based streaming"
+---
+
+`MessagePayload` is the standard data contract for chat messages between Elements. It wraps a `MessageModel` that holds role, content, tool calls, and optional provider-backed streaming.
+
+Most Elements that speak “chat” use `MessagePayload` on their ports (for example `LLMChatElement`, `HistoryHandlerElement`, `ChatInterfaceElement`, `ChatGatewayElement`).
+
+## Construction
+
+```python
+from pyllments.payloads import MessagePayload
+
+user = MessagePayload(content="Hello", role="user")
+assistant = MessagePayload(
+    role="assistant",
+    mode="stream",
+    message_coroutine=provider_stream,  # async iterator from LLM backend
+)
+```
+
+Constructor arguments are passed to `MessageModel`. Common fields:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `role` | `'user'` | OpenAI-style role: `system`, `user`, `assistant`, `function`, `tool`, `developer` |
+| `content` | `''` | Message text (updated during streaming when aggregating) |
+| `mode` | `'atomic'` | `'atomic'` or `'stream'` |
+| `message_coroutine` | `None` | Atomic: awaitable response. Stream: async iterator (or awaitable that resolves to one) |
+| `aggregate_stream` | `True` | When streaming, update `content` / `tool_calls` on the model as events arrive |
+| `correlation_id` | `None` | Optional turn id (set by `ChatGatewayElement` on user messages) |
+| `tool_calls` | `[]` | Accumulated tool calls (stream or atomic) |
+| `streamed` | `False` | Whether the stream has finished |
+| `ready` | `False` | Whether the message is fully processed |
+| `cancelled` | `False` | Whether streaming was cancelled |
+
+## Atomic mode
+
+In `mode='atomic'`, the model may store a coroutine in `message_coroutine`. Call `await payload.model.aget_message()` (or `await payload.model.await_ready()`) to resolve it and populate `content` and `tool_calls`.
+
+`LLMChatElement` with `output_mode='atomic'` returns payloads in this shape.
+
+## Stream mode
+
+In `mode='stream'`, `message_coroutine` is an async iterator of provider chunks (OpenRouter/LiteLLM stream events). Consume the stream with the event API rather than only waiting for final `content`.
+
+### `MessageStreamEvent`
+
+Defined in `pyllments.payloads.message.stream_events`. Each event has a `type`:
+
+| Type | Meaning |
+|------|---------|
+| `token` | Text delta in `content_delta` |
+| `tool_call_delta` | Partial tool call update in `tool_call_delta` |
+| `tool_calls_complete` | Final `tool_calls` list for the message |
+| `done` | Stream finished successfully |
+| `cancelled` | Stream was cancelled |
+| `error` | Error string in `error` |
+
+### Consuming events
+
+```python
+async for event in message.model.aiter_events():
+    match event.type:
+        case "token":
+            ui.append(event.content_delta)
+        case "tool_calls_complete":
+            schedule_tools(event.tool_calls)
+        case "done":
+            break
+```
+
+**Convenience:**
+
+```python
+async for token in message.model.aiter_tokens():
+    ui.append(token)
+```
+
+**Full aggregation (Panel/history):**
+
+```python
+await message.model.stream()  # delegates to aiter_events with aggregation
+# message.model.content is now complete
+```
+
+Or:
+
+```python
+await message.model.aget_message()
+```
+
+### `aggregate_stream`
+
+When `aggregate_stream=True` (default), `aiter_events()` updates `content` and `tool_calls` on the model as chunks arrive—same behavior as the legacy `stream()` method.
+
+When `aggregate_stream=False`, events are yielded but the model is not updated; use this if your application layer owns aggregation (for example a stream broker) and Pyllments history is not waiting on this payload.
+
+### Cancellation
+
+`message.model.cancel()`:
+
+- Sets `cancelled` and `ready`
+- Cancels any in-flight `stream()` task
+- Calls `aclose()` on the active provider async iterator when available, so upstream token generation can stop
+
+Used by `ChatGatewayElement` / `TurnHandle.cancel()` to avoid burning tokens after the user aborts.
+
+::: {.callout-warning}
+A stream can only be consumed once. Do not call `aiter_events()` and `stream()` concurrently on the same payload.
+:::
+
+## Views
+
+`MessagePayload` provides Panel views for GUIs:
+
+- `create_static_view()` — markdown display with role styling
+- `create_collapsible_view()` — truncated preview with expand toggle
+
+Views watch `model.content` and update reactively during streaming when aggregation is enabled.
+
+## Integration with ChatGatewayElement
+
+Typical production flow:
+
+1. `ChatGatewayElement.submit_message()` emits a user `MessagePayload` (`correlation_id` = turn id).
+2. Graph runs (history → LLM).
+3. Assistant `MessagePayload` arrives on `assistant_message_input`.
+4. Application code uses `TurnHandle.stream()` → `message.model.aiter_events()`.
+5. Optional: `tool_calls_complete` events trigger `tool_events_output` for downstream MCP wiring.
+
+See [ChatGatewayElement](../elements/ChatGatewayElement/index.qmd) for ports and wiring.

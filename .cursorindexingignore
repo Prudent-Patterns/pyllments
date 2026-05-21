@@ -1,16 +1,53 @@
-# Start of Selection
-# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
-__pycache__
+# Patterns excluded from Cursor codebase indexing.
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging and build outputs
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Tool and test caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+
+# Coverage reports
+.coverage*
+coverage.xml
+htmlcov/
+
+# Dependencies (if present)
+node_modules/
+
+# Secrets and local environment
 .env
+
+# IDE local settings
+.vscode/
+.idea/
+
+# Repository-specific
 LICENSE
-.vscode
-projects
+projects/
 examples/
 .ignore*
 assets/
 dev_sandbox/
 dev_nbs/
-# Log files to ignore
 *.log
 logs/
 docs/_site/

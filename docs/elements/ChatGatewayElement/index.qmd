@@ -1,0 +1,125 @@
+---
+title: "ChatGatewayElement"
+description: "Production boundary for submitting messages, streaming tokens, and cancelling turns from application code"
+lightbox: true
+---
+
+The `ChatGatewayElement` is a transport-agnostic boundary for driving Pyllments chat flows from backend or service code. Unlike `ChatInterfaceElement` (Panel UI) or `APIElement` (blocking HTTP futures), it exposes a Python API for:
+
+- **Send** — inject a user `MessagePayload` into the graph with one call
+- **Receive** — stream assistant tokens/events through a `TurnHandle`
+- **Cancel** — stop in-flight generation and close the provider stream
+
+Use it when your application owns the HTTP/WebSocket layer (FastAPI, SSE, custom stream broker) and Pyllments owns the LLM graph.
+
+## When to use this element
+
+| Element | Best for |
+|---------|----------|
+| `ChatGatewayElement` | Production apps: programmatic submit/stream/cancel |
+| `ChatInterfaceElement` | Browser GUI with Panel |
+| `APIElement` | Simple request/response HTTP endpoints (atomic responses) |
+| `PipeElement` | Debugging and testing flows |
+
+## Instantiation
+
+**Arguments:**
+
+`default_aggregate_stream: bool = True`<br>
+<span class="tab">When assistant messages arrive in `stream` mode, whether `MessageModel.aggregate_stream` is enabled so `content` and `tool_calls` are updated during consumption. Keep `True` when `HistoryHandlerElement` (or similar) must await a completed message. Set `False` only if your app fully owns aggregation and history is handled separately.</span>
+
+## Application API
+
+### `submit_message(content, role='user', **kwargs) -> TurnHandle`
+
+Creates a user `MessagePayload` with `correlation_id` set to the turn id, registers the turn, and schedules emission on `message_output`. Returns immediately with a `TurnHandle`.
+
+Additional `**kwargs` are passed through to `MessagePayload` / `MessageModel` (for example `mode`, `timestamp`).
+
+### `submit_message_async(content, role='user', **kwargs) -> TurnHandle`
+
+Same as `submit_message`, but awaits `message_output` emission. Prefer this in async tests or when you need the message on the wire before continuing.
+
+### `cancel(turn_id: str) -> None`
+
+Cancels a turn by id. If an assistant message is already linked, calls `MessageModel.cancel()` to tear down the provider stream.
+
+### `TurnHandle`
+
+| Method | Description |
+|--------|-------------|
+| `stream()` | Async iterator of `MessageStreamEvent` (tokens, tool deltas, completion). Waits until the assistant `MessagePayload` is linked to this turn. |
+| `final_message()` | Awaits the completed assistant `MessagePayload`. Consumes the stream if not already read. |
+| `cancel()` | Delegates to `gateway.cancel(turn_id)`. |
+
+**Example:**
+
+```python
+from pyllments.elements import ChatGatewayElement, LLMChatElement, HistoryHandlerElement
+
+gateway = ChatGatewayElement()
+llm = LLMChatElement(output_mode='stream', generate_content_on_emit=False)
+history = HistoryHandlerElement(history_token_limit=10000)
+
+gateway.ports.message_output > history.ports.message_emit_input
+history.ports.message_history_output > llm.ports.messages_emit_input
+llm.ports.message_output > gateway.ports.assistant_message_input
+llm.ports.message_output > history.ports.messages_input
+
+turn = gateway.submit_message("Hello")
+
+async for event in turn.stream():
+    if event.type == "token":
+        broker.publish(event.content_delta)
+
+assistant = await turn.final_message()
+```
+
+::: {.callout-important}
+Call `turn.stream()` or `await turn.final_message()` for each turn. Assistant streams are consumed once; `HistoryHandlerElement` waiting on `await_ready()` will not complete until the stream finishes or is cancelled.
+:::
+
+::: {.callout-note}
+Configure `LLMChatElement` with `generate_content_on_emit=False` and `output_mode='stream'` so the gateway (or your app) consumes the provider stream instead of the LLM element draining it before emit.
+:::
+
+## Turn matching
+
+Phase 1 uses **FIFO** matching: the oldest pending turn receives the next assistant `MessagePayload` on `assistant_message_input`.
+
+User messages set `MessageModel.correlation_id` to the turn id for forward-compatible explicit matching when assistant payloads also carry that id.
+
+Cancelled turns discard or cancel late-arriving assistant messages.
+
+## Input Ports
+
+| Port Name | Payload Type | Behavior |
+|-----------|--------------|----------|
+| `assistant_message_input` | `MessagePayload` | Receives assistant responses (typically from `LLMChatElement.message_output`). Links payload to the pending turn and applies `default_aggregate_stream` for stream mode. |
+
+: {.hover}
+
+## Output Ports
+
+| Port Name | Payload Type | Behavior |
+|-----------|--------------|----------|
+| `message_output` | `MessagePayload` | Emits user messages into the flow (history, context builder, etc.). |
+| `tool_events_output` | `StructuredPayload` | **Outline:** emits `{"turn_id": str, "tool_calls": list}` when a stream completes with tool calls. Connect to `MCPElement` or a custom executor in a later iteration. |
+
+: {.hover}
+
+## Tool events (outline)
+
+While iterating `turn.stream()`, when a `tool_calls_complete` event is observed, the gateway emits on `tool_events_output`:
+
+```python
+{"turn_id": "turn-1", "tool_calls": [{"id": "...", "type": "function", "function": {...}}]}
+```
+
+No MCP execution is performed by the gateway itself. Wire `tool_events_output` to your tool runner when ready.
+
+## Related documentation
+
+- [MessagePayload](../../explanation/MessagePayload.qmd) — streaming, `MessageStreamEvent`, and cancellation on the model
+- [LLMChatElement](../LLMChatElement/index.qmd) — LLM backend and `generate_content_on_emit`
+- [Gateway Chat recipe](../../recipes/gateway_chat/index.qmd) — reference wiring

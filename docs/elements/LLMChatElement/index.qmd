@@ -38,8 +38,14 @@ Local model endpoints (`ollama`, `vLLM`, etc.) are supported through the `litell
 <span class="tab">LiteLLM-only. Base URL for custom/local model endpoints.</span>
 `output_mode`: Literal['atomic', 'stream'] = 'stream'<br>
 <span class="tab">Whether to return the message containing a streaming callback or an atomic one</span>
+`generate_content_on_emit`: bool = False<br>
+<span class="tab">When `True`, awaits full message content via `aget_message()` before emitting on `message_output`. Keep `False` when using `ChatGatewayElement` or other consumers that call `aiter_events()` on the emitted payload.</span>
 `env_path`: str = None<br>
 <span class="tab">Path to the .env file to load. If not provided, the .env file in the current working directory will be used.</span>
+
+::: {.callout-note}
+For production streaming with [ChatGatewayElement](../ChatGatewayElement/index.qmd), use `output_mode='stream'` and `generate_content_on_emit=False` so the assistant stream remains available to your application's `TurnHandle.stream()`.
+:::
 
 ### Input Ports
 

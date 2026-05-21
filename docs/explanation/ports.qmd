@@ -10,7 +10,7 @@ Ports are async-friendly but use queues, locks, and ordered processing to guaran
 ## Basics: High-Level Usage
 
 ### What Are Ports?
-- **Purpose**: Ports allow Elements to communicate by passing `Payload` objects (data containers with models and views).
+- **Purpose**: Ports allow Elements to communicate by passing `Payload` objects (data containers with models and views). See [MessagePayload](MessagePayload.qmd) for chat streaming and cancellation behavior.
 - **Types**:
   - **InputPort**: Receives payloads and triggers internal logic (e.g., updating an Element's model or view).
   - **OutputPort**: Emits payloads to connected inputs.
@@ -82,7 +82,7 @@ For developers extending pyllments or debugging, here's how ports ensure determi
     ```
   - Advances to next item only after all connected inputs complete their `receive()` (including unpacks).
   - `stage_emit` returns after enqueueing, not after downstream delivery completes.
-  - Use `await output_port.drain()` (or `await lifecycle_manager.drain()`) when you need a hard completion boundary.
+  - Use `await output_port.drain()` when you need a hard completion boundary. On server stop, registered ports are drained automatically before close via `LifecycleManager.shutdown()`.
 
 - **Predictability**: FIFO queue + sequential awaits ensure no out-of-order emissions.
 

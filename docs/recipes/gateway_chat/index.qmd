@@ -1,0 +1,44 @@
+---
+title: "Gateway Chat"
+description: "Headless chat flow wired through ChatGatewayElement for application-driven streaming"
+---
+
+A reference recipe that connects `ChatGatewayElement`, `HistoryHandlerElement`, and `LLMChatElement` for production-style integration (no Panel UI).
+
+```bash
+pyllments recipe run gateway_chat
+```
+
+## Wiring
+
+```python
+gateway_el.ports.message_output > history_handler_el.ports.message_emit_input
+history_handler_el.ports.message_history_output > llm_chat_el.ports.messages_emit_input
+llm_chat_el.ports.message_output > gateway_el.ports.assistant_message_input
+llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
+```
+
+## Configuration
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `history_token_limit` | `10000` | Tokens kept in rolling history |
+| `model_name` | `openai/gpt-4o-mini` | Model passed to `LLMChatElement` |
+
+The LLM element uses `output_mode='stream'` and `generate_content_on_emit=False` so the gateway or your application code can consume token streams.
+
+## Application usage
+
+After loading the recipe module, drive the gateway from async application code:
+
+```python
+turn = gateway_el.submit_message("Hello")
+
+async for event in turn.stream():
+    if event.type == "token":
+        print(event.content_delta, end="", flush=True)
+
+msg = await turn.final_message()
+```
+
+See [ChatGatewayElement](../../elements/ChatGatewayElement/index.qmd) and [MessagePayload](../../explanation/MessagePayload.qmd) for full API details.

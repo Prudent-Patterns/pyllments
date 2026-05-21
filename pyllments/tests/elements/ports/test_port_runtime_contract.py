@@ -88,14 +88,33 @@ def test_lifecycle_manager_drain_flushes_registered_ports():
     loop.run_until_complete(out.close())
 
 
-def test_lifecycle_shutdown_idempotent_on_isolated_manager():
+def test_lifecycle_shutdown_drains_before_close():
     loop = LoopRegistry.get_loop()
+    LifecycleManager.reset_for_tests()
 
-    class IsolatedLifecycleManager(LifecycleManager):
-        _instance = None
-        _initialized = False
+    sender = Element(name="shutdown_drain_sender")
+    receiver = Element(name="shutdown_drain_receiver")
+    seen = []
 
-    manager = IsolatedLifecycleManager()
+    async def pack(payload: int) -> int:
+        return payload
+
+    def unpack(payload: int):
+        seen.append(payload)
+
+    out = sender.ports.add_output(name="out", pack_payload_callback=pack)
+    inn = receiver.ports.add_input(name="in", unpack_payload_callback=unpack, payload_type=int)
+
+    loop.run_until_complete(out.connect(inn))
+    loop.run_until_complete(out.stage_emit(payload=42))
+    loop.run_until_complete(lifecycle_manager.shutdown())
+
+    assert seen == [42]
+
+
+def test_lifecycle_shutdown_idempotent():
+    loop = LoopRegistry.get_loop()
+    LifecycleManager.reset_for_tests()
 
     class DummyResource:
         def __init__(self):
@@ -106,9 +125,9 @@ def test_lifecycle_shutdown_idempotent_on_isolated_manager():
             await asyncio.sleep(0)
 
     resource = DummyResource()
-    manager.register_resource(resource)
+    lifecycle_manager.register_resource(resource)
 
-    loop.run_until_complete(manager.shutdown())
-    loop.run_until_complete(manager.shutdown())
+    loop.run_until_complete(lifecycle_manager.shutdown())
+    loop.run_until_complete(lifecycle_manager.shutdown())
 
     assert resource.close_calls == 1

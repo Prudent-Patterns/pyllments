@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .text import TextElement
     from .structured_router_transformer import StructuredRouterTransformer
     from .structured_output import StructuredOutputElement
+    from .chat_gateway import ChatGatewayElement
     
 # Define mapping between class names and their module paths
 ELEMENT_MAPPING = {
@@ -41,6 +42,7 @@ ELEMENT_MAPPING = {
     "TextElement": ".text",
     "StructuredRouterTransformer": ".structured_router_transformer",
     "StructuredOutputElement": ".structured_output",
+    "ChatGatewayElement": ".chat_gateway",
 }
 
 def __getattr__(name):
