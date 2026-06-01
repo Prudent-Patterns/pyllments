@@ -7,7 +7,13 @@ import param
 from loguru import logger as _logger
 
 from pyllments.base.payload_base import Payload
-from pyllments.logging import log_staging, log_emit, log_receive, log_connect
+from pyllments.logging import (
+    diagnostics_enabled,
+    log_staging,
+    log_emit,
+    log_receive,
+    log_connect,
+)
 from pyllments.runtime.loop_registry import LoopRegistry
 from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
 
@@ -22,7 +28,7 @@ def _resolve_callback_annotations(callback):
     try:
         return get_type_hints(callback)
     except Exception as exc:
-        logger.debug(f"Falling back to raw annotations for {callback}: {exc}")
+        logger.debug("Falling back to raw annotations for {}: {}", callback, exc)
         return inspect.getfullargspec(callback).annotations.copy()
 
 class Port(param.Parameterized):
@@ -433,7 +439,12 @@ class OutputPort(Port):
                 
                 try:
                     payload = emission['payload']
-                    logger.trace(f"Emitting payload from port {self.name} to {len(self.input_ports)} input ports.")
+                    if diagnostics_enabled():
+                        logger.trace(
+                            "Emitting payload from port {} to {} input ports.",
+                            self.name,
+                            len(self.input_ports),
+                        )
                     # Process each input port in the order they were connected
                     for port in self.input_ports:
                         await port.receive(payload, self)

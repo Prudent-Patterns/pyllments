@@ -19,6 +19,8 @@ def serve(
     filename: str,
     logging: bool = common_opts["logging"],
     logging_level: str = common_opts["logging_level"],
+    log_file: Optional[str] = common_opts["log_file"],
+    diagnostics: bool = common_opts["diagnostics"],
     no_gui: bool = common_opts["no_gui"],
     port: int = common_opts["port"],
     env: Optional[str] = common_opts["env"],
@@ -42,6 +44,8 @@ def serve(
     cli_args = common_options.build_cli_args_dict(
         logging=logging,
         logging_level=logging_level,
+        log_file=log_file,
+        diagnostics=diagnostics,
         no_gui=no_gui,
         port=port,
         env=env,

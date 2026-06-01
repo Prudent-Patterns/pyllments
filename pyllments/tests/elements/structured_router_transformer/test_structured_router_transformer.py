@@ -2,7 +2,7 @@ import pytest
 
 from pydantic import RootModel, create_model
 
-from pyllments.logging import setup_logging
+from pyllments.logging import setup_serve_logging
 from pyllments.elements import StructuredRouterTransformer, PipeElement, MCPElement
 from pyllments.payloads import MessagePayload, StructuredPayload
 from pyllments.runtime.loop_registry import LoopRegistry
@@ -10,7 +10,7 @@ from pyllments.runtime.loop_registry import LoopRegistry
 from pathlib import Path
 import asyncio
 
-setup_logging()
+setup_serve_logging()
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PARENT_DIR = SCRIPT_DIR.parent

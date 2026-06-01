@@ -117,8 +117,10 @@ def to_message_payload(payload, payload_message_mapping=payload_message_mapping,
             # Convert typing.List[T] to built-in list[T]
             payload_type = list[args[0]]
     try:
-        # Lookup conversion function for the normalized payload type
         conversion_function = payload_message_mapping[payload_type]
+        # Non-message payloads use conversion defaults when role is None (e.g. tools -> system).
+        if role is None and payload_type not in (MessagePayload, list[MessagePayload]):
+            return conversion_function(payload)
         return conversion_function(payload, role)
     except KeyError:
         raise ValueError(f"No message payload mapping found for {payload_type}")

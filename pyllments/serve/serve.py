@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 import uvicorn
 
-from pyllments.logging import setup_logging
+from pyllments.logging import setup_serve_logging
 from pyllments.common.resource_loader import get_asset
 from pyllments.runtime.app_registry import AppRegistry
 from pyllments.runtime.loop_registry import LoopRegistry
@@ -59,9 +59,19 @@ def parse_dict_value(value):
         raise ValueError(f"Invalid dictionary literal: {value}. Error: {e}")
 
 
-def server_setup(logging: bool = False, logging_level: str = 'INFO'):
+def server_setup(
+    logging: bool = False,
+    logging_level: str = 'INFO',
+    log_file: str = None,
+    diagnostics: bool = False,
+):
     if logging:
-        setup_logging(log_file='file_loader.log', stdout_log_level=logging_level, file_log_level=logging_level)
+        setup_serve_logging(
+            log_file=log_file,
+            stdout_log_level=logging_level,
+            file_log_level=logging_level,
+            enable_diagnostics=diagnostics,
+        )
     import panel as pn
 
     pn.config.css_files = [GLOBAL_CSS_MOUNT_PATH, FILE_ICONS_MOUNT_PATH]
@@ -188,6 +198,8 @@ def serve(
     inline: bool = False,
     logging: bool = False,
     logging_level: str = 'INFO',
+    log_file: str = None,
+    diagnostics: bool = False,
     env: str = None,
     host: str = '0.0.0.0',
     port: int = 8000,
@@ -208,6 +220,11 @@ def serve(
         Enable logging, by default False.
     logging_level : str, optional
         Set logging level, by default 'INFO'.
+    log_file : str, optional
+        Optional file path for log output. If unset, logs are stdout-only.
+    diagnostics : bool, optional
+        Enable detailed framework diagnostics such as port payload-flow logs,
+        by default False.
     env : str, optional
         Path to .env file, by default None.
     host : str, default '0.0.0.0'
@@ -224,7 +241,12 @@ def serve(
     logger.debug(f"Serve: Using loop with ID: {id(loop)}")
     
     async def async_serve_body_wrapper():
-        server_setup(logging=logging, logging_level=logging_level)
+        server_setup(
+            logging=logging,
+            logging_level=logging_level,
+            log_file=log_file,
+            diagnostics=diagnostics,
+        )
         if env:
             load_dotenv(env)
         # else:

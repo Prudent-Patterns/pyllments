@@ -135,6 +135,18 @@ class CommonOptions:
                 default="INFO",
                 help="Set logging level."
             ),
+            "log_file": CommonOption(
+                name="log_file",
+                type=Optional[str],
+                default=None,
+                help="Optional file path for log output. Logs are stdout-only when unset."
+            ),
+            "diagnostics": CommonOption(
+                name="diagnostics",
+                type=bool,
+                default=False,
+                help="Enable detailed framework diagnostics, including port payload-flow logs."
+            ),
             "no_gui": CommonOption(
                 name="no_gui",
                 type=bool,
@@ -220,6 +232,9 @@ class CommonOptions:
         if (args.get("logging_level") not in [None, self.options["logging_level"].default] 
             and not args.get("logging")):
             args["logging"] = True
+
+        if (args.get("log_file") or args.get("diagnostics")) and not args.get("logging"):
+            args["logging"] = True
             
         return args
 
@@ -244,7 +259,15 @@ class CommonOptions:
         serve_args = {}
         
         # Direct mappings (same name, same value)
-        direct_mappings = ["logging", "logging_level", "env", "host", "port"]
+        direct_mappings = [
+            "logging",
+            "logging_level",
+            "log_file",
+            "diagnostics",
+            "env",
+            "host",
+            "port",
+        ]
         for arg in direct_mappings:
             if arg in cli_args and cli_args[arg] is not None:
                 serve_args[arg] = cli_args[arg]

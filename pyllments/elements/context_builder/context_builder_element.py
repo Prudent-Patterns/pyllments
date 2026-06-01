@@ -328,7 +328,11 @@ class ContextBuilderElement(Element):
             missing = [name for name in self.required_ports if name not in ready]
 
             self.logger.debug(
-                f"Received payload on '{active_name}'. Progress: {len(ready)}/{total_required} ready; Missing: {missing}"
+                "Received payload on '{}'. Progress: {}/{} ready; Missing: {}",
+                active_name,
+                len(ready),
+                total_required,
+                missing,
             )
 
             if active_name in self.callbacks and active_port.payload is not None:
@@ -353,14 +357,18 @@ class ContextBuilderElement(Element):
 
             if not self._is_processing:
                 if not triggerable:
-                    self.logger.trace(f"Ignoring non-trigger port {active_name}")
+                    self.logger.trace("Ignoring non-trigger port {}", active_name)
                     return None
                 # Begin a new trigger flow
                 self._is_processing = True
                 self._pending_trigger = active_name
-                self.logger.debug(f"Acquired lock for trigger {active_name}")
+                self.logger.debug("Acquired lock for trigger {}", active_name)
             else:
-                self.logger.debug(f"Received dependency {active_name} for trigger {self._pending_trigger}")
+                self.logger.debug(
+                    "Received dependency {} for trigger {}",
+                    active_name,
+                    self._pending_trigger,
+                )
 
             # Determine order and process messages for the pending trigger
             order = self._get_message_order(kwargs, self._pending_trigger)
@@ -368,7 +376,11 @@ class ContextBuilderElement(Element):
             start_time = time.perf_counter()
             emitted = await self._process_messages(kwargs, messages_output, self._pending_trigger)
             elapsed = time.perf_counter() - start_time
-            self.logger.debug(f"ContextBuilderElement: message processing for trigger '{self._pending_trigger}' took {elapsed:.4f} seconds")
+            self.logger.debug(
+                "ContextBuilderElement: message processing for trigger '{}' took {:.4f} seconds",
+                self._pending_trigger,
+                elapsed,
+            )
             # Release lock and clear consumed payloads if we fulfilled and emitted
             if emitted:
                 # Clear only regular ports that are not marked persist in the input_map
@@ -378,7 +390,10 @@ class ContextBuilderElement(Element):
                         cfg = self.input_map.get(real_name, {})
                         if not cfg.get('persist', False):
                             self.flow_controller.flow_port_map[real_name].payload = None
-                self.logger.debug(f"Emitted and releasing lock for trigger {self._pending_trigger}")
+                self.logger.debug(
+                    "Emitted and releasing lock for trigger {}",
+                    self._pending_trigger,
+                )
                 self._is_processing = False
                 self._pending_trigger = None
             return None
@@ -664,25 +679,41 @@ class ContextBuilderElement(Element):
         Convert a payload to a MessagePayload with the specified role.
         
         Uses the payload_message_mapping to determine how to convert different payload types.
+        Mixed payload lists (e.g. from HistoryHandler context_output) are converted per item.
         """
         if payload is None:
             return None
-            
-        # Get payload type for conversion
+
+        if isinstance(payload, list) and payload:
+            item_types = {type(item) for item in payload}
+            if len(item_types) > 1:
+                messages = []
+                for item in payload:
+                    convert_kwargs = {
+                        "payload": item,
+                        "payload_message_mapping": self.payload_message_mapping,
+                        "expected_type": type(item),
+                    }
+                    if role is not None:
+                        convert_kwargs["role"] = role
+                    converted = to_message_payload(**convert_kwargs)
+                    if isinstance(converted, list):
+                        messages.extend(converted)
+                    else:
+                        messages.append(converted)
+                return messages
+
         if name in self.flow_controller.flow_port_map:
             port_type = self.flow_controller.flow_port_map[name].payload_type
         else:
             port_type = MessagePayload
-        
-        try:
-            return to_message_payload(
-                payload,
-                self.payload_message_mapping,
-                expected_type=port_type,
-                role=role
-            )
-        except Exception as e:
-            raise
+
+        return to_message_payload(
+            payload,
+            self.payload_message_mapping,
+            expected_type=port_type,
+            role=role,
+        )
 
     # ---- Dependency Pre-computation ----
 

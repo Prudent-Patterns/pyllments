@@ -16,8 +16,8 @@ LLM_NAME = 'gpt-4.1'
 
 chat_el = ChatInterfaceElement()
 history_el = HistoryHandlerElement(context_token_limit=3000)
-chat_el.ports.user_message_output > history_el.ports.messages_input
-chat_el.ports.assistant_message_output > history_el.ports.message_emit_input
+chat_el.ports.user_message_output > history_el.ports.payload_input
+chat_el.ports.assistant_message_output > history_el.ports.payload_emit_input
 
 main_context_builder_el = ContextBuilderElement(
     input_map={
@@ -31,7 +31,7 @@ main_context_builder_el = ContextBuilderElement(
             'message': "Below is a list of messages that makes up the conversation history so far.",
             'depends_on': 'history'
         },
-        'history': {'ports': [history_el.ports.message_history_output]},
+        'history': {'ports': [history_el.ports.context_output]},
         'conversational_memory': {'payload_type': MessagePayload},
         'conversational_memory_template': {
             'role': 'system',
@@ -82,7 +82,7 @@ conversational_context_builder_el = ContextBuilderElement(
             'message': "Below is a list of messages that makes up the conversation history so far. \n"
                        "This will be used to build a running summary."
         },
-        'history': {'ports': [history_el.ports.message_history_output]},
+        'history': {'ports': [history_el.ports.context_output]},
         'conversational_memory': {'payload_type': MessagePayload},
         'conversational_memory_template': {
             'role': 'system',
@@ -124,7 +124,7 @@ factual_context_builder_el = ContextBuilderElement(
             'role': 'system',
             'message': "Below is a list of messages that makes up the conversation history so far.",
         },
-        'history': {'ports': [history_el.ports.message_history_output]},
+        'history': {'ports': [history_el.ports.context_output]},
         'factual_memory': {'payload_type': MessagePayload},
         'factual_memory_template': {
             'role': 'system',

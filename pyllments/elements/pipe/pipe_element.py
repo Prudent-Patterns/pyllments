@@ -46,9 +46,9 @@ class PipeElement(Element):
                 result = self.receive_callback(payload)
                 if asyncio.iscoroutine(result) or asyncio.isfuture(result):
                     awaited_result = await result
-                    logger.info(f"Unpacking: {awaited_result}")
+                    logger.trace("Unpacking: {}", awaited_result)
                 else:
-                    logger.info(f"Unpacking: {result}")
+                    logger.trace("Unpacking: {}", result)
             # if someone is awaiting a response, fulfill the future
             if self._receive_future is not None and not self._receive_future.done():
                 self._receive_future.set_result(payload)

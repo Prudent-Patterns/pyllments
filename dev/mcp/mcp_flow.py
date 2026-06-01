@@ -187,15 +187,15 @@ final_context_builder_el = ContextBuilderElement(
 )
 
 history_handler_el = HistoryHandlerElement()
-history_handler_el.ports.message_history_output > initial_context_builder_el.ports.history
-history_handler_el.ports.message_history_output > final_context_builder_el.ports.history
-chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input
-chat_interface_el.ports.tools_response_output > history_handler_el.ports.tools_responses_input
-structured_router_el.ports.reply_message > history_handler_el.ports.message_emit_input
+history_handler_el.ports.context_output > initial_context_builder_el.ports.history
+history_handler_el.ports.context_output > final_context_builder_el.ports.history
+chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_input
+chat_interface_el.ports.tools_response_output > history_handler_el.ports.payload_input
+structured_router_el.ports.reply_message > history_handler_el.ports.payload_emit_input
 
 final_llm_chat_el = LLMChatElement(model_name='gpt-4.1')
 final_context_builder_el.ports.messages_output > final_llm_chat_el.ports.messages_emit_input
-final_llm_chat_el.ports.message_output > history_handler_el.ports.message_emit_input
+final_llm_chat_el.ports.message_output > history_handler_el.ports.payload_emit_input
 final_llm_chat_el.ports.message_output > chat_interface_el.ports.message_input
 
 @flow

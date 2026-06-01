@@ -111,7 +111,7 @@ For developers extending pyllments or debugging, here's how ports ensure determi
 - **Concurrency**: Queues/locks prevent races; slow unpacks delay but preserve order.
 - **Readiness**: Use checks to defer processing/emission until ready.
 - **Completion boundaries**: For short-lived request handlers (e.g., workers), call `drain` before returning if queued emissions must finish first.
-- **Debugging**: Enable logging (e.g., `log_emit`, `log_receive`) for timestamps.
+- **Debugging**: Enable Pyllments diagnostics when you need payload-flow traces; normal embedded usage keeps these logs off by default.
 - **Performance**: Avoid long-running callbacks to prevent bottlenecks.
 
 For full code, see `pyllments/ports/ports.py`.

@@ -1,280 +1,346 @@
+from __future__ import annotations
+
+import asyncio
 from collections import deque
-from pathlib import Path
-from typing import List, Union, Tuple
+from typing import Any, List, Optional, Union
 
 import param
-from sqlite_utils import Database
 
 from pyllments.base.model_base import Model
-from pyllments.common.tokenizers import get_token_len
 from pyllments.payloads import MessagePayload, ToolsResponsePayload
 from pyllments.runtime.loop_registry import LoopRegistry
+
+from .history_projection import (
+    HistoryEntry,
+    ProjectionContext,
+    TierInterval,
+    normalize_projection_tiers,
+    payload_token_count,
+    project_payload,
+    resolve_tier_interval,
+)
+from .history_store import (
+    HistoryRecord,
+    HistoryStore,
+    SQLiteHistoryStore,
+    new_entry_id,
+    payload_to_record,
+    record_to_payload,
+)
+
+SupportedPayload = Union[MessagePayload, ToolsResponsePayload]
 
 
 class HistoryHandlerModel(Model):
     """
-    Model for handling chat history with optional SQLite persistence.
-    When persist=True, messages and tool responses are stored in SQLite and loaded on startup.
-    When persist=False, messages and tool responses are only kept in memory and lost on restart.
-    """
-    history_token_limit = param.Integer(default=32000, bounds=(1, None), doc="""
-        The max amount of tokens to keep in the history""")
-    history = param.ClassSelector(class_=deque, default=deque())
-    history_token_count = param.Integer(default=0, bounds=(0, None), doc="""
-        The amount of tokens in the history""")
+    Raw history ledger with token-tiered projection for context emission.
 
-    context_token_limit = param.Integer(default=16000, bounds=(0, None), doc="""
-        The amount of tokens to keep in the context window""")
-    context = param.ClassSelector(class_=deque, default=deque(), instantiate=True)
-    context_token_count = param.Integer(default=0, bounds=(0, None), doc="""
-        The amount of tokens in the context window""")
+    Stores original payloads in ``history``. Context and summarization candidates are
+    derived at emit time. Optional persistence uses a pluggable HistoryStore.
+    """
+
+    history_token_limit = param.Integer(
+        default=32000,
+        bounds=(1, None),
+        doc="Max raw tokens retained in the history ledger.",
+    )
+    history = param.ClassSelector(class_=deque, default=deque())
+    history_token_count = param.Integer(default=0, bounds=(0, None))
+
+    context_token_limit = param.Integer(
+        default=16000,
+        bounds=(0, None),
+        doc="Max projected tokens emitted on context_output.",
+    )
+    projection_tiers = param.Dict(
+        default=None,
+        allow_None=True,
+        doc="Numeric tier boundaries -> {payload_type: projector}.",
+    )
+    summary_token_threshold = param.Integer(
+        default=8000,
+        bounds=(0, None),
+        doc="Raw entries older than this token distance from newest are eligible for summarization.",
+    )
 
     tokenizer_model = param.String(default="gpt-4o")
-    
-    persist = param.Boolean(default=False, doc="""
-        Whether to persist messages to SQLite. If False, messages are only kept in memory.""")
-    
-    # Database parameters only used when persist=True
-    db_path = param.String(default=None, doc="The path to the history database")
 
-    def __init__(self, **params):
+    persist = param.Boolean(default=False)
+    db_path = param.String(default=None)
+
+    def __init__(self, history_store: Optional[HistoryStore] = None, **params):
         super().__init__(**params)
-        
-        if self.persist:
-            # Initialize database-related attributes only if persistence is enabled
-            self._pending_deletes: List[float] = []
-            self._pending_inserts: List[Union[MessagePayload, ToolsResponsePayload]] = []
-            self._db_setup()
+        self._tier_intervals: List[TierInterval] = normalize_projection_tiers(
+            self.projection_tiers,
+            self.context_token_limit,
+        )
+        self._last_summary_candidate_entry_ids: List[str] = []
 
-    def _db_setup(self):
-        """Sets up the SQLite database and loads existing messages and tool responses."""
-        # Set up database path
-        path = Path(self.db_path) if self.db_path else Path(f"{self.name}.db")
-        if not path.suffix == '.db':
-            path = path / f"{self.name}.db"
-        self.db_path = str(path)
-        
-        # Initialize database and table
-        self.db = Database(self.db_path)
-        self.table = self.db['history']
-        
-        # Create table if it doesn't exist
-        if not self.table.exists():
-            self.table.create({
-                "type": str,  # 'message' or 'tool_response'
-                "role": str,  # For messages
-                "content": str,
-                "mode": str,  # For messages
-                "tool_responses": str,  # JSON string for tool responses
-                "timestamp": float
-            }, pk="timestamp")
-            return  # No entries to load from a new table
-        
-        # Load existing entries ordered by timestamp
-        rows = self.table.rows_where(order_by="timestamp")
-        entries = []
-        for row in rows:
-            try:
-                if row['type'] == 'message':
-                    entry = MessagePayload(
-                        role=row['role'],
-                        content=row['content'],
-                        mode=row.get('mode', 'atomic'),
-                        timestamp=row['timestamp']
-                    )
-                else:  # tool_response
-                    import json
-                    tool_responses = json.loads(row['tool_responses'])
-                    entry = ToolsResponsePayload(
-                        tool_responses=tool_responses,
-                        content=row['content'],
-                        timestamp=row['timestamp']
-                    )
-                entries.append(entry)
-            except Exception as e:
-                self.logger.warning(f"Failed to load entry from database: {e}")
-                continue
-        
-        # Load entries into history (which will also handle context population)
-        if entries:
-            self.load_entries(entries)
+        self._history_store: Optional[HistoryStore] = history_store
+        if self.persist and self._history_store is None:
+            self._history_store = SQLiteHistoryStore(db_path=self.db_path, name=self.name)
 
-    def update_history(self, entry: Union[MessagePayload, ToolsResponsePayload], token_estimate: int):
-        """Update history with a new message or tool response."""
-        if token_estimate > self.history_token_limit:
-            raise ValueError(
-                f"The token count ({token_estimate}) of the new entry exceeds the history limit ({self.history_token_limit})."
-            )
-            
-        # Track entries to be deleted if persistence is enabled
-        deleted_entries = []
-        
-        # Remove entries from history until the new entry will fit
-        while (
-            self.history_token_count + token_estimate >
-            self.history_token_limit
-        ):
-            popped_entry, popped_token_count = self.history.popleft()
-            self.history_token_count -= popped_token_count
-            if self.persist:
-                deleted_entries.append(popped_entry)
+        self._pending_delete_ids: List[str] = []
+        self._pending_append_records: List[HistoryRecord] = []
+        self._store_load_task = None
 
-        self.history.append((entry, token_estimate))
-        self.history_token_count += token_estimate
-        
-        # Update database if persistence is enabled
-        if self.persist and (deleted_entries or entry):
-            # Add to pending changes
-            self._pending_deletes.extend(e.model.timestamp for e in deleted_entries)
-            self._pending_inserts.append(entry)
-            
-            # Trigger database update
+        if self._history_store is not None:
+            self._store_load_task = self._schedule_task(self.hydrate_from_store())
+
+    @staticmethod
+    def _schedule_task(coro):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
             loop = LoopRegistry.get_loop()
-            loop.create_task(self._sync_database())
+        return loop.create_task(coro)
 
-    async def _sync_database(self):
-        """Synchronizes pending changes with the database in a single transaction."""
-        if not self._pending_deletes and not self._pending_inserts:
+    def _refresh_tier_intervals(self):
+        self._tier_intervals = normalize_projection_tiers(
+            self.projection_tiers,
+            self.context_token_limit,
+        )
+
+    @param.depends("projection_tiers", "context_token_limit", watch=True)
+    def _on_projection_config_changed(self):
+        self._refresh_tier_intervals()
+
+    async def hydrate_from_store(self):
+        """Load persisted raw records into memory without projection work."""
+        if self._history_store is None:
+            return
+        for record in await self._history_store.load_records():
+            payload = record_to_payload(record)
+            if payload is None:
+                continue
+            entry = HistoryEntry(
+                payload=payload,
+                raw_token_count=record.raw_token_count,
+                timestamp=record.timestamp,
+                entry_id=record.entry_id,
+                summarized=record.summarized,
+                metadata=record.metadata,
+            )
+            self._append_to_memory(entry, persist=False)
+
+    async def await_store_ready(self):
+        """Wait for any scheduled startup hydration to complete."""
+        if self._store_load_task is not None:
+            await self._store_load_task
+
+    def _wrap_payload(self, payload: SupportedPayload) -> Optional[HistoryEntry]:
+        if isinstance(payload, ToolsResponsePayload) and not payload.model.tool_responses:
+            return None
+        raw_tokens = payload_token_count(payload, self.tokenizer_model)
+        if raw_tokens == 0 and isinstance(payload, ToolsResponsePayload):
+            return None
+        ts = float(payload.model.timestamp)
+        return HistoryEntry(
+            payload=payload,
+            raw_token_count=raw_tokens,
+            timestamp=ts,
+            entry_id=new_entry_id(),
+        )
+
+    def _append_to_memory(self, entry: HistoryEntry, persist: bool = True):
+        if entry.raw_token_count > self.history_token_limit:
+            raise ValueError(
+                f"Token count ({entry.raw_token_count}) exceeds history limit "
+                f"({self.history_token_limit})."
+            )
+
+        deleted_entries: List[HistoryEntry] = []
+        while self.history_token_count + entry.raw_token_count > self.history_token_limit:
+            popped = self.history.popleft()
+            self.history_token_count -= popped.raw_token_count
+            deleted_entries.append(popped)
+
+        self.history.append(entry)
+        self.history_token_count += entry.raw_token_count
+
+        if persist and self._history_store is not None:
+            for deleted in deleted_entries:
+                self._pending_delete_ids.append(deleted.entry_id)
+            record = payload_to_record(
+                entry.entry_id,
+                entry.payload,
+                entry.raw_token_count,
+                entry.summarized,
+            )
+            if record is not None:
+                self._pending_append_records.append(record)
+            self._schedule_task(self._sync_store())
+
+    def _drain_pending_store_ops(self) -> tuple[List[str], List[HistoryRecord]]:
+        delete_ids = self._pending_delete_ids.copy()
+        append_records = self._pending_append_records.copy()
+        self._pending_delete_ids.clear()
+        self._pending_append_records.clear()
+        return delete_ids, append_records
+
+    async def _apply_store_ops(self, delete_ids: List[str], append_records: List[HistoryRecord]) -> None:
+        if not self._history_store:
+            return
+        if append_records:
+            await self._history_store.append_records(append_records)
+        if delete_ids:
+            await self._history_store.delete_records(delete_ids)
+
+    async def flush_store(self):
+        """Apply pending store writes on the current event loop."""
+        delete_ids, append_records = self._drain_pending_store_ops()
+        await self._apply_store_ops(delete_ids, append_records)
+
+    async def _sync_store(self):
+        if not self._history_store:
+            return
+        delete_ids, append_records = self._drain_pending_store_ops()
+        if not delete_ids and not append_records:
             return
 
-        # Get pending changes
-        deletes = self._pending_deletes.copy()
-        inserts = []
-        for entry in self._pending_inserts:
-            if isinstance(entry, MessagePayload):
-                inserts.append({
-                    "type": "message",
-                    "role": entry.model.role,
-                    "content": entry.model.content,
-                    "mode": entry.model.mode,
-                    "tool_responses": None,
-                    "timestamp": entry.model.timestamp
-                })
-            else:  # ToolsResponsePayload
-                import json
-                # Filter out the 'call' key from tool_responses
-                tool_responses = {k: v for k, v in entry.model.tool_responses.items() if k != 'call'}
-                inserts.append({
-                    "type": "tool_response",
-                    "role": None,
-                    "content": entry.model.content,
-                    "mode": None,
-                    "tool_responses": json.dumps(tool_responses),
-                    "timestamp": entry.model.timestamp
-                })
-        
-        # Clear pending changes
-        self._pending_deletes.clear()
-        self._pending_inserts.clear()
-
-        # Execute in thread pool
         try:
-            await LoopRegistry.get_loop().run_in_executor(
-                None,
-                self._execute_db_operations,
-                inserts,
-                deletes
-            )
+            await self._apply_store_ops(delete_ids, append_records)
         except Exception as e:
-            self.logger.error(f"Error syncing database: {e}")
+            if self.logger:
+                self.logger.error(f"Error syncing history store: {e}")
 
-    def _execute_db_operations(self, inserts: List[dict], deletes: List[float]):
-        """Executes database operations in a single transaction."""
-        with self.db.conn:  # This automatically handles the transaction
-            if deletes:
-                self.table.delete_where(
-                    "timestamp IN (" + ",".join("?" * len(deletes)) + ")",
-                    deletes
-                )
-            if inserts:
-                self.table.insert_all(inserts)
+    def update_history(self, entry: HistoryEntry):
+        self._append_to_memory(entry, persist=True)
 
-    def load_entries(self, entries: List[Union[MessagePayload, ToolsResponsePayload]]):
-        """Batch load multiple messages and tool responses efficiently."""
-        # Calculate token estimates for all entries first
-        entry_tokens = []
-        for entry in entries:
-            if isinstance(entry, MessagePayload):
-                token_estimate = get_token_len(entry.model.content, self.tokenizer_model)
-            else:  # ToolsResponsePayload
-                # Only count tokens if the tool has been called
-                if not entry.model.tool_responses:
-                    continue
-                token_estimate = get_token_len(entry.model.content, self.tokenizer_model)
-            entry_tokens.append((entry, token_estimate))
-        
-        # Update history and context in batch
-        for entry, token_estimate in entry_tokens:
-            self.update_history(entry, token_estimate)
-            self.update_context(entry, token_estimate)
-        
-        # Trigger context update only once after all entries are processed
-        self.param.trigger('context')
+    def load_entries(self, entries: List[SupportedPayload]):
+        for payload in entries:
+            wrapped = self._wrap_payload(payload)
+            if wrapped is not None:
+                self.update_history(wrapped)
+        self.param.trigger("history")
 
     def load_message(self, message: MessagePayload):
-        """Load a single message. For backwards compatibility."""
         self.load_entries([message])
 
     def load_tool_response(self, tool_response: ToolsResponsePayload):
-        """Load a single tool response."""
-        if not tool_response.model.tool_responses:
-            return
         self.load_entries([tool_response])
 
-    def update_context(self, entry: Union[MessagePayload, ToolsResponsePayload], token_estimate: int):
-        """Update context with a new message or tool response."""
-        if token_estimate > self.context_token_limit:
-            raise ValueError(
-                f"The token count ({token_estimate}) of the new entry exceeds the context limit ({self.context_token_limit})."
+    def mark_summary_candidates_summarized(self, entry_ids: List[str]):
+        """Mark raw ledger entries covered by an accepted summary artifact."""
+        id_set = set(entry_ids)
+        for entry in self.history:
+            if entry.entry_id in id_set:
+                entry.summarized = True
+        if self._history_store is not None and entry_ids:
+            self._schedule_task(self._mark_summarized_async(entry_ids))
+
+    async def _mark_summarized_async(self, entry_ids: List[str]):
+        if self._history_store is None:
+            return
+        try:
+            await self._history_store.mark_summarized(entry_ids)
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error marking summarized records: {e}")
+
+    def _entries_newest_first(self) -> List[HistoryEntry]:
+        return list(reversed(self.history))
+
+    def _project_entry(
+        self,
+        entry: HistoryEntry,
+        token_distance: int,
+        entry_index: int,
+        remaining_budget: Optional[int],
+    ) -> tuple[Any, int]:
+        interval = resolve_tier_interval(token_distance, self._tier_intervals)
+        ctx = ProjectionContext(
+            tier_start=interval.start,
+            tier_end=interval.end,
+            token_distance_from_newest=token_distance,
+            entry_index=entry_index,
+            tokenizer_model=self.tokenizer_model,
+            remaining_context_budget=remaining_budget,
+        )
+        projected = project_payload(entry.payload, interval, ctx)
+        projected_tokens = payload_token_count(projected, self.tokenizer_model)
+        return projected, projected_tokens
+
+    def _select_context_entries(self) -> List[tuple[HistoryEntry, Any]]:
+        if not self.history or self.context_token_limit <= 0:
+            return []
+
+        selected: List[tuple[HistoryEntry, Any]] = []
+        cumulative_distance = 0
+        projected_total = 0
+
+        for entry_index, entry in enumerate(self._entries_newest_first()):
+            distance = cumulative_distance
+            remaining = self.context_token_limit - projected_total
+            projected, projected_tokens = self._project_entry(
+                entry, distance, entry_index, remaining
             )
-        while (
-            self.context_token_count + token_estimate >
-            self.context_token_limit
-        ):
-            popped_entry, popped_token_count = self.context.popleft()
-            self.context_token_count -= popped_token_count
 
-        self.context.append((entry, token_estimate))
-        self.context_token_count += token_estimate
+            if selected and projected_total + projected_tokens > self.context_token_limit:
+                break
+            if not selected and projected_tokens > self.context_token_limit:
+                selected.append((entry, projected))
+                break
 
-    def get_context_message_payloads(self) -> List[MessagePayload]:
-        """Get all message payloads in the context window."""
-        result = []
-        for entry, _ in self.context:
-            if isinstance(entry, MessagePayload):
-                result.append(entry)
-            elif isinstance(entry, ToolsResponsePayload):
-                # Convert tool response into a MessagePayload for LLM context
-                wrapper = MessagePayload(
-                    role='assistant',
-                    content=entry.model.content,
-                    mode='atomic',
-                    timestamp=entry.model.timestamp
-                )
-                result.append(wrapper)
-        return result
+            selected.append((entry, projected))
+            projected_total += projected_tokens
+            cumulative_distance += entry.raw_token_count
 
-    def get_context_tool_response_payloads(self) -> List[ToolsResponsePayload]:
-        """Get all tool response payloads in the context window."""
-        return [entry for entry, _ in self.context if isinstance(entry, ToolsResponsePayload)]
+        selected.reverse()
+        return selected
 
-    def get_history_message_payloads(self) -> List[MessagePayload]:
-        """Get all message payloads in the history."""
-        result = []
-        for entry, _ in self.history:
-            if isinstance(entry, MessagePayload):
-                result.append(entry)
-            elif isinstance(entry, ToolsResponsePayload):
-                # Convert tool response into a MessagePayload for historical log
-                wrapper = MessagePayload(
-                    role='assistant',
-                    content=entry.model.content,
-                    mode='atomic',
-                    timestamp=entry.model.timestamp
-                )
-                result.append(wrapper)
-        return result
-        
-    def get_history_tool_response_payloads(self) -> List[ToolsResponsePayload]:
-        """Get all tool response payloads in the history."""
-        return [entry for entry, _ in self.history if isinstance(entry, ToolsResponsePayload)]
+    def get_context_payloads(self) -> List[Any]:
+        return [projected for _, projected in self._select_context_entries()]
+
+    def get_summary_candidate_payloads(self) -> List[Any]:
+        if not self.history or self.summary_token_threshold <= 0:
+            return []
+
+        entries_chronological = list(self.history)
+        cumulative_from_newest = 0
+        distances: List[int] = [0] * len(entries_chronological)
+
+        for i in range(len(entries_chronological) - 1, -1, -1):
+            distances[i] = cumulative_from_newest
+            cumulative_from_newest += entries_chronological[i].raw_token_count
+
+        candidates: List[Any] = []
+        candidate_entry_ids: List[str] = []
+        for entry, distance in zip(entries_chronological, distances):
+            if distance >= self.summary_token_threshold and not entry.summarized:
+                candidates.append(entry.payload)
+                candidate_entry_ids.append(entry.entry_id)
+
+        if candidates:
+            self._last_summary_candidate_entry_ids = candidate_entry_ids
+        return candidates
+
+    def accept_summary_artifact(self, artifact: Any):
+        import time
+
+        if self._is_supported_payload(artifact):
+            wrapped = self._wrap_payload(artifact)
+        elif hasattr(artifact, "model"):
+            ts = getattr(artifact.model, "timestamp", None) or time.time()
+            wrapped = HistoryEntry(
+                payload=artifact,
+                raw_token_count=max(1, payload_token_count(artifact, self.tokenizer_model)),
+                timestamp=float(ts),
+                entry_id=new_entry_id(),
+            )
+        else:
+            wrapped = None
+
+        if wrapped is not None:
+            self.update_history(wrapped)
+        if self._last_summary_candidate_entry_ids:
+            self.mark_summary_candidates_summarized(self._last_summary_candidate_entry_ids)
+            self._last_summary_candidate_entry_ids = []
+        self.param.trigger("history")
+
+    @staticmethod
+    def _is_supported_payload(payload: Any) -> bool:
+        return isinstance(payload, (MessagePayload, ToolsResponsePayload))
+
+    def get_context_entries_for_view(self) -> List[HistoryEntry]:
+        return [entry for entry, _ in self._select_context_entries()]

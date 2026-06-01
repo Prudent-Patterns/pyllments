@@ -213,7 +213,7 @@ class MessageModel(Model):
                             type='tool_calls_complete',
                             tool_calls=[dict(tc) for tc in self.tool_calls],
                         )
-                    logger.info("Completed message stream")
+                    logger.debug("Completed message stream")
                     self.streamed = True
                     self.ready = True
                     yield MessageStreamEvent(

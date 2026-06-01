@@ -22,7 +22,7 @@ Project Structure:
 Key Dependencies:
 - Param: Defines reactive, type-validated parameters and automatic callbacks.
 - Panel: Builds and styles interactive UI components.
-- asyncio & loguru: Underpin FlowController concurrency and structured logging.
+- asyncio & loguru: Underpin FlowController concurrency and structured logging. See docs/explanation/logging.qmd for embedded vs serve/diagnostics setup.
 
 Design Principles:
 - Flow-Based Composition: Connect Elements to form directed graphs of data flow.

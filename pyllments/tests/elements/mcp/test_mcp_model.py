@@ -2,9 +2,9 @@ import pytest
 import concurrent.futures
 
 from pyllments.elements.mcp import MCPModel
-from pyllments.logging import setup_logging
+from pyllments.logging import setup_serve_logging
 
-setup_logging()
+setup_serve_logging()
 
 @pytest.fixture
 def mcp_model():

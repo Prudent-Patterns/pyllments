@@ -90,11 +90,11 @@ class ChatFlowManager:
         
         # Connect elements using appropriate ports:
         # Route user messages into history
-        flow['chat_interface'].ports.user_message_output > flow['history_handler'].ports.message_emit_input
+        flow['chat_interface'].ports.user_message_output > flow['history_handler'].ports.payload_emit_input
         # Silently record assistant messages in history
-        flow['chat_interface'].ports.assistant_message_output > flow['history_handler'].ports.messages_input
+        flow['chat_interface'].ports.assistant_message_output > flow['history_handler'].ports.payload_input
         # Send context history to LLM for response generation
-        flow['history_handler'].ports.message_history_output > flow['llm_chat'].ports.messages_emit_input
+        flow['history_handler'].ports.context_output > flow['llm_chat'].ports.messages_emit_input
         # Display LLM responses in chat interface and emit
         flow['llm_chat'].ports.message_output > flow['chat_interface'].ports.message_emit_input
         # Create view with unique name

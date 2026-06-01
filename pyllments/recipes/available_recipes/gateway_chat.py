@@ -36,7 +36,7 @@ llm_chat_el = LLMChatElement(
 )
 history_handler_el = HistoryHandlerElement(history_token_limit=config.history_token_limit)
 
-gateway_el.ports.message_output > history_handler_el.ports.message_emit_input
-history_handler_el.ports.message_history_output > llm_chat_el.ports.messages_emit_input
+gateway_el.ports.message_output > history_handler_el.ports.payload_emit_input
+history_handler_el.ports.context_output > llm_chat_el.ports.messages_emit_input
 llm_chat_el.ports.message_output > gateway_el.ports.assistant_message_input
-llm_chat_el.ports.message_output > history_handler_el.ports.messages_input
+llm_chat_el.ports.message_output > history_handler_el.ports.payload_input

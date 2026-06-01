@@ -1,0 +1,81 @@
+# Logging and Diagnostics
+
+Pyllments separates **application logging** from **framework diagnostics**.
+
+## Embedded / headless usage
+
+When Pyllments runs inside another service (for example a Cloudflare worker wrapper or custom API):
+
+- Import `pyllments` only. The `pyllments` Loguru namespace is **disabled by default** (`pyllments/__init__.py`).
+- Do **not** call `setup_logging()` or `setup_serve_logging()` unless you intentionally want Pyllments-owned sinks.
+- Keep **diagnostics off** (default). Your host owns telemetry, request tracing, and frontend communication logs.
+- Use element-bound loggers only for warnings and errors you explicitly want in your host pipeline:
+
+```python
+import pyllments
+from pyllments.elements import ChatGatewayElement
+
+# Optional: payload-flow traces without adding sinks
+from pyllments.logging import configure_diagnostics
+configure_diagnostics(enabled=True, level="TRACE")
+
+gateway = ChatGatewayElement(...)
+gateway.logger.warning("Something recoverable happened")
+```
+
+## Local debugging and `pyllments serve`
+
+For CLI, recipes, and `serve`, use **serve logging**, which replaces process sinks and enables the `pyllments` namespace:
+
+```python
+from pyllments.logging import setup_serve_logging
+
+setup_serve_logging(
+    stdout_log_level="DEBUG",
+    enable_diagnostics=True,  # port staging / emit / receive traces
+)
+```
+
+CLI equivalents:
+
+```bash
+pyllments serve my_flow.py --logging --logging-level DEBUG --diagnostics
+pyllments serve my_flow.py --logging --log-file ./pyllments.log
+```
+
+`--logging` alone enables stdout-only logging. File output requires `--log-file`.
+
+## Diagnostics vs normal logs
+
+| Kind | Control | Typical level | Examples |
+|------|---------|---------------|----------|
+| Diagnostics | `configure_diagnostics()` or `--diagnostics` with serve logging | `TRACE` | Port staging, emit, receive, connect |
+| Framework logs | `setup_serve_logging()` / element `self.logger` | `DEBUG`–`ERROR` | Flow invoke, template errors, lifecycle |
+| Host telemetry | Your application | (your choice) | Request IDs, latency, business events |
+
+Port traffic helpers (`log_staging`, `log_emit`, `log_receive`, `log_connect`) are **no-ops** when diagnostics are disabled, so hot paths stay cheap in production.
+
+## Adding sinks without clobbering the host
+
+If you need Pyllments stdout logging inside an app that already configured Loguru:
+
+```python
+from pyllments.logging import setup_logging
+
+setup_logging(
+    stdout_log_level="INFO",
+    replace_existing=False,  # keeps existing process sinks
+)
+```
+
+Use `setup_serve_logging()` (or `replace_existing=True`) only when Pyllments should own the full Loguru configuration.
+
+## Level conventions
+
+- **TRACE**: Payload flow, port queue details, CSS discovery, pipe debug unpacks.
+- **DEBUG**: State transitions useful while developing elements (context builder triggers, view rebuilds).
+- **INFO**: Lifecycle milestones in Pyllments-owned processes (server start, recipe run).
+- **WARNING**: Recoverable issues (missing optional dependency, skipped persistence).
+- **ERROR**: Failed operations (sync errors, template render failures).
+
+Elements bind `self.logger` with `element=<instance_name>` so logs remain identifiable in multi-element graphs.

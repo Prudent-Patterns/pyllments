@@ -33,7 +33,7 @@ history_handler_el = HistoryHandlerElement(context_token_limit=12000)
 
 # Set up ContextBuilder to aggregate history and new Discord messages
 input_map = {
-    'history': {'ports': [history_handler_el.ports.message_history_output], 'persist': True},
+    'history': {'ports': [history_handler_el.ports.context_output], 'persist': True},
     'user_query': {'ports': [discord_el.ports.user_message_output]}
 }
 emit_order = ['[history]', 'user_query']
@@ -53,7 +53,7 @@ context_builder = ContextBuilderElement(
 
 # Hook user and assistant flows like the chat recipe
 # Route incoming user messages into history
-discord_el.ports.user_message_output > history_handler_el.ports.message_emit_input
+discord_el.ports.user_message_output > history_handler_el.ports.payload_emit_input
 # Send LLM responses to Discord then record them in history via unified emit port
 llm_chat_el.ports.message_output > discord_el.ports.message_emit_input
-discord_el.ports.assistant_message_output > history_handler_el.ports.message_emit_input
+discord_el.ports.assistant_message_output > history_handler_el.ports.payload_emit_input

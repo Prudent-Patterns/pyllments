@@ -78,6 +78,8 @@ def run_recipe(
     recipe_name: str,
     logging: bool = False,
     logging_level: str = 'INFO',
+    log_file: Optional[str] = None,
+    diagnostics: bool = False,
     no_gui: bool = False,
     port: int = 8000,
     env: Optional[str] = None,
@@ -94,6 +96,10 @@ def run_recipe(
         Enable logging, by default False
     logging_level : str, optional
         Set logging level, by default 'INFO'
+    log_file : Optional[str], optional
+        Optional file path for log output. Logs are stdout-only when unset.
+    diagnostics : bool, optional
+        Enable detailed framework diagnostics, by default False.
     no_gui : bool, optional
         Don't look for GUI components, by default False
     port : int, optional
@@ -114,6 +120,8 @@ def run_recipe(
         cli_args = common_options.build_cli_args_dict(
             logging=logging,
             logging_level=logging_level,
+            log_file=log_file,
+            diagnostics=diagnostics,
             no_gui=no_gui,
             port=port,
             env=env,

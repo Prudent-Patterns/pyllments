@@ -4,10 +4,10 @@ import time  # Import time
 
 from pyllments.elements import MCPElement, PipeElement
 from pyllments.payloads import StructuredPayload
-from pyllments.logging import setup_logging
+from pyllments.logging import setup_serve_logging
 from loguru import logger
 from pyllments.runtime.loop_registry import LoopRegistry  # Import LoopRegistry
-setup_logging()
+setup_serve_logging()
 
 # Helper function to run the loop
 def run_loop_briefly(loop, duration=0.1):

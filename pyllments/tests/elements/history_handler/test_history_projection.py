@@ -1,0 +1,134 @@
+"""Tests for HistoryHandler projection tiers and summarization candidates."""
+
+import pytest
+
+from pyllments.elements.history_handler.history_handler_model import HistoryHandlerModel
+from pyllments.elements.history_handler.history_projection import (
+    ProjectionContext,
+    abridge_tool_response,
+    default_projection_tiers,
+    normalize_projection_tiers,
+    stub_tool_response,
+)
+from pyllments.payloads import MessagePayload, ToolsResponsePayload
+
+
+def _tool_response(content_text: str, ts: float) -> ToolsResponsePayload:
+    return ToolsResponsePayload(
+        tool_responses={
+            "tool_a": {
+                "mcp_name": "mcp",
+                "tool_name": "search",
+                "description": "search docs",
+                "parameters": {"q": "test"},
+                "response": {
+                    "content": [{"type": "text", "text": content_text}],
+                    "isError": False,
+                },
+            }
+        },
+        timestamp=ts,
+    )
+
+
+def test_default_tiers_include_zero_and_tool_projectors():
+    tiers = default_projection_tiers(16000)
+    assert 0 in tiers
+    assert ToolsResponsePayload in tiers[0]
+
+
+def test_normalize_projection_tiers_requires_zero():
+    with pytest.raises(ValueError, match="key 0"):
+        normalize_projection_tiers({4000: {}}, 16000)
+
+
+def test_tool_response_abridged_and_stubbed_copies():
+    long_text = "x" * 800
+    payload = _tool_response(long_text, 1.0)
+    pctx = ProjectionContext(
+        tier_start=4000,
+        tier_end=12000,
+        token_distance_from_newest=5000,
+        entry_index=1,
+        tokenizer_model="gpt-4o",
+    )
+    abridged = abridge_tool_response(payload, pctx, max_text_chars=100)
+    assert abridged is not payload
+    assert "[truncated]" in abridged.model.content
+
+    stubbed = stub_tool_response(payload, pctx)
+    assert stubbed is not payload
+    assert "completed" in stubbed.model.content.lower()
+
+
+def test_context_projection_uses_tier_by_token_distance():
+    model = HistoryHandlerModel(
+        context_token_limit=100000,
+        history_token_limit=100000,
+        summary_token_threshold=100000,
+        projection_tiers={
+            0: {ToolsResponsePayload: lambda p, c: p},
+            20: {ToolsResponsePayload: stub_tool_response},
+        },
+        tokenizer_model="gpt-4o",
+    )
+    big = _tool_response("y" * 200, 1.0)
+    model.load_entries([big])
+    model.load_entries(
+        [
+            MessagePayload(
+                role="user",
+                content="padding " * 80,
+                timestamp=2.0,
+            )
+        ]
+    )
+
+    context = model.get_context_payloads()
+    assert len(context) == 2
+    assert isinstance(context[0], ToolsResponsePayload)
+    assert isinstance(context[1], MessagePayload)
+    assert context[0] is not big
+    assert "completed" in context[0].model.content.lower()
+
+
+def test_summary_candidates_beyond_threshold():
+    model = HistoryHandlerModel(
+        context_token_limit=50000,
+        history_token_limit=50000,
+        summary_token_threshold=10,
+        projection_tiers={0: {}},
+        tokenizer_model="gpt-4o",
+    )
+    for i in range(5):
+        model.load_entries(
+            [MessagePayload(role="user", content=f"message {i} " + ("word " * 20), timestamp=float(i))]
+        )
+
+    candidates = model.get_summary_candidate_payloads()
+    assert len(candidates) >= 1
+    assert all(isinstance(p, MessagePayload) for p in candidates)
+
+    model.accept_summary_artifact(
+        MessagePayload(role="system", content="summary", timestamp=99.0)
+    )
+    assert model.get_summary_candidate_payloads() == []
+
+
+def test_summary_marks_prior_candidates_summarized():
+    model = HistoryHandlerModel(
+        context_token_limit=50000,
+        history_token_limit=50000,
+        summary_token_threshold=5,
+        projection_tiers={0: {}},
+        tokenizer_model="gpt-4o",
+    )
+    model.load_entries([MessagePayload(role="user", content="a " * 50, timestamp=1.0)])
+    model.load_entries([MessagePayload(role="user", content="b " * 50, timestamp=2.0)])
+    first = model.get_summary_candidate_payloads()
+    assert first
+    model.accept_summary_artifact(
+        MessagePayload(role="system", content="done", timestamp=3.0)
+    )
+    second = model.get_summary_candidate_payloads()
+    assert second == []
