@@ -115,7 +115,12 @@ Here's what happens step by step in the chat flow:
 **chat_flow.py**
 ```python
 from pyllments import flow
-from pyllments.elements import ChatInterfaceElement, LLMChatElement, HistoryHandlerElement
+from pyllments.elements import (
+    ChatInterfaceElement,
+    ContextBuilderElement,
+    HistoryHandlerElement,
+    LLMChatElement,
+)
 
 # Instantiate the elements
 chat_interface_el = ChatInterfaceElement()
@@ -127,16 +132,16 @@ context_builder_el = ContextBuilderElement(
             'role': "system",
             'message': "You are Marvin, a Paranoid Android."
         },
-        'history': {'ports': [history_handler_el.ports.message_history_output]},
+        'history': {'ports': [history_handler_el.ports.context_output]},
         'query': {'ports': [chat_interface_el.ports.user_message_output]},
     },
     emit_order=['system_prompt_constant', '[history]', 'query']
 )
 # Connect the elements
-chat_interface_el.ports.user_message_output > history_handler_el.ports.message_input
-context_builder_el.ports.messages_output > llm_chat_el.ports.messages_input
+chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_emit_input
+context_builder_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input
-chat_interface_el.ports.assistant_message_output > history_handler_el.ports.message_emit_input
+chat_interface_el.ports.assistant_message_output > history_handler_el.ports.payload_emit_input
 
 # Create the visual elements and wrap with @flow decorator to serve with pyllments
 @flow

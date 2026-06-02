@@ -61,10 +61,10 @@ gateway = ChatGatewayElement()
 llm = LLMChatElement(output_mode='stream', generate_content_on_emit=False)
 history = HistoryHandlerElement(history_token_limit=10000)
 
-gateway.ports.message_output > history.ports.message_emit_input
-history.ports.message_history_output > llm.ports.messages_emit_input
+gateway.ports.message_output > history.ports.payload_emit_input
+history.ports.context_output > llm.ports.messages_emit_input
 llm.ports.message_output > gateway.ports.assistant_message_input
-llm.ports.message_output > history.ports.messages_input
+llm.ports.message_output > history.ports.payload_input
 
 turn = gateway.submit_message("Hello")
 

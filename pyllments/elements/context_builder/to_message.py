@@ -1,6 +1,7 @@
 from typing import Any, Optional, get_origin, get_args
 
-from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, ToolsResponsePayload
+from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads.structured.summary_contract import SUMMARY_ARTIFACT_TYPE, summary_artifact_content
 
 
 def chunk2message(payload, role='user'):
@@ -71,6 +72,19 @@ def tools_response_list2message(payload, role='system'):
         for item in payload
     ]
 
+def structured2message(payload, role='system'):
+    """
+    Converts a StructuredPayload into a MessagePayload for LLM context.
+
+    Summary artifacts use a dedicated prefix; other structured data is stringified.
+    """
+    data = payload.model.data or {}
+    if data.get("type") == SUMMARY_ARTIFACT_TYPE:
+        prefix = "Conversation summary:\n"
+        return MessagePayload(content=prefix + summary_artifact_content(payload), role=role)
+    return MessagePayload(content=str(data), role=role)
+
+
 def schema2message(payload, role='system'):
     """
     Converts a SchemaPayload into a MessagePayload.
@@ -88,6 +102,7 @@ payload_message_mapping = {
     ToolsResponsePayload: tools_response2message,
     list[ToolsResponsePayload]: tools_response_list2message,
     SchemaPayload: schema2message,
+    StructuredPayload: structured2message,
 
 }
 

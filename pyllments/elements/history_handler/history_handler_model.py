@@ -7,7 +7,12 @@ from typing import Any, List, Optional, Union
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads.structured.summary_contract import (
+    build_summary_request,
+    is_summary_artifact,
+    summary_artifact_entry_ids,
+)
 from pyllments.runtime.loop_registry import LoopRegistry
 
 from .history_projection import (
@@ -292,9 +297,9 @@ class HistoryHandlerModel(Model):
     def get_context_payloads(self) -> List[Any]:
         return [projected for _, projected in self._select_context_entries()]
 
-    def get_summary_candidate_payloads(self) -> List[Any]:
+    def _collect_summary_candidates(self) -> tuple[List[Any], List[str]]:
         if not self.history or self.summary_token_threshold <= 0:
-            return []
+            return [], []
 
         entries_chronological = list(self.history)
         cumulative_from_newest = 0
@@ -310,16 +315,45 @@ class HistoryHandlerModel(Model):
             if distance >= self.summary_token_threshold and not entry.summarized:
                 candidates.append(entry.payload)
                 candidate_entry_ids.append(entry.entry_id)
+        return candidates, candidate_entry_ids
 
+    def get_summary_candidate_payloads(self) -> List[Any]:
+        """Return raw candidate payloads (legacy helper). Prefer :meth:`get_summary_request`."""
+        candidates, candidate_entry_ids = self._collect_summary_candidates()
         if candidates:
             self._last_summary_candidate_entry_ids = candidate_entry_ids
         return candidates
 
+    def get_summary_request(self) -> Optional[StructuredPayload]:
+        """Build a summarization request for eligible unsummarized ledger spans."""
+        candidates, candidate_entry_ids = self._collect_summary_candidates()
+        if not candidates:
+            return None
+        self._last_summary_candidate_entry_ids = candidate_entry_ids
+        return build_summary_request(
+            source_payloads=candidates,
+            source_entry_ids=candidate_entry_ids,
+        )
+
     def accept_summary_artifact(self, artifact: Any):
         import time
 
-        if self._is_supported_payload(artifact):
+        entry_ids_to_mark: List[str] = []
+
+        if is_summary_artifact(artifact):
+            data = artifact.model.data or {}
+            wrapped = HistoryEntry(
+                payload=artifact,
+                raw_token_count=max(1, payload_token_count(artifact, self.tokenizer_model)),
+                timestamp=float(data.get("timestamp") or time.time()),
+                entry_id=new_entry_id(),
+            )
+            entry_ids_to_mark = summary_artifact_entry_ids(artifact)
+        elif self._is_supported_payload(artifact):
             wrapped = self._wrap_payload(artifact)
+            if self._last_summary_candidate_entry_ids:
+                entry_ids_to_mark = list(self._last_summary_candidate_entry_ids)
+                self._last_summary_candidate_entry_ids = []
         elif hasattr(artifact, "model"):
             ts = getattr(artifact.model, "timestamp", None) or time.time()
             wrapped = HistoryEntry(
@@ -333,9 +367,8 @@ class HistoryHandlerModel(Model):
 
         if wrapped is not None:
             self.update_history(wrapped)
-        if self._last_summary_candidate_entry_ids:
-            self.mark_summary_candidates_summarized(self._last_summary_candidate_entry_ids)
-            self._last_summary_candidate_entry_ids = []
+        if entry_ids_to_mark:
+            self.mark_summary_candidates_summarized(entry_ids_to_mark)
         self.param.trigger("history")
 
     @staticmethod

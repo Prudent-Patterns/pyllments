@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from sqlite_utils import Database
 
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
 from loguru import logger
 
 logger = logger.bind(name=__name__)
@@ -22,6 +22,13 @@ PayloadDeserializer = Callable[[dict], Any]
 
 _SERIALIZERS: Dict[str, PayloadSerializer] = {}
 _DESERIALIZERS: Dict[str, PayloadDeserializer] = {}
+
+
+def _payload_timestamp(payload: Any) -> float:
+    data = getattr(getattr(payload, "model", None), "data", None)
+    if isinstance(data, dict) and data.get("timestamp") is not None:
+        return float(data["timestamp"])
+    return float(getattr(payload.model, "timestamp", 0) or 0)
 
 
 def register_payload_serializer(
@@ -79,6 +86,21 @@ register_payload_serializer(
 )
 
 
+def _serialize_structured(payload: StructuredPayload) -> dict:
+    return {"data": payload.model.data}
+
+
+def _deserialize_structured(data: dict) -> StructuredPayload:
+    return StructuredPayload(data=data.get("data", data))
+
+
+register_payload_serializer(
+    StructuredPayload,
+    _serialize_structured,
+    _deserialize_structured,
+)
+
+
 def payload_to_record(entry_id: str, payload: Any, raw_token_count: int, summarized: bool = False) -> Optional["HistoryRecord"]:
     """Build a HistoryRecord from a payload, or None if unsupported."""
     payload_type = type(payload).__name__
@@ -86,7 +108,7 @@ def payload_to_record(entry_id: str, payload: Any, raw_token_count: int, summari
     if serializer is None:
         logger.warning("No serializer for payload type %s; skipping persistence.", payload_type)
         return None
-    ts = float(getattr(payload.model, "timestamp", 0) or 0)
+    ts = _payload_timestamp(payload)
     return HistoryRecord(
         entry_id=entry_id,
         timestamp=ts,

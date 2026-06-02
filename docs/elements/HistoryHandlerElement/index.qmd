@@ -1,9 +1,24 @@
 ---
 title: "HistoryHandlerElement"
 lightbox: true
+description: "Maintains raw history, emits projected context, and coordinates summarization"
 ---
 
-This element is responsible for assembling and managing the chat history and context for downstream elements. It handles incoming messages and tool responses, optionally persists them to a SQLite database, and emits the current context for use by other elements in the flow. The token limits are set upon instantiation, and will determine the size of the context window as well as the amount of messages kept in the history from which that context history is assembled from.
+`HistoryHandlerElement` manages the conversation ledger used by downstream chat
+flows. It stores raw `MessagePayload`, `ToolsResponsePayload`, and accepted
+summary artifacts, then emits projected context for elements such as
+`ContextBuilderElement` and `LLMChatElement`.
+
+The element separates three concerns:
+
+- Raw history retention, capped by `history_token_limit`.
+- Context projection, capped by `context_token_limit`.
+- Summarization coordination, driven by `summary_token_threshold`.
+
+It does not call an LLM itself. When older unsummarized entries cross the summary
+threshold, it emits a structured summary request (`StructuredPayload` with
+`type: summary_request`) for a `SummarizerElement` and later accepts a structured
+summary artifact (`type: summary`).
 
 ## Instantiation
 
@@ -14,11 +29,15 @@ This element is responsible for assembling and managing the chat history and con
 `persist: bool = False`<br>
 <span class="tab">Whether to persist messages and tool responses to a SQLite database.</span>
 `db_path: str = None`<br>
-<span class="tab">Custom path for the history database file (optional when `persist=True`). Should be higher than the `history_token_limit`.</span>
+<span class="tab">Custom path for the history database file when `persist=True`.</span>
 `history_token_limit: int = 32000`<br>
-<span class="tab">The max number of tokens to keep in the history.</span>
+<span class="tab">The max number of raw tokens to keep in the history ledger.</span>
 `context_token_limit: int = 16000`<br>
-<span class="tab">The max number of tokens to include in the context window.</span>
+<span class="tab">The max number of projected tokens to emit on `context_output`.</span>
+`summary_token_threshold: int = 8000`<br>
+<span class="tab">Raw-token distance from the newest entry at which unsummarized entries become eligible for summarization. Set to `0` to disable summary candidates.</span>
+`projection_tiers: dict = None`<br>
+<span class="tab">Optional tier configuration for projecting older entries before emitting context.</span>
 `tokenizer_model: str = 'gpt-4o'`<br>
 <span class="tab">The tokenizer model to use for token length estimation. (Using tiktoken)</span>
 
@@ -26,10 +45,9 @@ This element is responsible for assembling and managing the chat history and con
 
 | Port Name                 | Payload Type                                                 | Behavior                                                                      |
 |---------------------------|--------------------------------------------------------------|-------------------------------------------------------------------------------|
-| message_emit_input        | MessagePayload                                               | Loads the message into history and emits the current context payload.        |
-| messages_input            | MessagePayload \| list[MessagePayload]                       | Loads one or more messages into history without emitting.                     |
-| tool_response_emit_input  | ToolsResponsePayload                                         | Loads the tool response into history and emits the current context payload.   |
-| tools_responses_input      | ToolsResponsePayload \| list[ToolsResponsePayload]           | Loads one or more tool responses into history without emitting.               |
+| `payload_emit_input` | `MessagePayload`, `ToolsResponsePayload`, or lists of those payloads | Loads supported payloads into history, then emits projected context and any summary request. |
+| `payload_input` | `MessagePayload`, `ToolsResponsePayload`, or lists of those payloads | Loads supported payloads into history without emitting context or summary requests. |
+| `summary_input` | `StructuredPayload` (`type: summary`) or other payload with a model | Accepts a summary artifact, appends it to history, and marks `data["source_entry_ids"]` when present on structured summaries. |
 
 : {.hover}
 
@@ -37,9 +55,46 @@ This element is responsible for assembling and managing the chat history and con
 
 | Port Name               | Payload Type            | Behavior                                                      |
 |-------------------------|-------------------------|---------------------------------------------------------------|
-| message_history_output  | List[MessagePayload]    | Emits a list of `MessagePayload` representing the current context. |
+| `context_output` | `list` | Emits the current projected context payloads in chronological order. |
+| `summary_candidate_output` | `StructuredPayload` (`type: summary_request`) | Emits raw unsummarized history spans that are eligible for summarization. |
 
 : {.hover}
+
+## Summarization Flow
+
+The history handler only selects candidates and records returned summaries. The
+LLM call belongs in a connected `SummarizerElement`:
+
+```python
+history_handler_el.ports.summary_candidate_output > summarizer_el.ports.summary_request_emit_input
+summarizer_el.ports.summary_output > history_handler_el.ports.summary_input
+```
+
+The structured summary request contains `source_payloads`, `source_entry_ids`,
+and optional `instructions`. See [Structured Summary Contract](../../explanation/StructuredSummary.qmd).
+
+When a structured summary artifact (`type: summary`) returns on `summary_input`,
+the model appends it to the ledger and marks exactly `data["source_entry_ids"]` as
+summarized. Those entries will not be selected again as summary candidates.
+
+:::: {.callout-note}
+Summarized entries are still part of the raw ledger until normal token-limit
+eviction. The summary marker prevents repeated summarization; context projection
+still decides what gets emitted on `context_output`.
+::::
+
+## Typical Chat Wiring
+
+Use `payload_emit_input` for turns that should refresh context immediately:
+
+```python
+chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_emit_input
+history_handler_el.ports.context_output > context_builder_el.ports.history
+context_builder_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
+llm_chat_el.ports.message_output > history_handler_el.ports.payload_emit_input
+```
+
+Use `payload_input` when another event will trigger context emission later.
 
 ### Views
 

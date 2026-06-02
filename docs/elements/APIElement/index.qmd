@@ -24,7 +24,7 @@ A dictionary defining the expected inputs for the API. Each key creates an input
 ```python
 input_map = {
     'user_query': MessagePayload,
-    'history': {'ports': [history_el.ports.messages_output], 'persist': False}
+    'history': {'ports': [history_el.ports.context_output], 'persist': False}
 }
 ```
 
@@ -148,7 +148,7 @@ api_el = APIElement(
 
 # Wire up the flow
 chat_builder_el.ports.user_output > api_el.ports.user_query
-history_handler_el.ports.message_history_output > api_el.ports.conversation_history
+history_handler_el.ports.context_output > api_el.ports.conversation_history
 ``` -->
 
 

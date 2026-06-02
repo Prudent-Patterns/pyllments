@@ -10,7 +10,11 @@ from pyllments.elements.history_handler.history_projection import (
     normalize_projection_tiers,
     stub_tool_response,
 )
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads.structured.summary_contract import (
+    build_summary_artifact,
+    is_summary_request,
+)
 
 
 def _tool_response(content_text: str, ts: float) -> ToolsResponsePayload:
@@ -92,7 +96,7 @@ def test_context_projection_uses_tier_by_token_distance():
     assert "completed" in context[0].model.content.lower()
 
 
-def test_summary_candidates_beyond_threshold():
+def test_summary_request_beyond_threshold():
     model = HistoryHandlerModel(
         context_token_limit=50000,
         history_token_limit=50000,
@@ -105,17 +109,26 @@ def test_summary_candidates_beyond_threshold():
             [MessagePayload(role="user", content=f"message {i} " + ("word " * 20), timestamp=float(i))]
         )
 
-    candidates = model.get_summary_candidate_payloads()
-    assert len(candidates) >= 1
-    assert all(isinstance(p, MessagePayload) for p in candidates)
+    request = model.get_summary_request()
+    assert request is not None
+    assert is_summary_request(request)
+    payloads = request.model.data["source_payloads"]
+    entry_ids = request.model.data["source_entry_ids"]
+    assert len(payloads) >= 1
+    assert len(entry_ids) == len(payloads)
+    assert all(isinstance(p, MessagePayload) for p in payloads)
 
     model.accept_summary_artifact(
-        MessagePayload(role="system", content="summary", timestamp=99.0)
+        build_summary_artifact(
+            content="summary",
+            source_entry_ids=entry_ids,
+            timestamp=99.0,
+        )
     )
-    assert model.get_summary_candidate_payloads() == []
+    assert model.get_summary_request() is None
 
 
-def test_summary_marks_prior_candidates_summarized():
+def test_summary_payload_marks_only_its_source_entry_ids():
     model = HistoryHandlerModel(
         context_token_limit=50000,
         history_token_limit=50000,
@@ -125,10 +138,21 @@ def test_summary_marks_prior_candidates_summarized():
     )
     model.load_entries([MessagePayload(role="user", content="a " * 50, timestamp=1.0)])
     model.load_entries([MessagePayload(role="user", content="b " * 50, timestamp=2.0)])
-    first = model.get_summary_candidate_payloads()
-    assert first
+    model.load_entries([MessagePayload(role="user", content="c " * 50, timestamp=3.0)])
+    request = model.get_summary_request()
+    assert request is not None
+    marked_ids = list(request.model.data["source_entry_ids"])
+    assert len(marked_ids) >= 2
     model.accept_summary_artifact(
-        MessagePayload(role="system", content="done", timestamp=3.0)
+        build_summary_artifact(
+            content="done",
+            source_entry_ids=marked_ids[:1],
+            timestamp=4.0,
+        )
     )
-    second = model.get_summary_candidate_payloads()
-    assert second == []
+    summarized = [e for e in model.history if e.summarized]
+    assert len(summarized) == 1
+    assert summarized[0].entry_id == marked_ids[0]
+    follow_up = model.get_summary_request()
+    assert follow_up is not None
+    assert marked_ids[0] not in follow_up.model.data["source_entry_ids"]

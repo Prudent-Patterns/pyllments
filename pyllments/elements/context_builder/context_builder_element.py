@@ -706,7 +706,7 @@ class ContextBuilderElement(Element):
         if name in self.flow_controller.flow_port_map:
             port_type = self.flow_controller.flow_port_map[name].payload_type
         else:
-            port_type = MessagePayload
+            port_type = type(payload)
 
         return to_message_payload(
             payload,

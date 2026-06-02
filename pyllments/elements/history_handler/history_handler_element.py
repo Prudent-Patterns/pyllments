@@ -6,7 +6,7 @@ import param
 
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
 from pyllments.runtime.loop_registry import LoopRegistry
 
 from .history_handler_model import HistoryHandlerModel
@@ -32,7 +32,7 @@ class HistoryHandlerElement(Element):
     payload_emit_input : ingest and emit context + summary candidates
     summary_input : summarizer artifacts (e.g. StructuredPayload)
     context_output : projected payload list for ContextBuilderElement
-    summary_candidate_output : full raw spans for SummarizerElement
+    summary_candidate_output : StructuredPayload summary_request for SummarizerElement
     """
 
     show_tool_responses = param.Boolean(
@@ -74,10 +74,10 @@ class HistoryHandlerElement(Element):
         context = self.model.get_context_payloads()
         await self.ports.output["context_output"].stage_emit(context=context)
 
-        candidates = self.model.get_summary_candidate_payloads()
-        if candidates:
+        request = self.model.get_summary_request()
+        if request is not None:
             await self.ports.output["summary_candidate_output"].stage_emit(
-                context=candidates
+                context=request
             )
 
     def _payload_input_setup(self):
@@ -126,8 +126,8 @@ class HistoryHandlerElement(Element):
         )
 
     def _summary_candidate_output_setup(self):
-        async def pack(context: list) -> list:
-            return context
+        async def pack(request: StructuredPayload) -> StructuredPayload:
+            return request
 
         self.ports.add_output(
             name="summary_candidate_output",

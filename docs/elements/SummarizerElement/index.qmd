@@ -1,0 +1,96 @@
+---
+title: "SummarizerElement"
+description: "Summarizes history spans and emits structured summary artifacts"
+---
+
+`SummarizerElement` condenses a span of history payloads into a `StructuredPayload`
+with `data["type"] == "summary"`. It sits behind
+`HistoryHandlerElement.summary_candidate_output`, which emits a structured summary
+request when older entries are eligible for summarization.
+
+The element uses an internal chat model backend (`openrouter` by default, or
+`litellm`) in atomic mode. `summary_output` only emits after the LLM response text
+has been resolved.
+
+## Instantiation
+
+```python
+from pyllments.elements import SummarizerElement
+
+summarizer_el = SummarizerElement(
+    model_name="openai/gpt-4o-mini",
+    summary_instructions="Summarize the conversation for future context.",
+)
+```
+
+**Arguments:**
+
+`backend`: Literal['openrouter', 'litellm'] = 'openrouter'<br>
+<span class="tab">Selects the LLM backend used for summarization.</span>
+`model_name`: str = 'openai/gpt-4o-mini'<br>
+<span class="tab">The backend model name. Passed through to the internal chat model.</span>
+`model_args`: dict = {}<br>
+<span class="tab">Additional provider request arguments such as temperature.</span>
+`base_url`: str = None<br>
+<span class="tab">LiteLLM-only. Base URL for a custom or local model endpoint.</span>
+`api_key`: str = None<br>
+<span class="tab">Optional API key passed to the backend model. OpenRouter also reads `OPENROUTER_API_KEY` from the environment.</span>
+`summary_instructions`: str<br>
+<span class="tab">System instructions describing what the summary should preserve and omit.</span>
+`summary_format_prompt`: str<br>
+<span class="tab">Final user prompt sent after the source payloads to request the summary output.</span>
+`strategy`: str = 'default'<br>
+<span class="tab">Optional label stored on the emitted summary structured payload.</span>
+
+### Input Ports
+
+| Port Name | Payload Type | Behavior |
+|-----------|--------------|----------|
+| `summary_request_emit_input` | `StructuredPayload` (`type: summary_request`) | Converts source payloads into messages, asks the LLM for a summary, and emits a structured summary artifact with the same `source_entry_ids`. |
+| `payloads_emit_input` | `MessagePayload`, `ToolsResponsePayload`, or lists of those payloads | Ad hoc summarization path. Emits a structured summary without history entry IDs. |
+
+:: {.hover}
+
+### Output Ports
+
+| Port Name | Payload Type | Behavior |
+|-----------|--------------|----------|
+| `summary_output` | `StructuredPayload` (`type: summary`) | Emits the resolved summary text and metadata. Usually connected to `HistoryHandlerElement.summary_input`. |
+
+:: {.hover}
+
+## History Wiring
+
+```python
+history_handler_el.ports.summary_candidate_output > summarizer_el.ports.summary_request_emit_input
+summarizer_el.ports.summary_output > history_handler_el.ports.summary_input
+```
+
+See [Structured Summary Contract](../../explanation/StructuredSummary.qmd) for the
+`data` field shapes.
+
+## Message Assembly
+
+1. A system message from `summary_instructions`.
+2. Source payloads converted to `MessagePayload` using the same conversion map as `ContextBuilderElement`.
+3. A final user message from `summary_format_prompt`.
+
+## Summary Artifact Fields
+
+| Field | Description |
+|-------|-------------|
+| `content` | The resolved summary text. |
+| `source_entry_ids` | History ledger entry IDs covered by this summary. |
+| `strategy` | Optional summarization strategy label. |
+| `model_name` | Backend model that produced the summary. |
+| `timestamp` | Creation time for the artifact. |
+
+## Ad Hoc Summarization
+
+```python
+some_element.ports.payloads_output > summarizer_el.ports.payloads_emit_input
+summarizer_el.ports.summary_output > downstream_el.ports.summary_input
+```
+
+Because this path does not carry ledger IDs, a history handler that receives the
+summary will append it but cannot mark prior entries as summarized.

@@ -11,7 +11,8 @@ from pyllments.elements.history_handler.history_store import (
     record_to_payload,
     new_entry_id,
 )
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads.structured.summary_contract import build_summary_artifact, is_summary_artifact
 
 
 def test_sqlite_roundtrip_message_and_tool():
@@ -131,7 +132,7 @@ def test_mark_summarized_on_store():
         asyncio.run(_run())
 
 
-def test_accept_summary_marks_candidate_entry_ids():
+def test_accept_summary_payload_marks_explicit_entry_ids():
     model = HistoryHandlerModel(
         context_token_limit=50000,
         history_token_limit=50000,
@@ -141,12 +142,53 @@ def test_accept_summary_marks_candidate_entry_ids():
     )
     model.load_entries([MessagePayload(role="user", content="a " * 50, timestamp=1.0)])
     model.load_entries([MessagePayload(role="user", content="b " * 50, timestamp=2.0)])
-    assert model.get_summary_candidate_payloads()
-    candidate_ids = list(model._last_summary_candidate_entry_ids)
+    request = model.get_summary_request()
+    assert request is not None
+    candidate_ids = list(request.model.data["source_entry_ids"])
     model.accept_summary_artifact(
-        MessagePayload(role="system", content="summary", timestamp=3.0)
+        build_summary_artifact(
+            content="summary",
+            source_entry_ids=candidate_ids,
+            timestamp=3.0,
+        )
     )
-    assert model.get_summary_candidate_payloads() == []
+    assert model.get_summary_request() is None
     for entry in model.history:
         if entry.entry_id in candidate_ids:
             assert entry.summarized
+
+
+def test_persisted_summary_payload_reloads():
+    with tempfile.TemporaryDirectory() as tmp:
+        async def _run():
+            db_path = str(Path(tmp) / "summary_hist.db")
+            model = HistoryHandlerModel(
+                persist=True,
+                db_path=db_path,
+                history_token_limit=50000,
+                context_token_limit=50000,
+                tokenizer_model="gpt-4o",
+            )
+            await model.await_store_ready()
+            model.accept_summary_artifact(
+                build_summary_artifact(
+                    content="stored summary",
+                    source_entry_ids=[],
+                    timestamp=1.0,
+                )
+            )
+            await model.flush_store()
+
+            model2 = HistoryHandlerModel(
+                persist=True,
+                db_path=db_path,
+                history_token_limit=50000,
+                context_token_limit=50000,
+                tokenizer_model="gpt-4o",
+            )
+            await model2.await_store_ready()
+            assert len(model2.history) == 1
+            assert is_summary_artifact(model2.history[0].payload)
+            assert model2.history[0].payload.model.data["content"] == "stored summary"
+
+        asyncio.run(_run())

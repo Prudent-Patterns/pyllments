@@ -11,7 +11,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from pyllments.common.tokenizers import get_token_len
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads.structured.summary_contract import (
+    SUMMARY_ARTIFACT_TYPE,
+    summary_artifact_content,
+)
 
 # Payload -> projected payload
 Projector = Callable[[Any, "ProjectionContext"], Any]
@@ -126,6 +130,11 @@ def payload_token_count(payload: Any, tokenizer_model: str) -> int:
         if not payload.model.tool_responses:
             return 0
         return get_token_len(payload.model.content or "", tokenizer_model)
+    if isinstance(payload, StructuredPayload):
+        data = payload.model.data or {}
+        if data.get("type") == SUMMARY_ARTIFACT_TYPE:
+            return get_token_len(summary_artifact_content(payload), tokenizer_model)
+        return get_token_len(str(data), tokenizer_model)
     content = getattr(getattr(payload, "model", None), "content", None)
     if isinstance(content, str):
         return get_token_len(content, tokenizer_model)

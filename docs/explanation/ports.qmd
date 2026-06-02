@@ -54,7 +54,7 @@ Ports are managed via an Element's `ports` attribute (a `Ports` object).
 ### Example
 In the `ChatInterfaceElement` (from `chat_interface_element.py`):
 - Input: `message_emit_input` receives a `MessagePayload`, adds it to the chat model, and emits to `user_message_output`.
-- Connection in a recipe (e.g., `mcp_chat.py`): `chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input`.
+- Connection in a recipe: `chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_emit_input`.
 
 This setup allows building flows like user input → LLM processing → chat display, all predictably.
 

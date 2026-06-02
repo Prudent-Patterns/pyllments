@@ -1,0 +1,80 @@
+---
+title: "Structured Summary Contract"
+description: "StructuredPayload data shapes for history summarization"
+---
+
+Summarization uses `StructuredPayload` with a `type` discriminator in
+`payload.model.data`. There is no dedicated `SummaryPayload` class.
+
+This keeps summarization on the generic structured payload while still carrying
+the metadata history needs, especially `source_entry_ids`.
+
+## Summary Request
+
+Emitted by `HistoryHandlerElement.summary_candidate_output` when older
+unsummarized entries cross `summary_token_threshold`.
+
+```python
+from pyllments.payloads import StructuredPayload
+
+request = StructuredPayload(data={
+    "type": "summary_request",
+    "source_payloads": [message_payload, tool_response_payload],
+    "source_entry_ids": ["entry-1", "entry-2"],
+    "instructions": "Summarize decisions and unresolved questions.",
+    "timestamp": 1710000000.0,
+})
+```
+
+| Field | Description |
+|-------|-------------|
+| `type` | Must be `"summary_request"`. |
+| `source_payloads` | Raw payloads to summarize. |
+| `source_entry_ids` | Ledger entry IDs covered by the request. |
+| `instructions` | Optional request-specific summarization override. |
+| `timestamp` | Request creation time. |
+
+Helper builders live in `pyllments.payloads.structured.summary_contract`.
+
+## Summary Artifact
+
+Returned by `SummarizerElement.summary_output` and accepted on
+`HistoryHandlerElement.summary_input`.
+
+```python
+summary = StructuredPayload(data={
+    "type": "summary",
+    "content": "The user chose SQLite persistence and wants concise docs.",
+    "source_entry_ids": ["entry-1", "entry-2"],
+    "strategy": "default",
+    "model_name": "openai/gpt-4o-mini",
+    "timestamp": 1710000100.0,
+})
+```
+
+| Field | Description |
+|-------|-------------|
+| `type` | Must be `"summary"`. |
+| `content` | Summary text. |
+| `source_entry_ids` | Ledger entries represented by this summary. |
+| `strategy` | Optional strategy label. |
+| `model_name` | Model that generated the summary. |
+| `timestamp` | Artifact creation time. |
+
+When `HistoryHandlerElement` accepts a structured summary, it appends the payload
+to the ledger and marks exactly `source_entry_ids` as summarized.
+
+## Context Conversion
+
+`ContextBuilderElement` converts structured summaries (`type == "summary"`) into
+a system `MessagePayload` prefixed with `Conversation summary:`.
+
+Other `StructuredPayload` shapes are stringified conservatively and are not treated
+as summaries for marking or conversion.
+
+## Relationship To Messages
+
+A plain `MessagePayload(role="system")` can still be accepted as a manual
+summary, but it uses the legacy candidate bookmark path for marking entries.
+Automated summarization should use `StructuredPayload` with `type: "summary"` so
+marking stays tied to explicit entry IDs.

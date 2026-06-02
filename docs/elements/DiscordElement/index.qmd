@@ -23,8 +23,8 @@ from pyllments.elements import DiscordElement, LLMChatElement
 discord_el = DiscordElement(bot_token="YOUR_DISCORD_TOKEN")
 
 # Wire up to an LLM chat element
-discord_el.ports.message_output > llm_el.ports.messages_input
-llm_el.ports.message_output > discord_el.ports.message_input
+discord_el.ports.message_output > llm_el.ports.messages_emit_input
+llm_el.ports.message_output > discord_el.ports.assistant_message_emit_input
 ``` -->
 
 ## Input Ports

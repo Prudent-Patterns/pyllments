@@ -95,11 +95,11 @@ To facilitate the proper communication between the elements:
 
 1. When we type a message into the `ChatInterfaceElement` and hit send, in addition to rendering it in the chatfeed,it emits a `MessagePayload` through the `message_output` port.
     a. The `ContextBuilderElement` receives the `MessagePayload` through the `query` port. More on this below.
-    b. The `HistoryHandlerElement` recieves a `MessagePayload` through the `message_input` port. This message is incorporated into our the running history it contains. This does not trigger an emission.
+    b. The `HistoryHandlerElement` receives a `MessagePayload` through the `payload_emit_input` port. This message is incorporated into the running history and can trigger context emission.
 2. When the `ContextBuilderElement` receives the MessagePayload through the `query` port, the condition is satisifed for the emission of a list of messages. Remember, the history port is optional, so it need not receive any payload for us to trigger the emission. It is simply ignored from the `emit_order` when no history is present at that port.
 3. As the `LLMChatElement` receives a list of messages, it sends them to the LLM we have specified and emits a `MessagePayload` response through the `message_output` port.
 4. The `MessagePayload` is received by the `ChatInterfaceElement` and rendered in the chatfeed. However, we should note that the `message_emit_input` port also triggers the emission of that very same message after it has streamed to the chatfeed to be passed along, and this time, out of the `assistant_message_output` port.
-5. The message is received by the `HistoryHandlerElement` in its `message_emit_input` port. This triggers it to emit its message history as a list[MessagePayload] to the `ContextBuilderElement`. Now, when we send a new message through our interface, the history will be included in the context.
+5. The assistant message is received by the `HistoryHandlerElement` in its `payload_emit_input` port. This triggers it to emit projected history on `context_output` to the `ContextBuilderElement`. Now, when we send a new message through our interface, the history will be included in the context.
 
 ## 4. Connecting the elements
 
@@ -107,13 +107,14 @@ Now that we have a flow in mind, connecting the elements is a breeze.
 
 ```python
 chat_interface_el.ports.user_message_output > context_builder_el.ports.query
-chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input
+chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_emit_input
 
-history_handler_el.ports.messages_output > context_builder_el.ports.history
+history_handler_el.ports.context_output > context_builder_el.ports.history
 
 context_builder_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
 
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input
+chat_interface_el.ports.assistant_message_output > history_handler_el.ports.payload_emit_input
 ```
 
 The ports are accessed using dot notation on the `ports` attribute of the element.
@@ -259,13 +260,14 @@ context_builder_el = ContextBuilderElement(
     )
 
 chat_interface_el.ports.user_message_output > context_builder_el.ports.query
-chat_interface_el.ports.user_message_output > history_handler_el.ports.messages_input
+chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_emit_input
 
-history_handler_el.ports.messages_output > context_builder_el.ports.history
+history_handler_el.ports.context_output > context_builder_el.ports.history
 
 context_builder_el.ports.messages_output > llm_chat_el.ports.messages_emit_input
 
 llm_chat_el.ports.message_output > chat_interface_el.ports.message_emit_input
+chat_interface_el.ports.assistant_message_output > history_handler_el.ports.payload_emit_input
 
 interface_view = chat_interface_el.create_interface_view(width=600, height=800)
 chat_history_view = history_handler_el.create_context_view(width=220)
