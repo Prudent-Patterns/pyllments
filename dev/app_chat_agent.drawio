@@ -1,0 +1,183 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36">
+  <diagram id="cPueLI_8mq5kZpy7Lz3J" name="chat">
+    <mxGraphModel dx="2698" dy="2678" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="node-run-coordinator" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#CCCCCC;fillColor=#343434;strokeColor=#666666;opacity=35;" value="RunCoordinator" vertex="1">
+          <mxGeometry height="40" width="140" x="430" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="node-flow-engine" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#CCCCCC;fillColor=#626262;strokeColor=#999999;opacity=35;" value="Chat Flow Engine" vertex="1">
+          <mxGeometry height="44" width="150" x="425" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="node-stream-broker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#CCCCCC;fillColor=#330000;strokeColor=#884444;opacity=35;" value="Stream Broker" vertex="1">
+          <mxGeometry height="44" width="130" x="650" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="node-persistence" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#E3C800;strokeColor=#B09500;opacity=35;" value="Persistence" vertex="1">
+          <mxGeometry height="44" width="120" x="850" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="node-gateway" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#274C77;strokeColor=#A3CEF1;" value="ChatGatewayElement" vertex="1">
+          <mxGeometry height="60" width="170" x="415" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="node-history" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#6B5B00;strokeColor=#D6B656;" value="HistoryHandlerElement" vertex="1">
+          <mxGeometry height="60" width="180" x="150" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="node-context" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#2D7600;strokeColor=#82B366;" value="ContextBuilderElement" vertex="1">
+          <mxGeometry height="60" width="180" x="410" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="node-state-counter" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#FFF2CC;strokeColor=#D6B656;" value="StateCounterElement" vertex="1">
+          <mxGeometry height="60" width="180" x="700" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="node-llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#31572C;strokeColor=#90A955;" value="LLMChatElement" vertex="1">
+          <mxGeometry height="60" width="170" x="415" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="node-mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#5A4E7C;strokeColor=#B39DDB;" value="MCPElement" vertex="1">
+          <mxGeometry height="60" width="160" x="700" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="node-custom-object" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="Custom Object Handler" vertex="1">
+          <mxGeometry height="60" width="190" x="980" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="node-summarizer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#6A4C93;strokeColor=#9673A6;" value="SummarizerElement" vertex="1">
+          <mxGeometry height="60" width="170" x="-90" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="group-chat-context" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="260" width="210" x="155" y="-240" as="geometry" />
+        </mxCell>
+        <mxCell id="context-box" parent="group-chat-context" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#8A9F2D;strokeColor=#2D7600;verticalAlign=top;" value="Chat Context" vertex="1">
+          <mxGeometry height="260" width="210" as="geometry" />
+        </mxCell>
+        <mxCell id="context-sys-prompt" parent="group-chat-context" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#FFFFFF;fillColor=#094F25;strokeColor=#2D7600;" value="Sys Prompt" vertex="1">
+          <mxGeometry height="30" width="180" x="15" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="context-default-tools" parent="group-chat-context" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#FFFFFF;fillColor=#094F25;strokeColor=#2D7600;" value="Default Tools" vertex="1">
+          <mxGeometry height="30" width="180" x="15" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="context-custom-objects" parent="group-chat-context" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#FFFFFF;fillColor=#094F25;strokeColor=#2D7600;" value="Custom Objects" vertex="1">
+          <mxGeometry height="30" width="180" x="15" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="context-summary" parent="group-chat-context" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#FFFFFF;fillColor=#094F25;strokeColor=#2D7600;" value="Rolling Summary" vertex="1">
+          <mxGeometry height="30" width="180" x="15" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="context-recent" parent="group-chat-context" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#FFFFFF;fillColor=#094F25;strokeColor=#2D7600;" value="Recent Messages / Tool Calls" vertex="1">
+          <mxGeometry height="36" width="180" x="15" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-run-to-flow" edge="1" parent="1" source="node-run-coordinator" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;opacity=35;" target="node-flow-engine">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-flow-to-gateway" edge="1" parent="1" source="node-flow-engine" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;opacity=35;" target="node-gateway">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-flow-to-stream" edge="1" parent="1" source="node-flow-engine" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;opacity=35;" target="node-stream-broker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-flow-to-persistence" edge="1" parent="1" source="node-flow-engine" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;opacity=35;" target="node-persistence">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="235" />
+              <mxPoint x="910" y="235" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-gateway-to-history" edge="1" parent="1" source="node-gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;" target="node-history">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="270" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-gateway-to-context" edge="1" parent="1" source="node-gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-gateway-to-counter" edge="1" parent="1" source="node-gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-state-counter">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="790" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-history-to-context" edge="1" parent="1" source="node-history" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-history-to-summarizer" edge="1" parent="1" source="node-history" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#9673A6;strokeWidth=2;" target="node-summarizer">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="240" y="440" />
+              <mxPoint x="-5" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-summarizer-to-history" edge="1" parent="1" source="node-summarizer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;" target="node-history">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-5" y="575" />
+              <mxPoint x="210" y="575" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-context-to-llm" edge="1" parent="1" source="node-context" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-llm-to-gateway" edge="1" parent="1" source="node-llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-gateway">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="365" y="680" />
+              <mxPoint x="365" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-llm-to-history" edge="1" parent="1" source="node-llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;" target="node-history">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="760" />
+              <mxPoint x="240" y="760" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-llm-to-mcp" edge="1" parent="1" source="node-llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-mcp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-mcp-to-custom" edge="1" parent="1" source="node-mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-custom-object">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-mcp-to-counter" edge="1" parent="1" source="node-mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-state-counter">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="790" y="620" />
+              <mxPoint x="790" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-counter-to-context" edge="1" parent="1" source="node-state-counter" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-custom-to-context" edge="1" parent="1" source="node-custom-object" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1075" y="570" />
+              <mxPoint x="530" y="570" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-custom-to-history" edge="1" parent="1" source="node-custom-object" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;" target="node-history">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1075" y="790" />
+              <mxPoint x="220" y="790" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="41tj2d8mwSCa3SuDdZPb-1" edge="1" parent="1" source="node-custom-object" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;exitX=0.38;exitY=-0.009;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" target="node-history">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1051" y="610" />
+              <mxPoint x="1051" y="590" />
+              <mxPoint x="285" y="590" />
+            </Array>
+            <mxPoint x="1062.5" y="620" as="sourcePoint" />
+            <mxPoint x="517.5" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

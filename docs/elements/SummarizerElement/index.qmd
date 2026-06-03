@@ -8,6 +8,10 @@ with `data["type"] == "summary"`. It sits behind
 `HistoryHandlerElement.summary_candidate_output`, which emits a structured summary
 request when older entries are eligible for summarization.
 
+There is no dedicated summary payload class. The request and returned artifact
+are both `StructuredPayload` instances whose `data` fields follow the
+[Structured Summary Contract](../../explanation/StructuredSummary.qmd).
+
 The element uses an internal chat model backend (`openrouter` by default, or
 `litellm`) in atomic mode. `summary_output` only emits after the LLM response text
 has been resolved.
@@ -67,7 +71,7 @@ summarizer_el.ports.summary_output > history_handler_el.ports.summary_input
 ```
 
 See [Structured Summary Contract](../../explanation/StructuredSummary.qmd) for the
-`data` field shapes.
+`data` field shapes and helper builders.
 
 ## Message Assembly
 
@@ -84,6 +88,10 @@ See [Structured Summary Contract](../../explanation/StructuredSummary.qmd) for t
 | `strategy` | Optional summarization strategy label. |
 | `model_name` | Backend model that produced the summary. |
 | `timestamp` | Creation time for the artifact. |
+
+The framework code builds these artifacts with
+`build_summary_artifact()` from
+`pyllments.payloads.structured.summary_contract`.
 
 ## Ad Hoc Summarization
 

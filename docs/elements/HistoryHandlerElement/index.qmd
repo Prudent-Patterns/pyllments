@@ -20,6 +20,10 @@ threshold, it emits a structured summary request (`StructuredPayload` with
 `type: summary_request`) for a `SummarizerElement` and later accepts a structured
 summary artifact (`type: summary`).
 
+The summarization loop intentionally uses `StructuredPayload` rather than
+dedicated summary payload classes. The summary-specific meaning lives in the
+`data["type"]` contract and `source_entry_ids`.
+
 ## Instantiation
 
 **Arguments:**
@@ -71,7 +75,8 @@ summarizer_el.ports.summary_output > history_handler_el.ports.summary_input
 ```
 
 The structured summary request contains `source_payloads`, `source_entry_ids`,
-and optional `instructions`. See [Structured Summary Contract](../../explanation/StructuredSummary.qmd).
+and optional `instructions`. See [Structured Summary Contract](../../explanation/StructuredSummary.qmd)
+for the request/artifact data shapes and helper builders.
 
 When a structured summary artifact (`type: summary`) returns on `summary_input`,
 the model appends it to the ledger and marks exactly `data["source_entry_ids"]` as

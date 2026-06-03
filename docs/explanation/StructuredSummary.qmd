@@ -4,10 +4,12 @@ description: "StructuredPayload data shapes for history summarization"
 ---
 
 Summarization uses `StructuredPayload` with a `type` discriminator in
-`payload.model.data`. There is no dedicated `SummaryPayload` class.
+`payload.model.data`. The previous dedicated `SummaryPayload` and
+`SummaryRequestPayload` classes were removed because summarization is a narrow
+history workflow, not a reusable payload family.
 
-This keeps summarization on the generic structured payload while still carrying
-the metadata history needs, especially `source_entry_ids`.
+The structured contract keeps the important history metadata, especially
+`source_entry_ids`, without adding one-off payload classes.
 
 ## Summary Request
 
@@ -34,7 +36,9 @@ request = StructuredPayload(data={
 | `instructions` | Optional request-specific summarization override. |
 | `timestamp` | Request creation time. |
 
-Helper builders live in `pyllments.payloads.structured.summary_contract`.
+Prefer `build_summary_request()` from
+`pyllments.payloads.structured.summary_contract` when constructing requests in
+code.
 
 ## Summary Artifact
 
@@ -63,6 +67,10 @@ summary = StructuredPayload(data={
 
 When `HistoryHandlerElement` accepts a structured summary, it appends the payload
 to the ledger and marks exactly `source_entry_ids` as summarized.
+
+Prefer `build_summary_artifact()` from
+`pyllments.payloads.structured.summary_contract` when constructing artifacts in
+code.
 
 ## Context Conversion
 
