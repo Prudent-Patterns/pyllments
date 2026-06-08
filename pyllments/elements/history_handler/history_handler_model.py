@@ -7,7 +7,7 @@ from typing import Any, List, Optional, Union
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import (
     build_summary_request,
     is_summary_artifact,
@@ -33,7 +33,7 @@ from .history_store import (
     record_to_payload,
 )
 
-SupportedPayload = Union[MessagePayload, ToolsResponsePayload]
+SupportedPayload = Union[MessagePayload, ToolUsePayload]
 
 
 class HistoryHandlerModel(Model):
@@ -134,10 +134,10 @@ class HistoryHandlerModel(Model):
             await self._store_load_task
 
     def _wrap_payload(self, payload: SupportedPayload) -> Optional[HistoryEntry]:
-        if isinstance(payload, ToolsResponsePayload) and not payload.model.tool_responses:
+        if isinstance(payload, ToolUsePayload) and not payload.model.tool_uses:
             return None
         raw_tokens = payload_token_count(payload, self.tokenizer_model)
-        if raw_tokens == 0 and isinstance(payload, ToolsResponsePayload):
+        if raw_tokens == 0 and isinstance(payload, ToolUsePayload):
             return None
         ts = float(payload.model.timestamp)
         return HistoryEntry(
@@ -222,8 +222,8 @@ class HistoryHandlerModel(Model):
     def load_message(self, message: MessagePayload):
         self.load_entries([message])
 
-    def load_tool_response(self, tool_response: ToolsResponsePayload):
-        self.load_entries([tool_response])
+    def load_tool_use(self, tool_use: ToolUsePayload):
+        self.load_entries([tool_use])
 
     def mark_summary_candidates_summarized(self, entry_ids: List[str]):
         """Mark raw ledger entries covered by an accepted summary artifact."""
@@ -373,7 +373,7 @@ class HistoryHandlerModel(Model):
 
     @staticmethod
     def _is_supported_payload(payload: Any) -> bool:
-        return isinstance(payload, (MessagePayload, ToolsResponsePayload))
+        return isinstance(payload, (MessagePayload, ToolUsePayload))
 
     def get_context_entries_for_view(self) -> List[HistoryEntry]:
         return [entry for entry, _ in self._select_context_entries()]

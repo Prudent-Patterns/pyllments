@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .message import MessagePayload
     from .chunk import ChunkPayload
     from .file import FilePayload
-    from .tools_response import ToolsResponsePayload
+    from .tool_use import ToolUsePayload
     from .schema import SchemaPayload
     from .structured import StructuredPayload
 
@@ -15,9 +15,7 @@ PAYLOAD_MAPPING = {
     "MessagePayload": ".message",
     "ChunkPayload": ".chunk",
     "FilePayload": ".file",
-    "ToolListPayload": ".tool_list",
-    "ToolCallPayload": ".tool_call",
-    "ToolsResponsePayload": ".tools_response",
+    "ToolUsePayload": ".tool_use",
     "SchemaPayload": ".schema",
     "StructuredPayload": ".structured",
 }

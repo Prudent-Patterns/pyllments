@@ -11,7 +11,7 @@ from pyllments.elements.history_handler.history_store import (
     record_to_payload,
     new_entry_id,
 )
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import build_summary_artifact, is_summary_artifact
 
 
@@ -22,15 +22,20 @@ def test_sqlite_roundtrip_message_and_tool():
             store = SQLiteHistoryStore(db_path=db_path)
 
             msg = MessagePayload(role="user", content="hello", timestamp=1.0)
-            tool = ToolsResponsePayload(
-                tool_responses={
-                    "t": {
-                        "mcp_name": "m",
-                        "tool_name": "fn",
-                        "response": {"content": [{"type": "text", "text": "ok"}]},
-                    }
-                },
+            tool = ToolUsePayload(
+                executor_element_name="main_tools",
                 timestamp=2.0,
+            )
+            tool.model.add_tool_use(
+                adapter_name="mcp",
+                provider_name="m",
+                tool_name="fn",
+                model_tool_name="m_fn",
+            )
+            tool_use_id = next(iter(tool.model.tool_uses))
+            tool.model.attach_result(
+                tool_use_id,
+                {"content": [{"type": "text", "text": "ok"}], "raw": None, "metadata": {}},
             )
             records = [
                 payload_to_record(new_entry_id(), msg, 5),
@@ -44,7 +49,7 @@ def test_sqlite_roundtrip_message_and_tool():
             payloads = [record_to_payload(r) for r in loaded]
             assert isinstance(payloads[0], MessagePayload)
             assert payloads[0].model.content == "hello"
-            assert isinstance(payloads[1], ToolsResponsePayload)
+            assert isinstance(payloads[1], ToolUsePayload)
 
         asyncio.run(_run())
 

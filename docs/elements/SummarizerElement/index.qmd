@@ -51,7 +51,7 @@ summarizer_el = SummarizerElement(
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
 | `summary_request_emit_input` | `StructuredPayload` (`type: summary_request`) | Converts source payloads into messages, asks the LLM for a summary, and emits a structured summary artifact with the same `source_entry_ids`. |
-| `payloads_emit_input` | `MessagePayload`, `ToolsResponsePayload`, or lists of those payloads | Ad hoc summarization path. Emits a structured summary without history entry IDs. |
+| `payloads_emit_input` | `MessagePayload`, `ToolUsePayload`, or lists of those payloads | Ad hoc summarization path. Emits a structured summary without history entry IDs. |
 
 :: {.hover}
 

@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36">
   <diagram id="cPueLI_8mq5kZpy7Lz3J" name="chat">
-    <mxGraphModel dx="2698" dy="2678" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1500" math="0" shadow="0">
+    <mxGraphModel dx="3413" dy="2886" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1500" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -14,7 +14,7 @@
           <mxGeometry height="44" width="130" x="650" y="140" as="geometry" />
         </mxCell>
         <mxCell id="node-persistence" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#E3C800;strokeColor=#B09500;opacity=35;" value="Persistence" vertex="1">
-          <mxGeometry height="44" width="120" x="850" y="140" as="geometry" />
+          <mxGeometry height="44" width="120" x="910" y="140" as="geometry" />
         </mxCell>
         <mxCell id="node-gateway" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#274C77;strokeColor=#A3CEF1;" value="ChatGatewayElement" vertex="1">
           <mxGeometry height="60" width="170" x="415" y="300" as="geometry" />
@@ -26,16 +26,22 @@
           <mxGeometry height="60" width="180" x="410" y="470" as="geometry" />
         </mxCell>
         <mxCell id="node-state-counter" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#FFF2CC;strokeColor=#D6B656;" value="StateCounterElement" vertex="1">
-          <mxGeometry height="60" width="180" x="700" y="430" as="geometry" />
+          <mxGeometry height="60" width="180" x="720" y="430" as="geometry" />
         </mxCell>
         <mxCell id="node-llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#31572C;strokeColor=#90A955;" value="LLMChatElement" vertex="1">
           <mxGeometry height="60" width="170" x="415" y="650" as="geometry" />
         </mxCell>
         <mxCell id="node-mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#5A4E7C;strokeColor=#B39DDB;" value="MCPElement" vertex="1">
-          <mxGeometry height="60" width="160" x="700" y="650" as="geometry" />
+          <mxGeometry height="60" width="160" x="670" y="650" as="geometry" />
         </mxCell>
-        <mxCell id="node-custom-object" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="Custom Object Handler" vertex="1">
-          <mxGeometry height="60" width="190" x="980" y="610" as="geometry" />
+        <mxCell id="node-tool-lifecycle" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#5A4E7C;strokeColor=#B39DDB;" value="ToolLifecycleElement&lt;br&gt;(Custom FlowController core)" vertex="1">
+          <mxGeometry height="70" width="200" x="1390" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="node-object-context" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="ObjectContextElement&lt;br&gt;(turn index + tools)" vertex="1">
+          <mxGeometry height="70" width="210" x="1190" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="node-object-store" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontFamily=Helvetica;fontSize=12;fontColor=#000000;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="Object State Store" vertex="1">
+          <mxGeometry height="80" width="150" x="1480" y="465" as="geometry" />
         </mxCell>
         <mxCell id="node-summarizer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=12;fontColor=#FFFFFF;fillColor=#6A4C93;strokeColor=#9673A6;" value="SummarizerElement" vertex="1">
           <mxGeometry height="60" width="170" x="-90" y="470" as="geometry" />
@@ -74,7 +80,7 @@
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="500" y="235" />
-              <mxPoint x="910" y="235" />
+              <mxPoint x="970" y="235" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -91,7 +97,14 @@
         <mxCell id="edge-gateway-to-counter" edge="1" parent="1" source="node-gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-state-counter">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="790" y="330" />
+              <mxPoint x="810" y="350" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-gateway-to-object-context" edge="1" parent="1" source="node-gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6C8EBF;strokeWidth=2;" target="node-object-context">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1295" y="330" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -136,45 +149,75 @@
         <mxCell id="edge-llm-to-mcp" edge="1" parent="1" source="node-llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-mcp">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="edge-mcp-to-custom" edge="1" parent="1" source="node-mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-custom-object">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="edge-mcp-to-counter" edge="1" parent="1" source="node-mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-state-counter">
+        <mxCell id="edge-mcp-to-tool-lifecycle" edge="1" parent="1" source="node-mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B3B3B3;strokeWidth=2;" target="node-tool-lifecycle">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="790" y="620" />
-              <mxPoint x="790" y="620" />
+              <mxPoint x="1490" y="680" />
             </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-tool-lifecycle-to-gateway" edge="1" parent="1" source="node-tool-lifecycle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;startArrow=classic;strokeColor=#A3CEF1;strokeWidth=4;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" target="node-gateway">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1070" y="925" />
+              <mxPoint x="1070" y="340" />
+            </Array>
+            <mxPoint x="1380" y="930" as="sourcePoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="edge-counter-to-context" edge="1" parent="1" source="node-state-counter" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="edge-custom-to-context" edge="1" parent="1" source="node-custom-object" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
+        <mxCell id="edge-tool-lifecycle-to-history" edge="1" parent="1" source="node-tool-lifecycle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;" target="node-history">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="1075" y="570" />
-              <mxPoint x="530" y="570" />
+              <mxPoint x="1450" y="830" />
+              <mxPoint x="220" y="830" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge-custom-to-history" edge="1" parent="1" source="node-custom-object" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;" target="node-history">
+        <mxCell id="edge-tool-lifecycle-to-context" edge="1" parent="1" source="node-tool-lifecycle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="1075" y="790" />
-              <mxPoint x="220" y="790" />
+              <mxPoint x="1520" y="590" />
+              <mxPoint x="520" y="590" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="41tj2d8mwSCa3SuDdZPb-1" edge="1" parent="1" source="node-custom-object" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#D6B656;strokeWidth=2;exitX=0.38;exitY=-0.009;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" target="node-history">
+        <mxCell id="edge-tool-lifecycle-to-object-context" edge="1" parent="1" source="node-tool-lifecycle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6C8EBF;strokeWidth=2;exitX=0;exitY=0.25;exitDx=0;exitDy=0;" target="node-object-context">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="1051" y="610" />
-              <mxPoint x="1051" y="590" />
-              <mxPoint x="285" y="590" />
+              <mxPoint x="1330" y="908" />
             </Array>
-            <mxPoint x="1062.5" y="620" as="sourcePoint" />
-            <mxPoint x="517.5" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-object-context-to-context" edge="1" parent="1" source="node-object-context" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#82B366;strokeWidth=2;" target="node-context">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1280" y="560" />
+              <mxPoint x="550" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-object-context-to-llm" edge="1" parent="1" source="node-object-context" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#90A955;strokeWidth=2;jumpStyle=arc;" target="node-llm">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1295" y="740" />
+              <mxPoint x="530" y="740" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-object-context-to-store" edge="1" parent="1" source="node-object-context" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6C8EBF;strokeWidth=2;" target="node-object-store">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-store-to-persistence" edge="1" parent="1" source="node-object-store" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;opacity=35;" target="node-persistence">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1555" y="450" />
+              <mxPoint x="1295" y="450" />
+              <mxPoint x="1295" y="235" />
+              <mxPoint x="970" y="235" />
+            </Array>
           </mxGeometry>
         </mxCell>
       </root>

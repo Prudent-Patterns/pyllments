@@ -7,7 +7,7 @@ lightbox: true
 
 This element is the backbone of flows involving user interaction through the browser by offering multiple Views you are able to compose to create your chat interface, including an input area, chat feed, and send button.
 
-It provides the essential component of user interaction through receiving `MessagePayloads` and `ToolsResponsePayloads`, generating `MessagePayloads` as responses, as well as granting tool call permission to received `ToolsResponsePayloads`.
+It provides the essential component of user interaction through receiving `MessagePayloads` and `ToolUsePayloads`, generating `MessagePayloads` as responses, and displaying tool-use lifecycle state from received `ToolUsePayloads`. Tool execution is handled by `ToolUseElement`, not the chat interface.
 
 ### Input Ports
 
@@ -15,7 +15,7 @@ It provides the essential component of user interaction through receiving `Messa
 |------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
 | `message_input`        | MessagePayload         | Displays any incoming message in the chat feed (no downstream emit).                                         |
 | `message_emit_input`   | MessagePayload         | Displays and then emits messages (user or assistant) via `user_message_output`, `assistant_message_output`, and `message_output`. |
-| `tools_response_emit_input`  | ToolsResponsePayload | Displays and then emits tool response messages via `tools_response_output`.                                 |
+| `tool_use_emit_input`  | ToolUsePayload | Displays and then emits tool-use payloads via `tool_use_output`.                                 |
 
 : {.hover}
 
@@ -27,7 +27,7 @@ It provides the essential component of user interaction through receiving `Messa
 | `assistant_message_output`| MessagePayload          | Emits processed assistant messages.                                                               |
 | `message_output`          | MessagePayload          | Emits both user and assistant messages from their respective emit inputs.                        |
 | `tool_message_output`     | MessagePayload          | Emits messages containing tool calls.                                                             |
-| `tools_response_output`   | ToolsResponsePayload    | Emits processed tool response messages.                                                          |
+| `tool_use_output`   | ToolUsePayload    | Emits processed tool-use payloads.                                                          |
 
 : {.hover}
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from pyllments.common.tokenizers import get_token_len
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import (
     SUMMARY_ARTIFACT_TYPE,
     summary_artifact_content,
@@ -90,9 +90,9 @@ def default_projection_tiers(context_token_limit: int) -> ProjectionTiers:
     mid = max(1, int(context_token_limit * 0.50))
     far = max(mid + 1, int(context_token_limit * 0.80))
     return {
-        0: {ToolsResponsePayload: keep_full},
-        mid: {ToolsResponsePayload: abridge_tool_response},
-        far: {ToolsResponsePayload: stub_tool_response},
+        0: {ToolUsePayload: keep_full},
+        mid: {ToolUsePayload: abridge_tool_use},
+        far: {ToolUsePayload: stub_tool_use},
     }
 
 
@@ -126,8 +126,8 @@ def payload_token_count(payload: Any, tokenizer_model: str) -> int:
     """Estimate tokens for a payload's string content."""
     if isinstance(payload, MessagePayload):
         return get_token_len(payload.model.content or "", tokenizer_model)
-    if isinstance(payload, ToolsResponsePayload):
-        if not payload.model.tool_responses:
+    if isinstance(payload, ToolUsePayload):
+        if not payload.model.tool_uses:
             return 0
         return get_token_len(payload.model.content or "", tokenizer_model)
     if isinstance(payload, StructuredPayload):
@@ -145,58 +145,59 @@ def keep_full(payload: Any, context: ProjectionContext) -> Any:
     return payload
 
 
-def abridge_tool_response(
-    payload: ToolsResponsePayload,
+def abridge_tool_use(
+    payload: ToolUsePayload,
     context: ProjectionContext,
     max_text_chars: int = 500,
-) -> ToolsResponsePayload:
-    """Return a copy with truncated tool response text."""
-    new_responses: Dict[str, Any] = {}
-    for name, data in payload.model.tool_responses.items():
-        new_data = {k: v for k, v in data.items() if k != "call"}
-        if "response" in new_data and new_data["response"].get("content"):
+) -> ToolUsePayload:
+    """Return a copy with truncated tool result text."""
+    new_tool_uses: Dict[str, Any] = {}
+    for tool_use_id, record in payload.model.tool_uses.items():
+        new_record = dict(record)
+        result = new_record.get("result")
+        if result and result.get("content"):
             new_content = []
-            for item in new_data["response"]["content"]:
+            for item in result["content"]:
                 text = item.get("text", "")
                 if len(text) > max_text_chars:
                     text = text[:max_text_chars] + "... [truncated]"
                 new_content.append({**item, "text": text})
-            new_data = {
-                **new_data,
-                "response": {**new_data["response"], "content": new_content},
-            }
-        new_responses[name] = new_data
-    return ToolsResponsePayload(
-        tool_responses=new_responses,
+            new_record["result"] = {**result, "content": new_content}
+        new_tool_uses[tool_use_id] = new_record
+    return ToolUsePayload(
+        tool_uses=new_tool_uses,
         timestamp=payload.model.timestamp,
+        payload_id=payload.model.payload_id,
+        turn_id=payload.model.turn_id,
+        status=payload.model.status,
     )
 
 
-def stub_tool_response(
-    payload: ToolsResponsePayload,
+def stub_tool_use(
+    payload: ToolUsePayload,
     context: ProjectionContext,
-) -> ToolsResponsePayload:
+) -> ToolUsePayload:
     """Return a minimal copy preserving tool identity and high-level outcome."""
-    stub_responses: Dict[str, Any] = {}
-    for name, data in payload.model.tool_responses.items():
-        tool_name = data.get("tool_name", name)
-        response = data.get("response") or {}
-        is_error = response.get("isError", False)
-        outcome = "failed" if is_error else "completed"
-        stub_responses[name] = {
-            "mcp_name": data.get("mcp_name", ""),
-            "tool_name": tool_name,
-            "description": data.get("description", ""),
+    stub_uses: Dict[str, Any] = {}
+    for tool_use_id, record in payload.model.tool_uses.items():
+        tool_name = record.get("model_tool_name", tool_use_id)
+        status = record.get("status", "completed")
+        outcome = status if status in {"failed", "denied"} else "completed"
+        stub_uses[tool_use_id] = {
+            **record,
             "parameters": None,
-            "response": {
-                "meta": None,
+            "result": {
                 "content": [
-                    {"type": "text", "text": f"Tool {tool_name} {outcome}.", "annotations": None}
+                    {"type": "text", "text": f"Tool {tool_name} {outcome}."}
                 ],
-                "isError": is_error,
+                "raw": None,
+                "metadata": {},
             },
         }
-    return ToolsResponsePayload(
-        tool_responses=stub_responses,
+    return ToolUsePayload(
+        tool_uses=stub_uses,
         timestamp=payload.model.timestamp,
+        payload_id=payload.model.payload_id,
+        turn_id=payload.model.turn_id,
+        status=payload.model.status,
     )

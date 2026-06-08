@@ -303,7 +303,10 @@ class MessageModel(Model):
                 message = response.choices[0].message
                 self.content = message.content or ''
                 if hasattr(message, 'tool_calls') and message.tool_calls:
-                    self.tool_calls = [tc.model_dump() for tc in message.tool_calls]
+                    self.tool_calls = [
+                        tc.model_dump() if hasattr(tc, 'model_dump') else dict(tc)
+                        for tc in message.tool_calls
+                    ]
                 self.message_coroutine = None
                 self.ready = True
             return self.content

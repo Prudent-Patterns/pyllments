@@ -13,7 +13,7 @@ The ContextBuilder helps you build an ordered list of messages from incoming pay
 
 ## Instantiation
 
-When initializing a `ContextBuilderElement`, you must provide an `input_map`, which defines the necessary components such as inputs, constants, and templates with optional keys such as `ports`, `payload_type`, `persist`, `callback`, and `depends_on` to be converted to messages and emitted. In conjunction, you may provide optional arguments like `emit_order`, `trigger_map`, `build_fn`, and `outgoing_input_ports` as described below.
+When initializing a `ContextBuilderElement`, you must provide an `input_map`, which defines the necessary components such as inputs, constants, and templates with optional keys such as `kind`, `ports`, `payload_type`, `persist`, `callback`, `message_fn`, and `depends_on` to be converted to messages and emitted. In conjunction, you may provide optional arguments like `emit_order`, `trigger_map`, `build_fn`, and `outgoing_input_ports` as described below.
 
 ### Inputs Setup
 
@@ -23,32 +23,37 @@ Absent `emit_order`, `trigger_map`, and `build_fn`, the `ContextBuilder` will wa
 
 This is a dictionary used to create input ports, constants, and templates. Each key maps to a configuration dictionary with specific properties based on the entry type:
 
-Keys:
+The entry type is taken from an explicit `kind` key (`'port'`, `'constant'`, or `'template'`) when present, and otherwise inferred from the key's suffix:
 
 - **Regular ports**: Keys without special suffixes create input ports
 - **Constants**: Keys ending with `_constant` create preset messages
 - **Templates**: Keys ending with `_template` create dynamic messages using Jinja2 templates
- 
+
+An explicit `kind` is useful when you want a name that doesn't follow the suffix convention (e.g. a constant named `system_prompt`). It always wins over the suffix.
+
+**Common Configuration Options** (apply to all entry types):
+
+- `kind`: Optional explicit entry type (`'port'`, `'constant'`, or `'template'`); overrides suffix inference.
+- `depends_on`: Optional port name or list of port names that must have payloads before this entry is included.
+- `message_fn`: Optional function overriding the default payload → `MessagePayload` conversion for this entry. It receives the payload and returns a `MessagePayload` (or list of them), taking precedence over `payload_message_mapping`.
+
 **Port Configuration Options:**
 
-- `role`: The role to assign to the message (e.g., 'user', 'assistant', 'system')
+- `role`: The role to assign to the message (e.g., 'user', 'assistant', 'system'). If omitted, the original message roles are preserved.
 - `payload_type`: The expected payload type (e.g., `MessagePayload`, `list[MessagePayload]`)
 - `ports`: Optional list of output ports to connect this input port to. (**Automatic** inference of `payload_type` so it's not necessary to specify when ports are provided -  the type is inferred from the first port connection)
 - `persist`: Boolean flag indicating whether the payload should persist after being emitted (defaults to `False`)
-- `depends_on`: Optional port name or list of port names that must have payloads before this entry is included.
-- `callback`: Optional function to transform the payload when received<br>(e.g., `lambda payload: MessagePayload(content=payload.model.content.strip())`)
+- `callback`: Optional function to transform the payload when received. It receives the incoming payload and must return the replacement payload<br>(e.g., `lambda payload: MessagePayload(content=payload.model.content.strip())`). May be async.
 
 **Constant Configuration Options:**
 
-- `role`: The role to assign to the message (e.g., 'system', 'user', 'assistant')
+- `role`: The role to assign to the message (e.g., 'system', 'user', 'assistant'). Defaults to `'user'`.
 - `message`: The content of the constant message
-- `depends_on`: Optional port name or list of port names that must have payloads before this constant is included.
 
 **Template Configuration Options:**
 
-- `role`: The role to assign to the message
+- `role`: The role to assign to the message. Defaults to `'system'`.
 - `template`: Jinja2 template string that can reference other port contents
-- `depends_on`: Optional port name or list of port names that must have payloads before this template is included.
 
 **Example:**
 
@@ -58,7 +63,7 @@ input_map = {
         'role': 'user', 
         'payload_type': MessagePayload, 
         'persist': True,
-        'callback': lambda payload: payload.model.content.strip()
+        'callback': lambda payload: MessagePayload(content=payload.model.content.strip(), role='user')
     },
     'port_b': {'role': 'assistant', 'payload_type': list[MessagePayload]}, 
     'user_constant': {'role': 'user', 'message': "This text will be a user message"}, 
@@ -173,6 +178,10 @@ The ContextBuilder uses several strategies to determine when and how to emit mes
 3. **Emit order**: If all required ports for the `emit_order` are available, that ordering is used
 4. **Default behavior**: If all required regular ports have payloads, use the order from the input maps
 
+## Configuration Validation
+
+At construction time the `ContextBuilder` checks the `input_map`, `emit_order`, `trigger_map`, and `depends_on`/template references for likely mistakes — undefined items referenced in an order, dangling `depends_on` targets, undefined template variables, and unsatisfiable dependency chains (including cycles). These are surfaced as **warnings in the logs** rather than raised errors: an unresolved reference simply degrades to "no emission" at runtime, so check the logs if a context never emits as expected.
+
 ## Callbacks
 
 Callbacks provide a way to transform payloads as they are received by the ContextBuilder. This is useful for preprocessing or filtering payload content before it's used in message construction.
@@ -183,11 +192,13 @@ Callbacks provide a way to transform payloads as they are received by the Contex
 'port_a': {
     'role': 'user',
     'payload_type': MessagePayload,
-    'callback': lambda payload: payload.model.content.upper()  # Convert to uppercase
+    'callback': lambda payload: MessagePayload(content=payload.model.content.upper(), role='user')
 }
 ```
 
-Callbacks receive the raw payload and should return the transformed payload or value. The transformation is applied before the payload is stored or used in template rendering.
+Callbacks receive the incoming payload and must return the replacement payload, which is stored on the port and used for emission and template rendering. Callbacks may be async (return a coroutine), in which case the result is awaited.
+
+For finer control over how a stored payload becomes a `MessagePayload` at emission time (without replacing the stored payload), use `message_fn` instead.
 
 ## Templates
 
@@ -205,11 +216,12 @@ Templates use Jinja2 syntax and can reference the content of any port payload. T
 
 ## Payload Persistence
 
-By default, port payloads are cleared after being used in a message emission, unless:
+After a successful emission, the ports that contributed to the emitted order have their payloads cleared, unless:
 
-1. The port is marked with `'persist': True` in its configuration
-2. The port is the one that just received a payload (triggering the current processing)
-3. The port is a constant or template (these always persist)
+1. The port is marked with `'persist': True` in its configuration — its payload is retained for reuse across future emissions.
+2. The port was not part of the emitted order — payloads that arrive early are held until the emission that actually consumes them.
+
+Constants and templates are not ports and are never cleared.
 
 This behavior allows you to control which inputs should be reused across multiple emissions.
 

@@ -5,40 +5,40 @@ import pytest
 from pyllments.elements.history_handler.history_handler_model import HistoryHandlerModel
 from pyllments.elements.history_handler.history_projection import (
     ProjectionContext,
-    abridge_tool_response,
+    abridge_tool_use,
     default_projection_tiers,
     normalize_projection_tiers,
-    stub_tool_response,
+    stub_tool_use,
 )
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import (
     build_summary_artifact,
     is_summary_request,
 )
 
 
-def _tool_response(content_text: str, ts: float) -> ToolsResponsePayload:
-    return ToolsResponsePayload(
-        tool_responses={
-            "tool_a": {
-                "mcp_name": "mcp",
-                "tool_name": "search",
-                "description": "search docs",
-                "parameters": {"q": "test"},
-                "response": {
-                    "content": [{"type": "text", "text": content_text}],
-                    "isError": False,
-                },
-            }
-        },
-        timestamp=ts,
+def _tool_use(content_text: str, ts: float) -> ToolUsePayload:
+    payload = ToolUsePayload(timestamp=ts, executor_element_name="main_tools")
+    payload.model.add_tool_use(
+        adapter_name="mcp",
+        provider_name="mcp",
+        tool_name="search",
+        model_tool_name="mcp_search",
+        description="search docs",
+        parameters={"q": "test"},
     )
+    tool_use_id = next(iter(payload.model.tool_uses))
+    payload.model.attach_result(
+        tool_use_id,
+        {"content": [{"type": "text", "text": content_text}], "raw": None, "metadata": {}},
+    )
+    return payload
 
 
 def test_default_tiers_include_zero_and_tool_projectors():
     tiers = default_projection_tiers(16000)
     assert 0 in tiers
-    assert ToolsResponsePayload in tiers[0]
+    assert ToolUsePayload in tiers[0]
 
 
 def test_normalize_projection_tiers_requires_zero():
@@ -46,9 +46,9 @@ def test_normalize_projection_tiers_requires_zero():
         normalize_projection_tiers({4000: {}}, 16000)
 
 
-def test_tool_response_abridged_and_stubbed_copies():
+def test_tool_use_abridged_and_stubbed_copies():
     long_text = "x" * 800
-    payload = _tool_response(long_text, 1.0)
+    payload = _tool_use(long_text, 1.0)
     pctx = ProjectionContext(
         tier_start=4000,
         tier_end=12000,
@@ -56,11 +56,11 @@ def test_tool_response_abridged_and_stubbed_copies():
         entry_index=1,
         tokenizer_model="gpt-4o",
     )
-    abridged = abridge_tool_response(payload, pctx, max_text_chars=100)
+    abridged = abridge_tool_use(payload, pctx, max_text_chars=100)
     assert abridged is not payload
     assert "[truncated]" in abridged.model.content
 
-    stubbed = stub_tool_response(payload, pctx)
+    stubbed = stub_tool_use(payload, pctx)
     assert stubbed is not payload
     assert "completed" in stubbed.model.content.lower()
 
@@ -71,12 +71,12 @@ def test_context_projection_uses_tier_by_token_distance():
         history_token_limit=100000,
         summary_token_threshold=100000,
         projection_tiers={
-            0: {ToolsResponsePayload: lambda p, c: p},
-            20: {ToolsResponsePayload: stub_tool_response},
+            0: {ToolUsePayload: lambda p, c: p},
+            20: {ToolUsePayload: stub_tool_use},
         },
         tokenizer_model="gpt-4o",
     )
-    big = _tool_response("y" * 200, 1.0)
+    big = _tool_use("y" * 200, 1.0)
     model.load_entries([big])
     model.load_entries(
         [
@@ -90,7 +90,7 @@ def test_context_projection_uses_tier_by_token_distance():
 
     context = model.get_context_payloads()
     assert len(context) == 2
-    assert isinstance(context[0], ToolsResponsePayload)
+    assert isinstance(context[0], ToolUsePayload)
     assert isinstance(context[1], MessagePayload)
     assert context[0] is not big
     assert "completed" in context[0].model.content.lower()

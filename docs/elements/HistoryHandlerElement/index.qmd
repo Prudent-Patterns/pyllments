@@ -5,7 +5,7 @@ description: "Maintains raw history, emits projected context, and coordinates su
 ---
 
 `HistoryHandlerElement` manages the conversation ledger used by downstream chat
-flows. It stores raw `MessagePayload`, `ToolsResponsePayload`, and accepted
+flows. It stores raw `MessagePayload`, `ToolUsePayload`, and accepted
 summary artifacts, then emits projected context for elements such as
 `ContextBuilderElement` and `LLMChatElement`.
 
@@ -49,8 +49,8 @@ dedicated summary payload classes. The summary-specific meaning lives in the
 
 | Port Name                 | Payload Type                                                 | Behavior                                                                      |
 |---------------------------|--------------------------------------------------------------|-------------------------------------------------------------------------------|
-| `payload_emit_input` | `MessagePayload`, `ToolsResponsePayload`, or lists of those payloads | Loads supported payloads into history, then emits projected context and any summary request. |
-| `payload_input` | `MessagePayload`, `ToolsResponsePayload`, or lists of those payloads | Loads supported payloads into history without emitting context or summary requests. |
+| `payload_emit_input` | `MessagePayload`, `ToolUsePayload`, or lists of those payloads | Loads supported payloads into history, then emits projected context and any summary request. |
+| `payload_input` | `MessagePayload`, `ToolUsePayload`, or lists of those payloads | Loads supported payloads into history without emitting context or summary requests. |
 | `summary_input` | `StructuredPayload` (`type: summary`) or other payload with a model | Accepts a summary artifact, appends it to history, and marks `data["source_entry_ids"]` when present on structured summaries. |
 
 : {.hover}

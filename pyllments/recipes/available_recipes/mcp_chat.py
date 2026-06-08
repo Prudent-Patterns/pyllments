@@ -5,11 +5,11 @@ from pyllments.elements import (
     ChatInterfaceElement,
     ContextBuilderElement,
     StructuredRouterTransformer,
-    MCPElement,
+    ToolUseElement,
     HistoryHandlerElement,
     LLMChatElement
 )
-from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
+from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload, ToolUsePayload
 from pyllments import flow
 
 
@@ -134,10 +134,7 @@ structured_router_el = StructuredRouterTransformer(
     }
 )
 
-# Connect initial context builder to initial LLM
 initial_context_builder_el.ports.messages_output > initial_llm_chat_el.ports.messages_emit_input
-
-# Connect initial LLM output to structured router
 initial_llm_chat_el.ports.message_output > structured_router_el.ports.message_input
 
 mcp_dir = pathlib.Path(config.mcp_dir)
@@ -150,13 +147,12 @@ mcp_args = {
     }
     for f in mcp_files
 }
-mcp_el = MCPElement(mcps={**mcp_args})
+tool_use_el = ToolUseElement(name="main_tools", mcps={**mcp_args})
 
-# Connect MCP schema to structured router and structured router schema to initial context builder
-mcp_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
-structured_router_el.ports.tools_tools > mcp_el.ports.tool_request_structured_input
+tool_use_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
+structured_router_el.ports.tools_tools > tool_use_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
-mcp_el.ports.tools_response_output > chat_interface_el.ports.tools_response_emit_input
+tool_use_el.ports.tool_result_output > chat_interface_el.ports.tool_use_emit_input
 
 final_context_builder_el = ContextBuilderElement(
     input_map={
@@ -174,7 +170,8 @@ final_context_builder_el = ContextBuilderElement(
             'payload_type': list[MessagePayload],
         },
         'tools': {
-            'ports': [chat_interface_el.ports.tools_response_output]
+            'ports': [chat_interface_el.ports.tool_use_output],
+            'payload_type': ToolUsePayload,
         },
         'tools_template': { 
             'role': 'system',
@@ -205,7 +202,7 @@ history_handler_el = HistoryHandlerElement()
 history_handler_el.ports.context_output > initial_context_builder_el.ports.history
 history_handler_el.ports.context_output > final_context_builder_el.ports.history
 chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_input
-chat_interface_el.ports.tools_response_output > history_handler_el.ports.payload_input
+chat_interface_el.ports.tool_use_output > history_handler_el.ports.payload_input
 structured_router_el.ports.reply_message > history_handler_el.ports.payload_emit_input
 
 final_llm_chat_el = LLMChatElement(**llm_chat_args)

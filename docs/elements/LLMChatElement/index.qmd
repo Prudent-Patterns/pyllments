@@ -51,7 +51,8 @@ For production streaming with [ChatGatewayElement](../ChatGatewayElement/index.q
 
 | Port Name            | Payload Type                                          | Behavior                                                                 |
 |----------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
-| messages_emit_input  | Union[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]] | Processes incoming messages or lists of messages/tool responses to generate an LLM response which is emitted from the `message_output` port. |
+| `messages_emit_input`  | `MessagePayload`, `ToolUsePayload`, or lists of those payloads | Processes incoming messages or lists of messages/tool-use payloads to generate an LLM response emitted from `message_output`. |
+| `tools_input`  | `StructuredPayload` | Receives provider-ready tool definitions (from `ToolUseElement.tools_output`) and forwards them into the LLM API request. |
 
 : {.hover}
 

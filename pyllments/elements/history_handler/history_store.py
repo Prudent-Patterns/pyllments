@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from sqlite_utils import Database
 
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from loguru import logger
 
 logger = logger.bind(name=__name__)
@@ -60,29 +60,43 @@ def _deserialize_message(data: dict) -> MessagePayload:
     )
 
 
-def _serialize_tool_response(payload: ToolsResponsePayload) -> dict:
-    tool_responses = {
-        k: {key: val for key, val in v.items() if key != "call"}
-        for k, v in payload.model.tool_responses.items()
-    }
+def _serialize_tool_use(payload: ToolUsePayload) -> dict:
     return {
-        "tool_responses": tool_responses,
+        "payload_id": payload.model.payload_id,
+        "turn_id": payload.model.turn_id,
+        "flow_id": payload.model.flow_id,
+        "flow_version": payload.model.flow_version,
+        "executor_element_name": payload.model.executor_element_name,
+        "status": payload.model.status,
+        "tool_uses": payload.model.tool_uses,
+        "metadata": payload.model.metadata,
         "timestamp": payload.model.timestamp,
+        "updated_at": payload.model.updated_at,
+        "correlation_id": payload.model.correlation_id,
     }
 
 
-def _deserialize_tool_response(data: dict) -> ToolsResponsePayload:
-    return ToolsResponsePayload(
-        tool_responses=data["tool_responses"],
-        timestamp=data["timestamp"],
+def _deserialize_tool_use(data: dict) -> ToolUsePayload:
+    return ToolUsePayload(
+        payload_id=data.get("payload_id"),
+        turn_id=data.get("turn_id"),
+        flow_id=data.get("flow_id"),
+        flow_version=data.get("flow_version"),
+        executor_element_name=data.get("executor_element_name"),
+        status=data.get("status", "pending"),
+        tool_uses=data.get("tool_uses", {}),
+        metadata=data.get("metadata", {}),
+        timestamp=data.get("timestamp"),
+        updated_at=data.get("updated_at"),
+        correlation_id=data.get("correlation_id"),
     )
 
 
 register_payload_serializer(MessagePayload, _serialize_message, _deserialize_message)
 register_payload_serializer(
-    ToolsResponsePayload,
-    _serialize_tool_response,
-    _deserialize_tool_response,
+    ToolUsePayload,
+    _serialize_tool_use,
+    _deserialize_tool_use,
 )
 
 

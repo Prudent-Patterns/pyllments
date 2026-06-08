@@ -1,176 +1,76 @@
 ---
 title: "MCPElement"
+description: "MCP-focused convenience wrapper around ToolUseElement"
 lightbox: true
 ---
 
-The purpose of this Element is to enable agentic capabilities when coupled with LLMs. It facilitates tool invocation via the Model Context Protocol (MCP). It can start and manage MCP servers (e.g., script-based or SSE servers), wrap Python functions as tools, and expose Pydantic schemas for tool arguments. When receiving a `StructuredPayload` containing the tool names and arguments, it emits a `ToolResponsePayload` containing the callbacks for the chosen tools to run, as well other metadata related to the tool call. Because it expects structured input, it also has the capacity to send out a pydantic schema containing the exact format it expects, along with the tool names and expected arguments.
+`MCPElement` is a thin subclass of [`ToolUseElement`](../ToolUseElement/index.qmd) for flows that primarily use Model Context Protocol (MCP) servers and optional local Python functions. It accepts `mcps=` and `functions=` and delegates adapter construction, schema emission, tool-call normalization, and execution to the base element.
+
+For ports, payloads, permission flow, and wiring patterns, see the [ToolUseElement documentation](../ToolUseElement/index.qmd).
 
 ## Instantiation
 
 **Arguments:**
 
 `mcps: dict`<br>
-  <span class="tab">A mapping of server names to MCP configurations. Each configuration dict may include the following keys:</span>
-  <span class="tab">`type`: str<br><span class="tab">Protocol type; one of 'script', 'sse', 'mcp_class', or 'functions'.</span></span>
-  <span class="tab">`script`: str (optional)<br><span class="tab">Path to the script for 'script' type servers.</span></span>
-  <span class="tab">`command`: str (optional)<br><span class="tab">Executable to run the script (defaults to the Python interpreter).</span></span>
-  <span class="tab">`args`: list[str] (optional)<br><span class="tab">Command-line arguments for the script.</span></span>
-  <span class="tab">`env`: dict (optional)<br><span class="tab">Environment variables for the subprocess.</span></span>
-  <span class="tab">`host`: str (optional)<br><span class="tab">Host address for 'sse' type servers.</span></span>
-  <span class="tab">`port`: int (optional)<br><span class="tab">Port number for 'sse' type servers.</span></span>
-  <span class="tab">`tools`: dict[str, Callable] (optional)<br><span class="tab">Mapping of function names to Python callables for 'functions' type.</span></span>
-  <span class="tab">`tools_requiring_permission`: list[str] (optional)<br><span class="tab">List of tool names that require user permission.</span></span>
+<span class="tab">A mapping of server names to MCP configurations. Each configuration dict may include the following keys:</span>
+<span class="tab">`type`: str<br><span class="tab">Protocol type; one of `script`, `sse`, `mcp_class`, or `functions`.</span></span>
+<span class="tab">`script`: str (optional)<br><span class="tab">Path to the script for `script` type servers.</span></span>
+<span class="tab">`command`: str (optional)<br><span class="tab">Executable to run the script (defaults to the Python interpreter).</span></span>
+<span class="tab">`args`: list[str] (optional)<br><span class="tab">Command-line arguments for the script.</span></span>
+<span class="tab">`env`: dict (optional)<br><span class="tab">Environment variables for the subprocess.</span></span>
+<span class="tab">`host`: str (optional)<br><span class="tab">Host address for `sse` type servers.</span></span>
+<span class="tab">`port`: int (optional)<br><span class="tab">Port number for `sse` type servers.</span></span>
+<span class="tab">`tools`: dict[str, Callable] (optional)<br><span class="tab">Mapping of function names to Python callables for `functions` type.</span></span>
+<span class="tab">`tools_requiring_permission`: list[str] (optional)<br><span class="tab">List of tool names that require user permission.</span></span>
 
-  **Example:**  
-  
+`functions: list | dict, optional`<br>
+<span class="tab">Additional local Python callables registered via `FunctionToolAdapter`.</span>
+
+`tools_requiring_permission: list[str], optional`<br>
+<span class="tab">Permission-gated tool names when using top-level `functions=`.</span>
+
+**Example:**
+
 ```python
-mcps = {
-    'todo': {
-        'type': 'script',
-        'script': 'todo_server.py',
-        'command': 'python',
-        'args': ['--logging'],
-        'env': {'API_KEY': 'xyz'},
-        'tools_requiring_permission': ['remove_todo']
-    },
-    'weather': {
-        'type': 'sse',
-        'host': 'localhost',
-        'port': 1234
-    },
-    'custom_funcs': {
-        'type': 'functions',
-        'tools': {
-            'calculate': calculate,
-            'get_current_time': get_current_time
+from pyllments.elements import MCPElement
+
+mcp_el = MCPElement(
+    mcps={
+        "todo": {
+            "type": "script",
+            "script": "todo_server.py",
+            "command": "python",
+            "args": ["--logging"],
+            "env": {"API_KEY": "xyz"},
+            "tools_requiring_permission": ["remove_todo"],
         },
-        'tools_requiring_permission': ['calculate']
-    }
-}
-```
-
-`loop: Any, optional`<br>
-<span class="tab">The asyncio event loop to use for setup. Defaults to the main loop from LoopRegistry.</span>
-
-### Input Ports
-
-| Port Name                         | Payload Type        | Behavior                                                                                  |
-|-----------------------------------|---------------------|-------------------------------------------------------------------------------------------|
-| tool_request_structured_input     | StructuredPayload   | Receives a Payload whose `model.data` is a list of dicts, each containing:<br><span class="tab">`name`: str — hybrid tool name.</span><br><span class="tab">`parameters`: dict — tool arguments (optional).</span><br>[Example](#sec-tool_request_structured_input)<br>Unpacks and forwards these entries to `tools_response_output`. |
-
-: {.hover}
-
-### Output Ports
-
-| Port Name              | Payload Type         | Behavior                                                                        |
-|------------------------|----------------------|---------------------------------------------------------------------------------|
-| tools_schema_output    | SchemaPayload        | Emits a `SchemaPayload` containing the Pydantic schema for available tools.|
-| tools_response_output  | ToolsResponsePayload | Emits a `ToolsResponsePayload` containing tool results mapping tool names to their responses.<br>[Example](#sec-tools_response_output) |
-
-: {.hover}
-
-## Data Flow Details
-
-### tool_request_structured_input payload {#sec-tool_request_structured_input}
-
-**payload.model.data**:
-
-```python
-[
-    {'name': 'todo_add', 'parameters': {'task': 'Buy milk'}},
-    {'name': 'weather_get', 'parameters': {'city': 'SF'}}
-]
-```
-
-### tools_response_output payload {#sec-tools_response_output}
-
-**payload.model.tool_responses**:
-```python
-{
-    'weather_temp_mcp': {
-        'mcp_name': 'weather_mcp',
-        'tool_name': 'temp',
-        'permission_required': False,
-        'description': 'Get the temperature in a location',
-        'parameters': {'location': 'San Francisco'},
-        'response': {
-            'meta': None,
-            'content': [{
-                'type': 'text',
-                'text': 'The temperature is 54F.',
-                'annotations': None
-            }],
-            'isError': False
-        }
-    },
-    'custom_funcs_check_prime': {
-        'mcp_name': 'custom_funcs',
-        'tool_name': 'check_prime',
-        'permission_required': False,
-        'description': 'Check if a number is prime.',
-        'parameters': {'n': 17},
-        'response': {
-            'meta': None,
-            'content': [{
-                'type': 'text',
-                'text': 'True',
-                'annotations': None
-            }],
-            'isError': False
-        }
-    }
-}
-```
-
-### tools_schema_output payload {#sec-tools_schema_output}
-
-**payload.model.schema**:
-
-```json
-{
-  "title": "tool_array",
-  "type": "array",
-  "items": {
-    "anyOf": [
-      {
-        "title": "todo_add",
-        "type": "object",
-        "properties": {
-          "name": {
-            "const": "todo_add"
-          },
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "task": {
-                "type": "string"
-              }
+        "custom_funcs": {
+            "type": "functions",
+            "tools": {
+                "calculate": calculate,
+                "get_current_time": get_current_time,
             },
-            "required": ["task"]
-          }
+            "tools_requiring_permission": ["calculate"],
         },
-        "required": ["name"]
-      },
-      {
-        "title": "weather_get",
-        "type": "object",
-        "properties": {
-          "name": {
-            "const": "weather_get"
-          },
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "city": {
-                "type": "string"
-              }
-            },
-            "required": ["city"]
-          }
-        },
-        "required": ["name"]
-      }
-    ]
-  }
-}
+    },
+)
 ```
+
+## Ports and Payloads
+
+`MCPElement` inherits all ports from `ToolUseElement`:
+
+| Direction | Port | Payload |
+|-----------|------|---------|
+| In | `tool_request_structured_input` | `StructuredPayload` |
+| In | `tool_request_message_input` | `MessagePayload` |
+| In | `approved_tool_use_input` | `ToolUsePayload` |
+| In | `denied_tool_use_input` | `ToolUsePayload` |
+| Out | `tools_schema_output` | `SchemaPayload` |
+| Out | `tools_output` | `StructuredPayload` |
+| Out | `structured_tools_output` | `StructuredPayload` |
+| Out | `tool_use_output` | `ToolUsePayload` |
+| Out | `tool_result_output` | `ToolUsePayload` |
+
+Tool results are durable `ToolUsePayload` records—not payloads with embedded callables. See [ToolUseElement](../ToolUseElement/index.qmd) for payload shape examples and typical wiring.

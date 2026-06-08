@@ -7,7 +7,7 @@ import param
 from pyllments.base.element_base import Element
 from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
 from pyllments.elements.llm_chat.openrouter_chat_model import OpenRouterChatModel
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import summary_request_fields
 from pyllments.runtime.loop_registry import LoopRegistry
 
@@ -15,10 +15,10 @@ from .summarizer_model import SummarizerModel
 
 PayloadListInput = Union[
     MessagePayload,
-    ToolsResponsePayload,
+    ToolUsePayload,
     List[MessagePayload],
-    List[ToolsResponsePayload],
-    List[Union[MessagePayload, ToolsResponsePayload]],
+    List[ToolUsePayload],
+    List[Union[MessagePayload, ToolUsePayload]],
 ]
 
 

@@ -1,6 +1,6 @@
 from typing import Any, Optional, get_origin, get_args
 
-from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, StructuredPayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import SUMMARY_ARTIFACT_TYPE, summary_artifact_content
 
 
@@ -53,18 +53,18 @@ def message_list2message(payload, role=None):
         ]
     return payload
 
-def tools_response2message(payload, role='system'):
+def tool_use2message(payload, role='system'):
     """
-    Converts a ToolsResponsePayload into a MessagePayload.
-    
+    Converts a ToolUsePayload into a MessagePayload.
+
     Default role is 'system' but can be overridden.
     """
     return MessagePayload(content=payload.model.content, role=role)
 
-def tools_response_list2message(payload, role='system'):
+def tool_use_list2message(payload, role='system'):
     """
-    Converts a list of ToolsResponsePayloads into MessagePayloads.
-    
+    Converts a list of ToolUsePayloads into MessagePayloads.
+
     Default role is 'system' but can be overridden.
     """
     return [
@@ -99,8 +99,8 @@ payload_message_mapping = {
     list[ChunkPayload]: chunk_list2message,
     MessagePayload: message2message,
     list[MessagePayload]: message_list2message,
-    ToolsResponsePayload: tools_response2message,
-    list[ToolsResponsePayload]: tools_response_list2message,
+    ToolUsePayload: tool_use2message,
+    list[ToolUsePayload]: tool_use_list2message,
     SchemaPayload: schema2message,
     StructuredPayload: structured2message,
 

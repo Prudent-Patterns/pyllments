@@ -6,7 +6,7 @@ import param
 
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
-from pyllments.payloads import MessagePayload, StructuredPayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.runtime.loop_registry import LoopRegistry
 
 from .history_handler_model import HistoryHandlerModel
@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 PayloadInput = Union[
     MessagePayload,
-    ToolsResponsePayload,
+    ToolUsePayload,
     List[MessagePayload],
-    List[ToolsResponsePayload],
+    List[ToolUsePayload],
 ]
 
 
@@ -35,9 +35,9 @@ class HistoryHandlerElement(Element):
     summary_candidate_output : StructuredPayload summary_request for SummarizerElement
     """
 
-    show_tool_responses = param.Boolean(
+    show_tool_uses = param.Boolean(
         default=False,
-        doc="Include tool response views in the history panel.",
+        doc="Include tool use views in the history panel.",
     )
 
     def __init__(self, **params):
@@ -67,7 +67,7 @@ class HistoryHandlerElement(Element):
         return [
             p
             for p in items
-            if isinstance(p, (MessagePayload, ToolsResponsePayload))
+            if isinstance(p, (MessagePayload, ToolUsePayload))
         ]
 
     async def _emit_outputs(self):
@@ -151,7 +151,7 @@ class HistoryHandlerElement(Element):
             payload = entry.payload
             if isinstance(payload, MessagePayload):
                 views.append(payload.create_collapsible_view())
-            elif self.show_tool_responses and isinstance(payload, ToolsResponsePayload):
+            elif self.show_tool_uses and isinstance(payload, ToolUsePayload):
                 views.append(payload.create_collapsible_view())
 
         context_container = pn.Column(
@@ -179,7 +179,7 @@ class HistoryHandlerElement(Element):
                 payload = entry.payload
                 if isinstance(payload, MessagePayload):
                     context_container.append(payload.create_collapsible_view())
-                elif self.show_tool_responses and isinstance(payload, ToolsResponsePayload):
+                elif self.show_tool_uses and isinstance(payload, ToolUsePayload):
                     context_container.append(payload.create_collapsible_view())
             context_container.param.trigger("objects")
 

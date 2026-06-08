@@ -3,11 +3,11 @@ from .history_handler_model import HistoryHandlerModel
 from .history_projection import (
     HistoryEntry,
     ProjectionContext,
-    abridge_tool_response,
+    abridge_tool_use,
     default_projection_tiers,
     keep_full,
     normalize_projection_tiers,
-    stub_tool_response,
+    stub_tool_use,
 )
 from .history_store import (
     HistoryRecord,
@@ -22,10 +22,10 @@ __all__ = [
     "HistoryRecord",
     "ProjectionContext",
     "SQLiteHistoryStore",
-    "abridge_tool_response",
+    "abridge_tool_use",
     "default_projection_tiers",
     "keep_full",
     "normalize_projection_tiers",
     "register_payload_serializer",
-    "stub_tool_response",
+    "stub_tool_use",
 ]

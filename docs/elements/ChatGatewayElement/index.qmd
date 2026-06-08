@@ -96,6 +96,7 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
 | `assistant_message_input` | `MessagePayload` | Receives assistant responses (typically from `LLMChatElement.message_output`). Links payload to the pending turn and applies `default_aggregate_stream` for stream mode. |
+| `tool_use_input` | `ToolUsePayload` | Receives tool-use payloads from `ToolUseElement.tool_use_output`. Invokes application hooks; registers permission requests when any record requires approval. Does not execute tools. |
 
 : {.hover}
 
@@ -104,11 +105,33 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
 | `message_output` | `MessagePayload` | Emits user messages into the flow (history, context builder, etc.). |
-| `tool_events_output` | `StructuredPayload` | **Outline:** emits `{"turn_id": str, "tool_calls": list}` when a stream completes with tool calls. Connect to `MCPElement` or a custom executor in a later iteration. |
+| `tool_events_output` | `StructuredPayload` | Emits `{"turn_id": str, "tool_calls": list}` when a stream completes with tool calls. |
+| `tool_use_approved_output` | `ToolUsePayload` | Emits an approved `ToolUsePayload` back to `ToolUseElement.approved_tool_use_input`. |
+| `tool_use_denied_output` | `ToolUsePayload` | Emits a denied `ToolUsePayload` for history routing or `ToolUseElement.denied_tool_use_input`. |
 
 : {.hover}
 
-## Tool events (outline)
+## Tool-Use Permission Flow
+
+The gateway is a permission boundary only—it gates tool execution but does not run tools itself.
+
+```python
+tool_use_el.ports.tool_use_output > gateway.ports.tool_use_input
+gateway.ports.tool_use_approved_output > tool_use_el.ports.approved_tool_use_input
+gateway.ports.tool_use_denied_output > tool_use_el.ports.denied_tool_use_input
+tool_use_el.ports.tool_result_output > history_handler_el.ports.payload_emit_input
+```
+
+When a `ToolUsePayload` arrives on `tool_use_input` with records where `permission_required=True` and `status='awaiting_permission'`, the gateway registers a permission request and invokes `on_permission_request`. Your application approves or denies via:
+
+- `await gateway.approve_permission_request(request_id)` — marks records approved and emits on `tool_use_approved_output`
+- `await gateway.deny_permission_request(request_id, reason=...)` — marks records denied and emits on `tool_use_denied_output`
+
+Sync helpers `approve_permission_request_sync` and `deny_permission_request_sync` schedule the async methods on the runtime loop.
+
+Payloads that do not require permission pass through `tool_use_input` without gateway action; `ToolUseElement` executes them directly.
+
+## Tool events
 
 While iterating `turn.stream()`, when a `tool_calls_complete` event is observed, the gateway emits on `tool_events_output`:
 
@@ -116,10 +139,11 @@ While iterating `turn.stream()`, when a `tool_calls_complete` event is observed,
 {"turn_id": "turn-1", "tool_calls": [{"id": "...", "type": "function", "function": {...}}]}
 ```
 
-No MCP execution is performed by the gateway itself. Wire `tool_events_output` to your tool runner when ready.
+Wire `tool_events_output` to `ToolUseElement.tool_request_message_input` (via a message builder) or handle tool routing in application code.
 
 ## Related documentation
 
+- [ToolUseElement](../ToolUseElement/index.qmd) — tool orchestration and execution
 - [MessagePayload](../../explanation/MessagePayload.qmd) — streaming, `MessageStreamEvent`, and cancellation on the model
 - [LLMChatElement](../LLMChatElement/index.qmd) — LLM backend and `generate_content_on_emit`
 - [Gateway Chat recipe](../../recipes/gateway_chat/index.qmd) — reference wiring

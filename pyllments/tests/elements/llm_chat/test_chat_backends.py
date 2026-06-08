@@ -228,6 +228,74 @@ def test_openrouter_catalog_fetch_falls_back_without_litellm(monkeypatch):
     assert all("/" in model_name for models in provider_map.values() for model_name in models)
 
 
+@pytest.mark.asyncio
+async def test_openrouter_atomic_response_populates_tool_calls(monkeypatch):
+    class _ToolCall:
+        def model_dump(self):
+            return {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "lookup", "arguments": "{}"},
+            }
+
+    class _Message:
+        content = ""
+        tool_calls = [_ToolCall()]
+
+    class _ToolOpenRouter:
+        last_request_kwargs = None
+
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(send_async=self._send_async)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def _send_async(self, **kwargs):
+            _ToolOpenRouter.last_request_kwargs = kwargs
+            return SimpleNamespace(choices=[SimpleNamespace(message=_Message())])
+
+    monkeypatch.setattr(openrouter_module, "OpenRouter", _ToolOpenRouter)
+
+    model = OpenRouterChatModel(
+        output_mode="atomic",
+        model_name="openai/gpt-4o-mini",
+        tools=[{"type": "function", "function": {"name": "lookup"}}],
+        api_key="test-key",
+    )
+
+    response_payload = model.generate_response([_user_message("tools?")])
+    await response_payload.model.aget_message()
+
+    assert response_payload.model.tool_calls
+    assert response_payload.model.tool_calls[0]["function"]["name"] == "lookup"
+    assert _ToolOpenRouter.last_request_kwargs["tools"][0]["function"]["name"] == "lookup"
+
+
+@pytest.mark.asyncio
+async def test_llm_chat_element_forwards_tools_input():
+    from pyllments.elements.llm_chat import LLMChatElement
+    from pyllments.elements.pipe import PipeElement
+    from pyllments.payloads import StructuredPayload
+
+    element = LLMChatElement(
+        backend="openrouter",
+        api_key="test-key",
+        tools=[{"type": "function", "function": {"name": "existing"}}],
+    )
+    pipe = PipeElement(name="tools_pipe")
+    await pipe.ports.output["pipe_output"].connect(element.ports.input["tools_input"])
+
+    tools = [{"type": "function", "function": {"name": "search"}}]
+    await pipe.ports.output["pipe_output"].stage_emit(payload=StructuredPayload(data=tools))
+    await pipe.ports.output["pipe_output"].drain()
+
+    assert element.model.tools == tools
+
+
 def test_openrouter_catalog_fetch_uses_python_sdk(monkeypatch):
     monkeypatch.setattr(openrouter_module, "OpenRouter", _FakeOpenRouter)
 

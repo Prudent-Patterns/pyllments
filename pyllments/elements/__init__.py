@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .telegram import TelegramElement
     from .pipe import PipeElement
     from .transform import TransformElement
+    from .tool_use import ToolUseElement
     from .mcp import MCPElement
     from .text import TextElement
     from .structured_router_transformer import StructuredRouterTransformer
@@ -40,6 +41,7 @@ ELEMENT_MAPPING = {
     "TelegramElement": ".telegram",
     "PipeElement": ".pipe",
     "TransformElement": ".transform",
+    "ToolUseElement": ".tool_use",
     "MCPElement": ".mcp",
     "TextElement": ".text",
     "StructuredRouterTransformer": ".structured_router_transformer",

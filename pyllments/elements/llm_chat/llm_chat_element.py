@@ -5,7 +5,7 @@ from typing import Literal, Union, Optional, List, TYPE_CHECKING, cast
 import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
-from pyllments.payloads import MessagePayload, ToolsResponsePayload, StructuredPayload
+from pyllments.payloads import MessagePayload, ToolUsePayload, StructuredPayload
 from pyllments.elements.llm_chat.openrouter_chat_model import OpenRouterChatModel
 from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
 
@@ -81,7 +81,7 @@ class LLMChatElement(Element):
         self.ports.add_output(name='message_output', pack_payload_callback=pack)
 
     def _messages_emit_input_setup(self):
-        async def unpack(payload: Union[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]]):
+        async def unpack(payload: Union[MessagePayload, List[Union[MessagePayload, ToolUsePayload]]]):
             """
             Handle incoming payloads which may be a single message or a list of messages.
             
@@ -106,7 +106,7 @@ class LLMChatElement(Element):
         self.ports.add_input(
             name='messages_emit_input',
             unpack_payload_callback=unpack,
-            payload_type=Union[MessagePayload, List[Union[MessagePayload, ToolsResponsePayload]]]
+            payload_type=Union[MessagePayload, List[Union[MessagePayload, ToolUsePayload]]]
         )
 
     def _tools_input_setup(self):

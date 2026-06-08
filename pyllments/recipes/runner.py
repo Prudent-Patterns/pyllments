@@ -7,7 +7,6 @@ from typing import Optional, Any
 
 from pyllments.logging import logger
 from pyllments.serve import serve
-from pyllments.cli.serve_helper import CommonOptions
 
 
 def load_recipe_module(recipe_path: Path):
@@ -112,6 +111,11 @@ def run_recipe(
         Configuration parameters for the recipe, by default None
     """
     try:
+        # Imported lazily to avoid a circular import: the `pyllments.cli` package
+        # imports `pyllments.recipes` at load time, so importing CommonOptions at
+        # module scope would close the loop. Deferring it here breaks the cycle.
+        from pyllments.cli.serve_helper import CommonOptions
+
         recipe_path = get_recipe_path(recipe_name)
         logger.info(f"Running recipe {recipe_name} from {recipe_path}")
         

@@ -8,7 +8,7 @@ import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.elements.chat_interface import ChatInterfaceModel
-from pyllments.payloads import MessagePayload, ToolsResponsePayload
+from pyllments.payloads import MessagePayload, ToolUsePayload
 
 if TYPE_CHECKING:
     import panel as pn
@@ -30,12 +30,12 @@ class ChatInterfaceElement(Element):
     - input:
         - message_input: MessagePayload         # display only (no downstream emit)
         - message_emit_input: MessagePayload    # display and then emit based on role
-        - tools_response_emit_input: ToolsResponsePayload
+        - tool_use_emit_input: ToolUsePayload
     - output:
         - user_message_output: MessagePayload
         - assistant_message_output: MessagePayload
         - message_output: MessagePayload        # unified port for both user and assistant messages
-        - tools_response_output: ToolsResponsePayload
+        - tool_use_output: ToolUsePayload
     """
 
     def __init__(self, **params):
@@ -51,8 +51,8 @@ class ChatInterfaceElement(Element):
         # Input-only ports (no emit)
         self._message_input_setup()
         self._message_emit_input_setup()
-        self._tools_response_emit_input_setup()
-        self._tools_response_output_setup()
+        self._tool_use_emit_input_setup()
+        self._tool_use_output_setup()
         # Unified output port for both user and assistant messages
         self._message_output_setup()
         self._tool_message_output_setup()
@@ -96,25 +96,21 @@ class ChatInterfaceElement(Element):
             name='message_emit_input',
             unpack_payload_callback=unpack)
     
-    def _tools_response_emit_input_setup(self):
-        async def unpack(payload: ToolsResponsePayload):
-            # Add payload to chat model (renders permission prompt if needed)
+    def _tool_use_emit_input_setup(self):
+        async def unpack(payload: ToolUsePayload):
             await self.model.add_message(payload)
-            # Wait until tools have been executed (auto or after approval)
             await payload.model.await_ready()
-            # Then emit the completed tool response downstream
-            await self.ports.output['tools_response_output'].stage_emit(payload=payload)
+            await self.ports.output['tool_use_output'].stage_emit(payload=payload)
         self.ports.add_input(
-            name='tools_response_emit_input',
+            name='tool_use_emit_input',
             unpack_payload_callback=unpack)
         
-    def _tools_response_output_setup(self):
-        """Sets up the output port for tool responses"""
-        async def pack(payload: ToolsResponsePayload) -> ToolsResponsePayload:
+    def _tool_use_output_setup(self):
+        async def pack(payload: ToolUsePayload) -> ToolUsePayload:
             return payload
 
         self.ports.add_output(
-            name='tools_response_output',
+            name='tool_use_output',
             pack_payload_callback=pack)
 
     def _message_output_setup(self):
@@ -154,9 +150,9 @@ class ChatInterfaceElement(Element):
                         show_role=True
                     )
                 )
-            elif isinstance(message, ToolsResponsePayload):
+            elif isinstance(message, ToolUsePayload):
                 message_and_tool_response_views.append(
-                    message.create_tools_response_view()
+                    message.create_tool_use_view()
                 )
 
         self.chatfeed_view.extend(message_and_tool_response_views)
@@ -189,9 +185,8 @@ class ChatInterfaceElement(Element):
                         await asyncio.sleep(0.05)
                     new_item.model.content = loaded_content
 
-            elif isinstance(new_item, ToolsResponsePayload):
-                # Append the dynamic tool response view, which has its own prompt logic
-                self.chatfeed_view.append(new_item.create_tools_response_view())
+            elif isinstance(new_item, ToolUsePayload):
+                self.chatfeed_view.append(new_item.create_tool_use_view())
 
         self.watch(self.model, 'message_list', _update_chatfeed)
         return self.chatfeed_view

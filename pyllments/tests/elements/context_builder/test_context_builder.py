@@ -59,7 +59,7 @@ def test_basic_routing(output_pipe_and_messages):
             }
         },
         emit_order=['user_msg', 'assistant_msg'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
 
     # Send only the user message, expect no emission
@@ -85,7 +85,7 @@ def test_constants_and_templates(output_pipe_and_messages):
             'user_template': {'role': 'system', 'template': "The user said: {{ user_msg }}"}
         },
         emit_order=['system_constant', 'user_template', 'user_msg'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
 
     user_input.send_payload(MessagePayload(content="How does this work?", role="user"))
@@ -115,7 +115,7 @@ def test_emit_order(output_pipe_and_messages):
             'system_constant': {'role': 'system', 'message': "You are a helpful assistant."}
         },
         emit_order=['system_constant', 'user_msg', 'assistant_msg'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
 
     user_input.send_payload(MessagePayload(content="What is AI?", role="user"))
@@ -144,7 +144,7 @@ def test_trigger_map(output_pipe_and_messages):
             'user_msg': ['system_constant', 'user_msg'],
             'assistant_msg': ['system_constant', 'user_msg', 'assistant_msg']
         },
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
 
     # User trigger
@@ -183,7 +183,7 @@ def test_build_fn(output_pipe_and_messages):
             'system_constant': {'role': 'system', 'message': "You are a helpful assistant."}
         },
         build_fn=custom_build_fn,
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
 
     user_input.send_payload(MessagePayload(content="Hello", role="user"))
@@ -210,7 +210,7 @@ def test_port_persistence(output_pipe_and_messages):
             'assistant_msg': {'role': 'assistant', 'ports': [assistant_input.ports.output['pipe_output']]}
         },
         emit_order=['user_msg', 'assistant_msg'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Send initial messages
     user_input.send_payload(MessagePayload(content="Hello", role="user"))
@@ -237,7 +237,7 @@ def test_template_with_persisted_ports(output_pipe_and_messages):
             'summary_template': {'role': 'system', 'template': "Last user message: {{ user_msg }}"}
         },
         emit_order=['user_msg', 'assistant_msg', 'summary_template'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Send initial messages
     user_input.send_payload(MessagePayload(content="Hello", role="user"))
@@ -268,7 +268,7 @@ def test_template_processing(output_pipe_and_messages):
             'user_msg': ['user_msg', 'simple_template'],
             'assistant_msg': ['user_msg', 'assistant_msg', 'conversation_template']
         },
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Test user message trigger
     user_input.send_payload(MessagePayload(content="What is Python?", role="user"))
@@ -298,7 +298,7 @@ def test_template_waits_for_all(output_pipe_and_messages):
             'dependent_template': {'role': 'system', 'template': "Combined: {{ user_msg }} and {{ extra_msg }}"}
         },
         emit_order=['user_msg', 'dependent_template'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Send only the user message
     user_input.send_payload(MessagePayload(content="Hello from user", role="user"))
@@ -327,7 +327,7 @@ def test_callback(output_pipe_and_messages):
             }
         },
         emit_order=['user_msg'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     test_payload = MessagePayload(content="Test message", role="user")
     user_input.send_payload(test_payload)
@@ -336,6 +336,49 @@ def test_callback(output_pipe_and_messages):
     transformed = received[0]
     assert transformed.model.content == "Test message - callback"
     assert transformed.model.role == "user"
+
+
+def test_message_fn_override(output_pipe_and_messages):
+    output_pipe, received = output_pipe_and_messages
+    user_input = PipeElement(name="user_input")
+    # message_fn fully controls payload -> MessagePayload conversion for this item
+    def to_message(payload):
+        return MessagePayload(content=payload.model.content.upper(), role="system")
+    context_builder = ContextBuilderElement(
+        input_map={
+            'user_msg': {
+                'ports': [user_input.ports.output['pipe_output']],
+                'message_fn': to_message
+            }
+        },
+        emit_order=['user_msg'],
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
+    )
+    user_input.send_payload(MessagePayload(content="hello", role="user"))
+    run_loop_briefly()
+    assert len(received) == 1
+    assert received[0].model.content == "HELLO"
+    assert received[0].model.role == "system"
+
+
+def test_explicit_kind_overrides_suffix(output_pipe_and_messages):
+    output_pipe, received = output_pipe_and_messages
+    user_input = PipeElement(name="user_input")
+    # 'intro' has no _constant suffix but is declared a constant via 'kind'
+    context_builder = ContextBuilderElement(
+        input_map={
+            'intro': {'kind': 'constant', 'role': 'system', 'message': "Intro"},
+            'user_msg': {'role': 'user', 'ports': [user_input.ports.output['pipe_output']]}
+        },
+        emit_order=['intro', 'user_msg'],
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
+    )
+    assert context_builder.items['intro'].kind == 'constant'
+    user_input.send_payload(MessagePayload(content="Hi", role="user"))
+    run_loop_briefly()
+    assert len(received) == 2
+    assert_message_content(received, 0, "system", exact_content="Intro")
+    assert_message_content(received, 1, "user", exact_content="Hi")
 
 
 def test_flow_controller_persistence(output_pipe_and_messages):
@@ -350,7 +393,7 @@ def test_flow_controller_persistence(output_pipe_and_messages):
             'msg_template': {'role': 'system', 'template': "User said: {{ user_msg }}"}
         },
         emit_order=['msg_constant', 'user_msg', 'msg_template', 'assistant_msg'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Verify flow_map and storages
     fmap = context_builder.flow_controller.flow_map['input']
@@ -358,8 +401,8 @@ def test_flow_controller_persistence(output_pipe_and_messages):
     assert 'assistant_msg' in fmap
     assert 'msg_constant' not in fmap
     assert 'msg_template' not in fmap
-    assert 'msg_constant' in context_builder.constants
-    assert 'msg_template' in context_builder.templates
+    assert context_builder.items['msg_constant'].kind == 'constant'
+    assert context_builder.items['msg_template'].kind == 'template'
     # Send messages
     user_input.send_payload(MessagePayload(content="Hello", role="user"))
     assistant_input.send_payload(MessagePayload(content="Hi", role="assistant"))
@@ -376,7 +419,7 @@ def test_flow_controller_persistence(output_pipe_and_messages):
     assert_message_content(received, 3, "assistant", exact_content="How are you?")
 
 
-def test_template_storage(output_pipe_and_messages):
+def test_template_renders_from_ports(output_pipe_and_messages):
     output_pipe, received = output_pipe_and_messages
     user_input = PipeElement(name="user_input")
     assistant_input = PipeElement(name="assistant_input")
@@ -387,20 +430,15 @@ def test_template_storage(output_pipe_and_messages):
             'convo_template': {'role': 'system', 'template': "Conversation:\nUser: {{ user_msg }}\nAssistant: {{ assistant_msg }}"}
         },
         emit_order=['user_msg', 'assistant_msg', 'convo_template'],
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
-    # Load user message
+    # Template should wait for both variables before emitting
     user_input.send_payload(MessagePayload(content="What is Python?", role="user"))
     run_loop_briefly()
-    # Template storage should have the user payload
-    assert 'convo_template' in context_builder.template_storage
-    assert 'user_msg' in context_builder.template_storage['convo_template']
-    # Load assistant message
+    assert len(received) == 0
+    # Once both ports have payloads, the template renders from them
     assistant_input.send_payload(MessagePayload(content="Python is a programming language.", role="assistant"))
     run_loop_briefly()
-    # Now storage includes both
-    assert 'assistant_msg' in context_builder.template_storage['convo_template']
-    # Verify emitted content
     assert len(received) == 3
     content = received[2].model.content
     assert "User: What is Python?" in content
@@ -425,7 +463,7 @@ def test_optional_items(output_pipe_and_messages):
             'user_msg': ['system_constant', 'user_msg', '[optional_msg]', '[optional_dep_template]'],
             'assistant_msg': ['system_constant', 'user_msg', 'assistant_msg', '[optional_msg]', 'required_template']
         },
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Case 1: optional missing
     user_input.send_payload(MessagePayload(content="Hello", role="user"))
@@ -475,7 +513,7 @@ def test_case1_required_items_with_and_without_history(output_pipe_and_messages)
             'history_template': {'role': 'system', 'template': "History available: {{ history }}", 'depends_on': 'history'}
         },
         trigger_map={'case1_trigger': ['main_system_message_constant', 'history_template', 'history', 'user_msg']},
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Without history
     user_input.send_payload(sample_user)
@@ -515,7 +553,7 @@ def test_case2_optional_items_skipped_and_included(output_pipe_and_messages):
             'history_template': {'role': 'system', 'template': "History available: {{ history }}", 'depends_on': 'history'}
         },
         trigger_map={'case2_trigger': ['main_system_message_constant', '[history_template]', '[history]', 'user_msg']},
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     # Without history
     user_input.send_payload(sample_user)
@@ -551,7 +589,7 @@ def test_case3_required_template_with_dependency(output_pipe_and_messages):
             'history_template': {'role': 'system', 'template': "History available: {{ history }}", 'depends_on': 'history'}
         },
         trigger_map={'case3_trigger': ['main_system_message_constant', 'history_template', 'history', 'user_msg']},
-        outgoing_input_port=output_pipe.ports.input['pipe_input']
+        outgoing_input_ports=[output_pipe.ports.input['pipe_input']]
     )
     user_input.send_payload(sample_user_msg)
     run_loop_briefly()
