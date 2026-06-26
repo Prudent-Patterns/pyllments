@@ -46,7 +46,13 @@ clear_received_payloads()
 send_payload(payload: Any):
 ```
 
-<span class="tab">Emits a payload into the flow.</span>
+<span class="tab">Emits a payload from a sync context (no running event loop).</span>
+
+```python
+async_send_payload(payload: Any):
+```
+
+<span class="tab">Emits a payload and awaits ordered delivery. Use this inside async apps and tests.</span>
 
 ```python
 send_and_receive(payload: Any, timeout: float = None) -> Any:

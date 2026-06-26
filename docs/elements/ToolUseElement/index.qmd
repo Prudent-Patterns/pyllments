@@ -6,6 +6,8 @@ lightbox: true
 
 The `ToolUseElement` is the framework element for model tool use. It aggregates tool definitions from registered adapters (MCP servers, local Python functions), emits provider-ready schemas, normalizes incoming tool requests, routes permission-gated calls through a gateway, and executes approved tool uses.
 
+Schema outputs use **latched emission**: when adapter resources become ready, schemas are emitted and replayed to ports connected afterward. Connection itself is topology only.
+
 Execution stays in the element and its adapters. `ToolUsePayload` stores only serializable lifecycle state—no embedded callables.
 
 ## Typical Flow

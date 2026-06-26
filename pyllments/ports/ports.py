@@ -14,8 +14,14 @@ from pyllments.logging import (
     log_receive,
     log_connect,
 )
-from pyllments.runtime.loop_registry import LoopRegistry
-from pyllments.runtime.lifecycle_manager import manager as lifecycle_manager
+from pyllments.runtime.scheduler import schedule_task
+from pyllments.ports.hooks import (
+    PortEvent,
+    PortHooks,
+    fire_port_hook,
+    resolve_hook_policy,
+    element_name_for_port,
+)
 
 logger = _logger.bind(name=__name__)
 
@@ -37,10 +43,25 @@ class Port(param.Parameterized):
     connected_elements = param.List(doc="List of elements connected to this port")
     id = param.String(doc="Unique identifier for the port")
 
-    def __init__(self, containing_element=None, **params):
+    def __init__(self, containing_element=None, hooks=None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
+        self.hooks = hooks
         self.id = str(uuid4())
+
+    async def _fire_hook(self, event_type: str, **kwargs) -> None:
+        """Fire a lifecycle hook on this port, if configured."""
+        if self.hooks is None:
+            return
+        direction = "input" if isinstance(self, InputPort) else "output"
+        event = PortEvent(
+            event=event_type,
+            element_name=element_name_for_port(self),
+            port_name=self.name,
+            direction=direction,
+            **kwargs,
+        )
+        await fire_port_hook(self.hooks, event, resolve_hook_policy(self))
 
     def __hash__(self):
         """Return a hash of the component's id for use in hash-based collections."""
@@ -165,8 +186,8 @@ class InputPort(Port):
         Callback function that processes incoming payloads.
         Can be a regular function or a coroutine function.""")
     
-    def __init__(self, readiness_check=None, **params):
-        super().__init__(**params)
+    def __init__(self, readiness_check=None, hooks=None, **params):
+        super().__init__(hooks=hooks, **params)
         self.readiness_check = readiness_check  # Optional coroutine to await before unpack
         self._is_ready = False  # Flag to avoid repeated readiness checks
         
@@ -231,11 +252,28 @@ class InputPort(Port):
         
         # Process sequentially
         async with self._processing_lock:
-            result = self.unpack_payload_callback(payload)
-            
-            # Handle async callbacks
-            if asyncio.iscoroutine(result):
-                await result
+            try:
+                await self._fire_hook(
+                    "received",
+                    payload=payload,
+                    source_port_name=output_port.name,
+                )
+                result = self.unpack_payload_callback(payload)
+                if asyncio.iscoroutine(result):
+                    await result
+                await self._fire_hook(
+                    "processed",
+                    payload=payload,
+                    source_port_name=output_port.name,
+                )
+            except Exception as exc:
+                await self._fire_hook(
+                    "error",
+                    payload=payload,
+                    source_port_name=output_port.name,
+                    error=exc,
+                )
+                raise
     
     async def _validate_payload(self, payload) -> bool:
         """
@@ -365,37 +403,22 @@ class OutputPort(Port):
         Callback to pack staged items into a payload.
         Can be a regular function or a coroutine function.""")
     
-    on_connect_callback = param.Callable(default=None, doc="""
-        Callback executed when a port is connected.
-        Can be a regular function or a coroutine function.""")
+    latched = param.Boolean(default=False, doc="""
+        When true, the latest emitted payload is retained and replayed to inputs
+        connected after the latch was set.""")
 
-    queue_maxsize = param.Integer(default=0, bounds=(0, None), doc="""
-        Optional maxsize for the internal emission queue.
-        0 means unbounded queue behavior (default).""")
-    
     # State tracking
     emit_ready = param.Boolean(default=False, doc="""
         True when all required items are staged and ready to emit""")
     
-    def __init__(self, containing_element=None, readiness_check=None, **params):
-        super().__init__(containing_element=containing_element, **params)
+    def __init__(self, containing_element=None, readiness_check=None, hooks=None, **params):
+        super().__init__(containing_element=containing_element, hooks=hooks, **params)
         self.readiness_check = readiness_check  # Optional coroutine to await before emit
-        
-        # Queue for ordered emission processing
-        self._emission_queue = asyncio.Queue(maxsize=self.queue_maxsize)
-        self._emission_task = None
-        
-        # Connected input ports in order of connection
+        self._emit_lock = asyncio.Lock()
+        self._scheduled_emit_tasks: set[asyncio.Task] = set()
+        self._latched_payload = None
         self.input_ports = []
-        
-        # Process callback annotations
         self._process_callback_annotations()
-        
-        # Start the emission processor
-        self._start_emission_processor()
-        
-        # Register with the manager
-        lifecycle_manager.register_port(self)
     
     def _process_callback_annotations(self):
         """Extract parameter and return types from pack_payload_callback."""
@@ -422,81 +445,70 @@ class OutputPort(Port):
             for name, type_ in annotations.items()
         }
     
-    def _start_emission_processor(self):
-        """Start the queue processor task for handling emissions."""
-        try:
-            loop = LoopRegistry.get_loop()
-            self._emission_task = loop.create_task(self._process_emission_queue())
-            logger.trace(f"Started emission processor for port {self.name}")
-        except Exception as e:
-            logger.error(f"Failed to start emission processor: {e}")
-    
-    async def _process_emission_queue(self):
-        """Process emissions in order as they arrive in the queue."""
-        try:
-            while True:
-                emission = await self._emission_queue.get()
-                
-                try:
-                    payload = emission['payload']
-                    if diagnostics_enabled():
-                        logger.trace(
-                            "Emitting payload from port {} to {} input ports.",
-                            self.name,
-                            len(self.input_ports),
-                        )
-                    # Process each input port in the order they were connected
-                    for port in self.input_ports:
-                        await port.receive(payload, self)
-                except Exception as e:
-                    import traceback
-                    logger.error(f"Error processing emission from {self.name}: {e}\n{traceback.format_exc()}")
-                finally:
-                    self._emission_queue.task_done()
-        except asyncio.CancelledError:
-            logger.trace(f"Emission processor for {self.name} cancelled")
-    async def connect(self, input_ports):
+    async def _deliver_payload(self, payload) -> None:
+        """Deliver a packed payload to connected input ports in connection order."""
+        if diagnostics_enabled():
+            logger.trace(
+                "Emitting payload from port {} to {} input ports.",
+                self.name,
+                len(self.input_ports),
+            )
+        for port in self.input_ports:
+            await port.receive(payload, self)
+            await self._fire_hook(
+                "delivered",
+                payload=payload,
+                target_port_name=port.name,
+            )
+
+    def _link_input_port(self, port: InputPort) -> None:
+        """Update graph topology for a single output-to-input link."""
+        if not isinstance(port, InputPort):
+            raise ValueError("Can only connect OutputPorts to InputPorts")
+
+        if not Port.is_payload_compatible(self.payload_type, port.payload_type):
+            raise ValueError(
+                f"Incompatible payload types:\n"
+                f"OutputPort '{self.name}' with type {self.payload_type}\n"
+                f"InputPort '{port.name}' with type {port.payload_type}"
+            )
+
+        self.input_ports.append(port)
+        port.output_ports.append(self)
+        self.connected_elements.append(port.containing_element)
+        port.connected_elements.append(self.containing_element)
+        log_connect(self, port)
+
+        if self.latched and self._latched_payload is not None:
+            schedule_task(self._replay_latched_to(port))
+
+    async def _replay_latched_to(self, input_port: InputPort) -> None:
+        """Deliver the latched payload to a single input port."""
+        if self._latched_payload is None:
+            return
+        async with self._emit_lock:
+            await input_port.receive(self._latched_payload, self)
+            await self._fire_hook(
+                "delivered",
+                payload=self._latched_payload,
+                target_port_name=input_port.name,
+            )
+
+    def connect(self, input_ports):
         """
         Connect this output port to one or more input ports.
-        
-        Args:
-            input_ports: A single InputPort or a list/tuple of InputPorts
+
+        Graph construction is synchronous and ordered. Latched outputs may
+        schedule replay delivery to newly connected inputs separately.
         """
         ports_list = input_ports if isinstance(input_ports, (list, tuple)) else [input_ports]
-        
         for port in ports_list:
-            # Type check
-            if not isinstance(port, InputPort):
-                raise ValueError(f"Can only connect OutputPorts to InputPorts")
-            
-            # Payload compatibility check
-            if not Port.is_payload_compatible(self.payload_type, port.payload_type):
-                raise ValueError(
-                    f"Incompatible payload types:\n"
-                    f"OutputPort '{self.name}' with type {self.payload_type}\n"
-                    f"InputPort '{port.name}' with type {port.payload_type}"
-                )
-            
-            # Add connections
-            self.input_ports.append(port)
-            port.output_ports.append(self)
-            
-            # Update connection tracking
-            self.connected_elements.append(port.containing_element)
-            port.connected_elements.append(self.containing_element)
-            
-            # Log the connection
-            log_connect(self, port)
-            
-            # Execute connect callback if provided,
-            # passing both this OutputPort and the newly connected InputPort
-            if self.on_connect_callback:
-                result = self.on_connect_callback(self, port)
-                if asyncio.iscoroutine(result):
-                    await result
-        
-        # For chaining support
+            self._link_input_port(port)
         return input_ports if isinstance(input_ports, (list, tuple)) else input_ports
+
+    async def aconnect(self, input_ports):
+        """Async-compatible alias for :meth:`connect`."""
+        return self.connect(input_ports)
     
     async def stage(self, **kwargs):
         """
@@ -628,36 +640,51 @@ class OutputPort(Port):
     
     async def emit(self):
         """
-        Pack the staged values into a payload and emit it to all connected input ports.
+        Pack staged values and deliver them to all connected input ports.
 
-        If a readiness_check coroutine was provided, it is awaited before emitting.
-        This allows the port to defer emission until it is ready (e.g., after initialization).
+        Await returns only after connected inputs have received the payload.
         """
         if not self.emit_ready:
-            missing_items = [name for name, item in self.required_items.items() 
-                           if item['value'] is None]
-            raise ValueError(f"Cannot emit from {self.name}: missing required items {missing_items}")
-        
-        # Pack the payload
-        payload = await self._pack_payload()
-        
-        # Log the emission
-        log_emit(self, payload)
-        
-        # Queue the emission for ordered processing using the LoopRegistry event loop
-        loop = LoopRegistry.get_loop()
-        await self._emission_queue.put({
-            'payload': payload,
-            'timestamp': loop.time()
-        })
-        
-        # Reset state
-        self.emit_ready = False
-        for item in self.required_items.values():
-            item['value'] = None
-        
+            missing_items = [
+                name for name, item in self.required_items.items() if item["value"] is None
+            ]
+            raise ValueError(
+                f"Cannot emit from {self.name}: missing required items {missing_items}"
+            )
+
+        payload = None
+        async with self._emit_lock:
+            try:
+                if self.readiness_check:
+                    await self.readiness_check()
+                payload = await self._pack_payload()
+                await self._fire_hook("before_emit", payload=payload)
+                log_emit(self, payload)
+                await self._deliver_payload(payload)
+                await self._fire_hook("emitted", payload=payload)
+                if self.latched:
+                    self._latched_payload = payload
+            except Exception as exc:
+                await self._fire_hook("error", payload=payload, error=exc)
+                raise
+            finally:
+                self.emit_ready = False
+                for item in self.required_items.values():
+                    item["value"] = None
+
         return payload
     
+    def schedule_stage_emit(self, **kwargs) -> asyncio.Task:
+        """
+        Schedule ``stage_emit`` without blocking the caller.
+
+        Fire-and-forget emissions are tracked so ``drain()`` can wait for them.
+        """
+        task = schedule_task(self.stage_emit(**kwargs))
+        self._scheduled_emit_tasks.add(task)
+        task.add_done_callback(self._scheduled_emit_tasks.discard)
+        return task
+
     async def stage_emit(self, **kwargs):
         """
         Stage values and immediately emit a payload.
@@ -693,60 +720,34 @@ class OutputPort(Port):
         return result
     
     def __gt__(self, other):
-        """Support for the '>' operator to connect ports."""
-        loop = LoopRegistry.get_loop()
-        loop.create_task(self.connect(other))
+        """Support for the '>' operator to connect ports synchronously."""
+        self.connect(other)
         return other
 
     async def close(self):
-        """Perform graceful shutdown of the port, ensuring background task stops."""
-        logger.trace(f"Attempting to close port {self.name} ({self.id}).")
-
-        # Cancel the emission processor task and wait for it if possible
-        if self._emission_task and not self._emission_task.done():
-            self._emission_task.cancel()
-            try:
-                # Get the loop the task runs on and the current loop
-                task_loop = self._emission_task.get_loop()
-                current_loop = LoopRegistry.get_loop()
-                
-                # Only await if the task is on the currently running loop and that loop isn't closed
-                if task_loop is current_loop and not current_loop.is_closed():
-                    logger.trace(f"Waiting for emission task cancellation for port {self.name} on current loop...")
-                    # Wait for the task to acknowledge cancellation
-                    await asyncio.gather(self._emission_task, return_exceptions=True)
-                    logger.trace(f"Emission task for port {self.name} finished cancellation.")
-                else:
-                    logger.trace(f"Emission task for port {self.name} is on a different or closed loop. Cannot confirm cancellation. Task Loop ID: {id(task_loop)}, Current Loop ID: {id(current_loop)}")
-                    
-            except asyncio.CancelledError:
-                # This is expected when the task is successfully cancelled on the current loop
-                logger.trace(f"Emission task for port {self.name} confirmed cancelled.")
-            except Exception as e:
-                # Log any other unexpected errors during cancellation
-                logger.trace(f"Error processing emission task cancellation for port {self.name}: {e}")
-        
-        self._emission_task = None # Clear the reference
-
-        # Clear connections (safe to do after task is stopped)
+        """Clear port connections and staged state."""
+        logger.trace("Closing port {} ({})", self.name, self.id)
         self.input_ports.clear()
         self.connected_elements.clear()
-        
-        # Reset state
         self.emit_ready = False
         for item in self.required_items.values():
-            item['value'] = None
-        
-        logger.trace(f"Port {self.name} ({self.id}) closed successfully.")
+            item["value"] = None
+        logger.trace("Port {} ({}) closed successfully.", self.name, self.id)
 
     async def drain(self):
         """
-        Wait for all currently queued emissions to be processed.
+        Wait for in-flight direct delivery and tracked scheduled emissions.
 
-        This does not stop future emits; it only flushes work already enqueued when
-        this method is awaited.
+        With direct delivery, ``await stage_emit()`` already completes delivery;
+        this also flushes ``schedule_stage_emit()`` work scheduled earlier.
         """
-        await self._emission_queue.join()
+        async with self._emit_lock:
+            pass
+        while self._scheduled_emit_tasks:
+            pending = list(self._scheduled_emit_tasks)
+            if not pending:
+                break
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def stage_emit_to(self, input_port, **kwargs):
         """
@@ -759,22 +760,31 @@ class OutputPort(Port):
         # stage values (this will _not_ auto‑emit because we've turned it off)
         await self.stage(**kwargs)
 
-        # pack the payload
-        if self.readiness_check:
-            await self.readiness_check()
-        payload = await self._pack_payload()
-
-        # log and send only to the target
-        log_emit(self, payload)
-        await input_port.receive(payload, self)
-
-        # reset our staging state
-        self.emit_ready = False
-        for item in self.required_items.values():
-            item['value'] = None
-
-        # restore original behavior
-        self.emit_when_ready = orig
+        payload = None
+        async with self._emit_lock:
+            try:
+                if self.readiness_check:
+                    await self.readiness_check()
+                payload = await self._pack_payload()
+                await self._fire_hook("before_emit", payload=payload)
+                log_emit(self, payload)
+                await input_port.receive(payload, self)
+                await self._fire_hook(
+                    "delivered",
+                    payload=payload,
+                    target_port_name=input_port.name,
+                )
+                await self._fire_hook("emitted", payload=payload)
+                if self.latched:
+                    self._latched_payload = payload
+            except Exception as exc:
+                await self._fire_hook("error", payload=payload, error=exc)
+                raise
+            finally:
+                self.emit_ready = False
+                for item in self.required_items.values():
+                    item["value"] = None
+                self.emit_when_ready = orig
         return payload
 
 
@@ -792,6 +802,15 @@ class Ports(param.Parameterized):
     def __init__(self, containing_element=None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
+
+    def _resolve_port_hooks(self, port_name: str) -> PortHooks | None:
+        """Resolve PortHooks for a port name from the containing element."""
+        element = self.containing_element
+        if element is None:
+            return None
+        port_hooks = getattr(element, "port_hooks", None) or {}
+        hooks = port_hooks.get(port_name)
+        return hooks if isinstance(hooks, PortHooks) else None
     
     def add_input(self, name: str, unpack_payload_callback, payload_type=None, readiness_check=None, **kwargs):
         """
@@ -813,13 +832,14 @@ class Ports(param.Parameterized):
             payload_type=payload_type,
             readiness_check=readiness_check,
             containing_element=self.containing_element,
+            hooks=self._resolve_port_hooks(name),
             **kwargs
         )
         self.input[name] = input_port
         return input_port
     
-    def add_output(self, name: str, pack_payload_callback, payload_type=None, 
-                 on_connect_callback=None, readiness_check=None, **kwargs):
+    def add_output(self, name: str, pack_payload_callback, payload_type=None,
+                 readiness_check=None, latched=False, **kwargs):
         """
         Add an output port.
 
@@ -827,20 +847,21 @@ class Ports(param.Parameterized):
             name: Name of the port
             pack_payload_callback: Function to pack payloads
             payload_type: Type of payload produced
-            on_connect_callback: Called when port is connected
             readiness_check: Optional coroutine to await before emitting a payload.
                 If provided, this coroutine will be awaited before each emit operation.
                 This is useful for ensuring that the port or its containing element is
                 ready before emitting data.
+            latched: Retain the latest emitted payload and replay it to late connections.
             **kwargs: Additional parameters for the port
         """
         output_port = OutputPort(
             name=name,
             pack_payload_callback=pack_payload_callback,
             payload_type=payload_type,
-            on_connect_callback=on_connect_callback,
             readiness_check=readiness_check,
+            latched=latched,
             containing_element=self.containing_element,
+            hooks=self._resolve_port_hooks(name),
             **kwargs
         )
         self.output[name] = output_port

@@ -8,8 +8,9 @@ from pydantic import BaseModel, create_model, RootModel, Field
 from loguru import logger
 from pydantic.config import ConfigDict
 
-from pyllments.elements.flow_control.flow_controller import FlowController
 from pyllments.base.element_base import Element
+from pyllments.elements.flow_control.flow_controller import FlowController
+from pyllments.runtime.scheduler import schedule_task
 from pyllments.common.pydantic_models import CleanModel
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload
 from pyllments.ports import OutputPort
@@ -95,6 +96,11 @@ class StructuredRouterTransformer(Element):
         self.ports = self.flow_controller.ports
         self.set_pydantic_schema()
         self.setup_schema_output()
+        schedule_task(self._emit_latched_schema())
+
+    async def _emit_latched_schema(self):
+        if self.pydantic_model is not None:
+            await self.ports.schema_output.stage_emit(pydantic_model=self.pydantic_model)
 
     def routing_setup(self):
         flow_controller_kwargs = {}
@@ -149,15 +155,10 @@ class StructuredRouterTransformer(Element):
     def setup_schema_output(self):
         async def pack(pydantic_model: type(RootModel)) -> SchemaPayload:
             return SchemaPayload(schema=pydantic_model)
-        async def on_connect(output_port, new_input_port):
-            return await output_port.stage_emit_to(
-                new_input_port,
-                pydantic_model=self.pydantic_model
-            )
         self.ports.add_output(
             name='schema_output',
             pack_payload_callback=pack,
-            on_connect_callback=on_connect
+            latched=True,
         )
         # Emits the schema payload when the pydantic model changes
         async def emit_on_change(event):

@@ -1,0 +1,29 @@
+---
+description: Ordered graph, readiness, and emission boundaries for Pyllments runtime code
+globs: pyllments/{ports,elements,recipes}/**/*.py
+alwaysApply: false
+---
+
+# Runtime Boundaries
+
+Use the ordered-boundary model when working on ports, elements, and recipes.
+
+## Graph Construction
+
+- `connect()` and `>` are topology operations: synchronous, ordered, and side-effect-light.
+- Do not emit payloads or await resources from connection.
+- Preserve connection order because output delivery follows that order.
+
+## Element Readiness
+
+- Resource readiness: await external/model setup with `model.await_ready()` or a port `readiness_check`.
+- Data readiness: store required payloads/schema/state in element-controlled slots.
+- Trigger readiness: a triggering input may attempt output, but the element should stand by if dependencies are missing.
+- Missing readiness should not cause sleeps, broad task polling, or partial output.
+
+## Emission
+
+- `await stage_emit(...)` is the deterministic delivery boundary.
+- Sync flow callbacks should return emit coroutines; async flow callbacks should `await` emits.
+- Use `latched=True` on state/schema outputs so late connections can receive the latest payload.
+- Use `schedule_task(...)` or `schedule_stage_emit(...)` only for intentional background work.

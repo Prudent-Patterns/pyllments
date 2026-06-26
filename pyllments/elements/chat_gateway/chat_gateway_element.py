@@ -7,7 +7,7 @@ import param
 
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import schedule_task
 from pyllments.elements.chat_gateway.chat_gateway_model import ChatGatewayModel
 from pyllments.elements.chat_gateway.turn_handle import TurnHandle
 
@@ -212,7 +212,7 @@ class ChatGatewayElement(Element):
 
     def approve_permission_request_sync(self, request_id: str) -> None:
         """Schedule :meth:`approve_permission_request` on the runtime loop."""
-        LoopRegistry.get_loop().create_task(self.approve_permission_request(request_id))
+        schedule_task(self.approve_permission_request(request_id))
 
     def deny_permission_request_sync(
         self,
@@ -220,9 +220,7 @@ class ChatGatewayElement(Element):
         reason: str | None = None,
     ) -> None:
         """Schedule :meth:`deny_permission_request` on the runtime loop."""
-        LoopRegistry.get_loop().create_task(
-            self.deny_permission_request(request_id, reason=reason)
-        )
+        schedule_task(self.deny_permission_request(request_id, reason=reason))
 
     async def submit_message_async(
         self,
@@ -274,8 +272,6 @@ class ChatGatewayElement(Element):
         )
         self.model.register_turn(turn_id, user_message)
 
-        loop = LoopRegistry.get_loop()
-
         async def _emit():
             await self._invoke_hook(
                 self.model.on_user_message_submitted,
@@ -284,7 +280,7 @@ class ChatGatewayElement(Element):
             )
             await self.ports.output["message_output"].stage_emit(payload=user_message)
 
-        loop.create_task(_emit())
+        schedule_task(_emit())
         return TurnHandle(turn_id=turn_id, user_message=user_message, gateway=self)
 
     def cancel(self, turn_id: str) -> None:

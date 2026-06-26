@@ -1,0 +1,56 @@
+---
+description: Async test hygiene for Pyllments ports, runtime, and pytest-asyncio
+globs: pyllments/tests/**/*.py
+alwaysApply: false
+---
+
+# Async Test Hygiene
+
+Pyllments ports use **direct ordered delivery**: `await stage_emit(...)` means delivery completed. Do not rely on background port queues or `lifecycle_manager.drain()` for normal ports.
+
+## Loop ownership
+
+- Prefer `@pytest.mark.asyncio` tests with `await` for port/element integration.
+- Rely on root `conftest.py` to reset `LoopRegistry` and `LifecycleManager` between tests.
+- Use `pyllments_runtime_cleanup` when a test registers real resources that need shutdown.
+- For sync driver tests, use `loop = LoopRegistry.get_loop()` + `run_until_complete`, then `LoopRegistry.reset()` if not using autouse fixture.
+
+## Forbidden patterns
+
+```python
+# BAD: gathers every task on the loop; can hang forever
+asyncio.gather(*asyncio.all_tasks(loop))
+
+# BAD: time-based polling when await drain/stage_emit is available
+while loop.time() < stop_time:
+    loop.run_until_complete(asyncio.sleep(0.01))
+```
+
+## Preferred patterns
+
+```python
+await output_port.stage_emit(payload=payload)
+await output_port.drain()  # optional flush point; direct delivery usually needs only stage_emit
+
+@pytest.mark.asyncio
+async def test_flow():
+    await gateway.submit_message_async("hello")
+    await gateway.ports.output["message_output"].drain()
+```
+
+## Lifecycle
+
+- `LifecycleManager` is for **resources** (MCP, Discord/Telegram clients, adapters), not normal output ports.
+- Tests that register resources should use `pyllments_runtime_cleanup` or call `await lifecycle_manager.shutdown()` explicitly.
+- Close ports with `await port.close()` when disconnecting test wiring; do not expect global shutdown to close ports.
+
+## Connection and emission
+
+- `output > input` and `connect()` are synchronous graph construction.
+- In async tests, call `connect()` without `await`.
+- Use `await pipe.async_send_payload(...)` inside `@pytest.mark.asyncio` tests.
+- Use `pipe.send_payload(...)` only from sync contexts with no running loop.
+
+## Fire-and-forget
+
+Use `schedule_task(...)` when background work is intentional. Tests should `await` the work under test instead of sleeping.

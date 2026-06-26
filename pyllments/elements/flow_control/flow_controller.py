@@ -7,7 +7,6 @@ import inspect  # for autodetecting the caller
 from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.ports.ports import InputPort, OutputPort, Ports
-from pyllments.runtime.loop_registry import LoopRegistry
 
 
 class FlowPort(param.Parameterized):
@@ -228,7 +227,7 @@ class FlowController(Element):
 
     def _setup_input_port(self, alias, payload_type):
         def unpack(payload: payload_type):
-            self._invoke_flow(alias, payload)
+            return self._invoke_flow(alias, payload)
         
         input_port = self.ports.add_input(alias, unpack_payload_callback=unpack)
         
@@ -257,6 +256,7 @@ class FlowController(Element):
             raise KeyError(f"No flow port found with alias '{input_port_name}'.")
 
         flow_port.payload = payload
+        persist = self.flow_map['input'][input_port_name].get('persist', False)
 
         self.logger.debug(f"Invoking flow_fn for input port {input_port_name}")
         result = self.flow_fn(
@@ -264,25 +264,17 @@ class FlowController(Element):
             c=self.context,
             **self.flow_port_map.list_view()
         )
-        
-        # Handle async result by creating a task
-        if asyncio.iscoroutine(result):
-            # Use the centralized LoopRegistry to schedule the coroutine
-            loop = LoopRegistry.get_loop()
-            try:
-                result_task = loop.create_task(result)
 
-                if not self.flow_map['input'][input_port_name].get('persist', False):
-                    async def clear_after_complete():
-                        try:
-                            await result_task
-                        finally:
-                            flow_port.payload = None
-                    loop.create_task(clear_after_complete())
-            except Exception as e:
-                self.logger.error(f"Error creating task: {e}")
-                if not self.flow_map['input'][input_port_name].get('persist', False):
-                    flow_port.payload = None
-        elif not self.flow_map['input'][input_port_name].get('persist', False):
-            # Synchronous case - clear immediately as before
+        if asyncio.iscoroutine(result):
+            async def run_and_maybe_clear():
+                try:
+                    return await result
+                finally:
+                    if not persist:
+                        flow_port.payload = None
+
+            return run_and_maybe_clear()
+
+        if not persist:
             flow_port.payload = None
+        return result

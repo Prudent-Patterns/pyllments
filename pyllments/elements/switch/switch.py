@@ -101,7 +101,7 @@ class Switch(Element):
 
         def flow_fn(active_input_port, c, **kwargs):
             if self.current_output in kwargs:
-                kwargs[self.current_output].emit(active_input_port.payload)
+                return kwargs[self.current_output].emit(active_input_port.payload)
 
         self.flow_controller = FlowController(
             containing_element=self,

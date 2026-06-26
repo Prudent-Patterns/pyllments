@@ -3,116 +3,87 @@ title: "Ports"
 ---
 
 
-Ports are the fundamental mechanism for connecting Elements in pyllments, enabling reactive, deterministic data flow through Payloads. They follow an observer pattern where OutputPorts notify connected InputPorts when emitting payloads. This design ensures predictability and modularity, making it easy to build complex, potentially cyclic graphs of Elements.
+Ports are the fundamental mechanism for connecting Elements in pyllments, enabling reactive, ordered data flow through Payloads. They follow an observer pattern where OutputPorts notify connected InputPorts when emitting payloads.
 
-Ports are async-friendly but use queues, locks, and ordered processing to guarantee deterministic behavior—no race conditions or non-deterministic ordering. This documentation covers the basics for high-level developers (e.g., those building recipes) and dives deeper for low-level implementers (e.g., creating custom Elements).
+## Runtime Boundaries
+
+Pyllments separates three concerns:
+
+1. **Graph construction** — `output > input` or `connect()` wires topology synchronously and in order.
+2. **Element readiness** — receiving elements store payloads and emit only when required state, schema, or resources are ready.
+3. **Payload delivery** — `await stage_emit(...)` completes after connected inputs have processed the payload.
+
+Background work is explicit (`schedule_task`, `schedule_stage_emit`) and is not hidden inside connection.
 
 ## Basics: High-Level Usage
 
 ### What Are Ports?
-- **Purpose**: Ports allow Elements to communicate by passing `Payload` objects (data containers with models and views). See [MessagePayload](MessagePayload.qmd) for chat streaming and cancellation behavior.
+
+- **Purpose**: Ports pass `Payload` objects between Elements.
 - **Types**:
-  - **InputPort**: Receives payloads and triggers internal logic (e.g., updating an Element's model or view).
+  - **InputPort**: Receives payloads and triggers element logic.
   - **OutputPort**: Emits payloads to connected inputs.
-- **Naming Convention**:
-  - Input ports: End in `_input` (if they receive without emitting downstream) or `_emit_input` (if they receive and trigger an output).
-  - Output ports: Describe what they emit (e.g., `user_message_output`).
-- **Key Features**:
-  - Type-safe: Payload types must be compatible (supports generics like `list[MessagePayload]` or `Union[A, B]`).
-  - Reactive: Receiving a payload can trigger emissions, creating chains.
-  - Deterministic: Ordered processing ensures predictable flows.
+- **Naming**:
+  - `*_input` — receive without necessarily emitting downstream.
+  - `*_emit_input` — receive and trigger downstream emission.
+  - Output names describe what they emit (e.g. `message_output`).
 
 ### Creating and Connecting Ports
-Ports are managed via an Element's `ports` attribute (a `Ports` object).
 
-- **Adding Ports in an Element**:
-  ```python
-  # In an Element's __init__
-  self.ports.add_input(
-      name='message_input',
-      unpack_payload_callback=self._handle_message  # Function to process payload
-  )
-  self.ports.add_output(
-      name='message_output',
-      pack_payload_callback=self._pack_message  # Function to create payload
-  )
-  ```
+```python
+self.ports.add_input(
+    name='message_input',
+    unpack_payload_callback=self._handle_message,
+)
+self.ports.add_output(
+    name='message_output',
+    pack_payload_callback=self._pack_message,
+    latched=True,  # optional: retain latest payload for late connections
+)
 
-- **Connecting Ports** (in a recipe):
-  ```python
-  # Using the > operator for connections
-  element_a.ports.output.message_output > element_b.ports.input.message_input
-  # Or for multiple:
-  element_a.ports.output.message_output > [element_b.ports.input.message_input, element_c.ports.input.message_input]
-  ```
-  Connections are one-way (output to input) and can fan-out (one output to many inputs) or fan-in (many outputs to one input).
+element_a.ports.output.message_output > element_b.ports.input.message_input
+```
 
-- **Emitting and Receiving**:
-  - **Emit**: Stage data and emit (e.g., `await output_port.stage_emit(payload=some_payload)`).
-  - **Receive**: Handled automatically via the `unpack_payload_callback` when a connected output emits.
+Connection is synchronous. It does not emit payloads or run async setup.
 
-### Example
-In the `ChatInterfaceElement` (from `chat_interface_element.py`):
-- Input: `message_emit_input` receives a `MessagePayload`, adds it to the chat model, and emits to `user_message_output`.
-- Connection in a recipe: `chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_emit_input`.
+### Emitting and Receiving
 
-This setup allows building flows like user input → LLM processing → chat display, all predictably.
+- **Ordered delivery**: `await output_port.stage_emit(payload=value)`
+- **Sync test/driver**: `PipeElement.send_payload(...)` when no event loop is running
+- **Async contexts**: `await pipe.async_send_payload(...)`
+- **Receive**: handled by the input port's `unpack_payload_callback`
 
-## Deeper Dive: Implementation Details
+## Readiness Gates
 
-For developers extending pyllments or debugging, here's how ports ensure determinism using async queues and locks.
+Elements should not assume “payload received” means “emit immediately.”
 
-### OutputPort Mechanics
-- **Staging and Emission**:
-  - Use `stage(**kwargs)` to prepare data (fills `required_items` dict, inferred from callback annotations).
-  - When ready (`emit_ready=True`), call `emit()` or auto-emit if `emit_when_ready=True`.
-  - Packs via `pack_payload_callback` (can be async, returns Payload).
-  - Optional `readiness_check` (awaitable) can gate explicit `stage_emit` flows.
+- **Resource readiness** — MCP clients, models, stores: `await model.await_ready()` or port `readiness_check`.
+- **Data readiness** — required inputs present (see `ContextBuilderElement` trigger maps).
+- **Trigger readiness** — a trigger port may start processing, but output waits until dependencies are satisfied.
 
-- **Queue for Ordering**:
-  - Emissions are queued in an `asyncio.Queue` (FIFO).
-  - A background task processes the queue:
-    ```python
-    async def _process_emission_queue(self):
-        while True:
-            emission = await self._emission_queue.get()
-            for port in self.input_ports:  # In connection order
-                await port.receive(payload, self)  # Awaits full receive/unpack
-            self._emission_queue.task_done()  # Moves to next item
-    ```
-  - Advances to next item only after all connected inputs complete their `receive()` (including unpacks).
-  - `stage_emit` returns after enqueueing, not after downstream delivery completes.
-  - Use `await output_port.drain()` when you need a hard completion boundary. On server stop, registered ports are drained automatically before close via `LifecycleManager.shutdown()`.
+Schema/state outputs often use `latched=True` so the latest schema is replayed when a downstream port connects later.
 
-- **Predictability**: FIFO queue + sequential awaits ensure no out-of-order emissions.
+## OutputPort Mechanics
 
-### InputPort Mechanics
-- **Reception**:
-  - `receive(payload, output_port)` validates type, then processes under an `asyncio.Lock`:
-    ```python
-    async def receive(self, payload, output_port):
-        async with self._processing_lock:
-            result = self.unpack_payload_callback(payload)
-            if asyncio.iscoroutine(result):
-                await result
-    ```
-  - Optional `readiness_check` runs once before first unpack.
-  - Unpack can trigger further emits (reactivity).
+- **Staging**: `stage(**kwargs)` fills `required_items` from callback annotations.
+- **Emission**: `emit()` packs and delivers directly to connected inputs in connection order under a per-port lock.
+- **Latched outputs**: after emit, the latest payload is retained and replayed to inputs connected afterward.
+- **Determinism**: `await stage_emit(...)` means delivery completed.
 
-- **Ordering**: Lock serializes receptions—next one starts only after current unpack completes.
+## InputPort Mechanics
 
-### The "Dance" Between Output and Input
-- Output queues emission → pulls from queue → awaits `receive()` on each input (sequential).
-- Input processes under lock, awaits unpack.
-- Output advances queue only after all receives complete (implicit "signal" via await resolution).
-- Next emission isn't automatic—triggered by unpack logic (e.g., calling `stage_emit` on another port).
+- `receive()` validates type, optionally awaits `readiness_check`, then runs `unpack_payload_callback` under a per-port lock.
+- If the callback returns a coroutine, it is awaited (use this for downstream emits from FlowController paths).
 
-### Edge Cases and Best Practices
-- **Concurrency**: Queues/locks prevent races; slow unpacks delay but preserve order.
-- **Readiness**: Use checks to defer processing/emission until ready.
-- **Completion boundaries**: For short-lived request handlers (e.g., workers), call `drain` before returning if queued emissions must finish first.
-- **Debugging**: Enable Pyllments diagnostics when you need payload-flow traces; normal embedded usage keeps these logs off by default.
-- **Performance**: Avoid long-running callbacks to prevent bottlenecks.
+## Quick Reference
 
-For full code, see `pyllments/ports/ports.py`.
+| Task | API |
+|------|-----|
+| Wire elements | `out > inp` or `out.connect(inp)` |
+| Emit with ordering | `await out.stage_emit(...)` |
+| Sync pipe send | `pipe.send_payload(...)` (no running loop) |
+| Async pipe send | `await pipe.async_send_payload(...)` |
+| State/schema output | `latched=True` on `add_output` |
+| Background work | `schedule_task(...)` explicitly |
 
+For implementation details, see `pyllments/ports/ports.py`.

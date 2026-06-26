@@ -9,7 +9,7 @@ from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
 from pyllments.elements.llm_chat.openrouter_chat_model import OpenRouterChatModel
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.payloads.structured.summary_contract import summary_request_fields
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import schedule_task
 
 from .summarizer_model import SummarizerModel
 
@@ -101,7 +101,7 @@ class SummarizerElement(Element):
                 _, source_entry_ids, _ = summary_request_fields(request)
                 await self._summarize_and_emit(messages, source_entry_ids)
 
-            LoopRegistry.get_loop().create_task(_handle())
+            schedule_task(_handle())
 
         self.ports.add_input(
             name="summary_request_emit_input",
@@ -121,7 +121,7 @@ class SummarizerElement(Element):
                 messages = self.model.build_messages_from_sources(sources)
                 await self._summarize_and_emit(messages, [])
 
-            LoopRegistry.get_loop().create_task(_handle())
+            schedule_task(_handle())
 
         self.ports.add_input(
             name="payloads_emit_input",

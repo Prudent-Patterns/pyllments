@@ -14,6 +14,8 @@ By using a `routing_map`, it:
 
 It leverages the `FlowController` for port management and routing logic.
 
+`schema_output` is a **latched** port: the unified schema is emitted when ready and replayed to inputs connected later, so recipes can wire topology first without connection-time async side effects.
+
 ## Instantiation
 
 **Arguments:**

@@ -5,7 +5,7 @@ import param
 
 from pyllments.base.element_base import Element
 from loguru import logger
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import resolve_loop, schedule_task
 
 
 class PipeElement(Element):
@@ -72,11 +72,28 @@ class PipeElement(Element):
         self.received_payloads = []
 
     def send_payload(self, payload: Any):
-        """Synchronously schedules the async stage_emit coroutine."""
-        loop = LoopRegistry.get_loop()
-        coro = self.ports.output['pipe_output'].stage_emit(payload=payload)
-        # Schedule the coroutine to run on the loop, but don't wait here.
-        loop.create_task(coro)
+        """
+        Emit a payload through ``pipe_output`` from a sync context.
+
+        Raises
+        ------
+        RuntimeError
+            When called inside a running event loop; use :meth:`async_send_payload`.
+        """
+        port = self.ports.output["pipe_output"]
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            resolve_loop().run_until_complete(port.stage_emit(payload=payload))
+            return
+        raise RuntimeError(
+            "PipeElement.send_payload() cannot be used inside a running event loop. "
+            "Use `await pipe.async_send_payload(...)` instead."
+        )
+
+    async def async_send_payload(self, payload: Any):
+        """Emit a payload and await ordered delivery through ``pipe_output``."""
+        await self.ports.output["pipe_output"].stage_emit(payload=payload)
 
     async def async_send_and_receive(self, payload: Any, timeout: float = None) -> Any:
         """
@@ -94,7 +111,7 @@ class PipeElement(Element):
         Any or None
             The first payload received by this pipe's input port, or None if the timeout is reached without a response.
         """
-        loop = LoopRegistry.get_loop()
+        loop = resolve_loop()
         # optionally clear history
         if getattr(self, 'store_received_payloads', False):
             self.clear_received_payloads()

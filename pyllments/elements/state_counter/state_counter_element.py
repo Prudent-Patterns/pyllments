@@ -9,7 +9,7 @@ from pyllments.base.element_base import Element
 from pyllments.base.payload_base import Payload
 from pyllments.elements.flow_control import FlowController
 from pyllments.payloads.structured import StructuredPayload
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import schedule_task
 
 
 def _default_reset_predicate(_payload: Any, _state: dict[str, Any]) -> bool:
@@ -217,8 +217,7 @@ class StateCounterElement(Element):
 
     def _schedule_task(self, coroutine):
         """Track element-local async work without relying on global lifecycle drains."""
-        loop = LoopRegistry.get_loop()
-        task = loop.create_task(coroutine)
+        task = schedule_task(coroutine)
         self._pending_tasks.add(task)
         task.add_done_callback(self._pending_tasks.discard)
         return task

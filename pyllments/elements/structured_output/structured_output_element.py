@@ -7,7 +7,7 @@ from loguru import logger
 
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import schedule_task
 from pyllments.payloads.message import MessagePayload
 from pyllments.payloads.schema import SchemaPayload
 from pyllments.payloads.structured import StructuredPayload
@@ -56,14 +56,10 @@ class StructuredOutputElement(Element):
         async def pack_schema() -> SchemaPayload:  # pragma: no cover
             return SchemaPayload(schema=self.model.schema)
 
-        async def _emit_on_connect(output_port, input_port):
-            """Emit current schema immediately after a connection is made."""
-            await output_port.stage_emit_to(input_port)
-
         self.ports.add_output(
             name="schema_output",
             pack_payload_callback=pack_schema,
-            on_connect_callback=_emit_on_connect,
+            latched=True,
         )
 
         # ---- structured_output -------------------------------------------
@@ -104,8 +100,7 @@ class StructuredOutputElement(Element):
     # ---------------------------------------------------------------------
     def emit_schema(self):
         """Convenience helper to push the *current* schema through *schema_output*."""
-        loop = LoopRegistry.get_loop()
-        loop.create_task(self.ports.output["schema_output"].stage_emit())
+        schedule_task(self.ports.output["schema_output"].stage_emit())
 
     # ---------------------------------------------------------------------
     # Views ----------------------------------------------------------------

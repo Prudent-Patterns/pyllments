@@ -15,6 +15,8 @@ listing:
 
 Recipes are pre-made flows that you can run straight from the command line.
 
+Recipes are **topology-first**: wire elements with `>` or `connect()`, then let element readiness gates and ordered `stage_emit` delivery handle schemas, triggers, and downstream emissions. You do not need a separate activation phase for most flows.
+
 Click on a recipe to see more details and configuration options.
 
 ```bash

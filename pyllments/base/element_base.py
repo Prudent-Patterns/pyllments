@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from pyllments.ports.ports import Ports
+from pyllments.ports.hooks import HookPolicy
 from pyllments.base.component_base import Component
 from pyllments.base.model_base import Model
 
@@ -15,6 +16,10 @@ class Element(Component):
     """Base class for all elements in the framework"""
     ports = param.ClassSelector(class_=Ports, doc="""
         Handles the Port interface for the Element""")
+    port_hooks = param.Dict(default={}, doc="""
+        Map of port name to PortHooks for lifecycle observation (host integration).""")
+    hook_policy = param.ClassSelector(default=HookPolicy(), class_=HookPolicy, doc="""
+        Default execution policy for port lifecycle hooks on this element.""")
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
     # view_cache = param.Dict(default={}, doc=""" TODO: Removeif no interference
@@ -41,6 +46,8 @@ class Element(Component):
 
         # bind logger so every message carries this name
         self.logger = logger.bind(name=self.__class__.__module__, element=self.name)
+        if self.hook_policy is None:
+            self.hook_policy = HookPolicy()
         self.ports = Ports(containing_element=self)
 
     def inject_payload_css(self, create_view_method: Callable, name=None, **kwargs):

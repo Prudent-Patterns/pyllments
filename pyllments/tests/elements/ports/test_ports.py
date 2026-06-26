@@ -21,7 +21,6 @@ def test_port_connection():
     el2.ports.add_input(name='some_input', payload_type=Payload, unpack_payload_callback=unpack)
 
     el1.ports.output['some_output'] > el2.ports.input['some_input']
-    LoopRegistry.get_loop().run_until_complete(asyncio.sleep(0))
 
     assert el1.ports.output['some_output'].connected_elements[0] is el2
     assert el2.ports.input['some_input'].connected_elements[0] is el1

@@ -2,7 +2,11 @@
 title: "ContextBuilderElement"
 ---
 
-The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order. For example, a resulting message sequence might look like:
+The ContextBuilder helps you build an ordered list of messages from incoming payloads and preset messages. It provides flexible ways to combine messages from different sources and emit them in a specific order.
+
+**Readiness model:** a trigger port may arrive before schema, history, or other dependencies. The element stores persisted inputs and emits only when the active trigger's required order is satisfied. This is the reference pattern for element-local readiness gates in pyllments.
+
+For example, a resulting message sequence might look like:
 
 ```
 1. main_system_prompt_constant,

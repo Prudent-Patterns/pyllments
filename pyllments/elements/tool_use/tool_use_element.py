@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, RootModel, create_model
 from pyllments.base.element_base import Element
 from pyllments.common.pydantic_models import CleanModel
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload, ToolUsePayload
+from pyllments.runtime.scheduler import schedule_task
 
 from .tool_use_model import ToolUseModel, build_adapters
 
@@ -46,6 +47,18 @@ class ToolUseElement(Element):
         )
         self.model = ToolUseModel(adapters=adapter_list)
         self._setup_ports()
+        schedule_task(self._emit_latched_schema_outputs())
+
+    async def _emit_latched_schema_outputs(self):
+        """Emit tool schemas when adapter resources are ready."""
+        await self.model.await_ready()
+        await self.ports.output["tools_schema_output"].stage_emit(tools_schema=self.tools_schema)
+        await self.ports.output["tools_output"].stage_emit(
+            tools_list=self._provider_tool_definitions()
+        )
+        await self.ports.output["structured_tools_output"].stage_emit(
+            tools_list=self._structured_tools_list()
+        )
 
     def _setup_ports(self):
         self._tools_schema_output_setup()
@@ -186,44 +199,32 @@ class ToolUseElement(Element):
         async def pack(tools_schema: type[BaseModel]) -> SchemaPayload:
             return SchemaPayload(schema=tools_schema)
 
-        async def on_connect(port, input_port):
-            await self.model.await_ready()
-            await port.stage_emit(tools_schema=self.tools_schema)
-
         self.ports.add_output(
             name="tools_schema_output",
             pack_payload_callback=pack,
-            on_connect_callback=on_connect,
             readiness_check=self.model.await_ready,
+            latched=True,
         )
 
     def _tools_output_setup(self):
         async def pack(tools_list: list[dict[str, Any]]) -> StructuredPayload:
             return StructuredPayload(data=tools_list)
 
-        async def on_connect_provider(port, input_port):
-            await self.model.await_ready()
-            await port.stage_emit(tools_list=self._provider_tool_definitions())
-
         self.ports.add_output(
             name="tools_output",
             pack_payload_callback=pack,
-            on_connect_callback=on_connect_provider,
             readiness_check=self.model.await_ready,
+            latched=True,
         )
 
         async def pack_structured(tools_list: list[dict[str, Any]]) -> StructuredPayload:
             return StructuredPayload(data=tools_list)
 
-        async def on_connect_structured(port, input_port):
-            await self.model.await_ready()
-            await port.stage_emit(tools_list=self._structured_tools_list())
-
         self.ports.add_output(
             name="structured_tools_output",
             pack_payload_callback=pack_structured,
-            on_connect_callback=on_connect_structured,
             readiness_check=self.model.await_ready,
+            latched=True,
         )
 
     def _tool_request_structured_input_setup(self):

@@ -27,7 +27,7 @@ class EmbedderElement(Element):
         def process_chunks(chunk_payloads: Union[list[ChunkPayload], ChunkPayload]):
             chunks = chunk_payloads if isinstance(chunk_payloads, list) else [chunk_payloads]
             processed_chunks = self.model.embed_chunks(chunks)
-            self.ports.output['processed_chunks_output'].stage_emit(processed_chunks=processed_chunks)
+            return self.ports.output['processed_chunks_output'].stage_emit(processed_chunks=processed_chunks)
 
         self.ports.add_input(name='chunk_input', unpack_payload_callback=process_chunks)
 
@@ -40,7 +40,7 @@ class EmbedderElement(Element):
     def _message_input_setup(self):
         def process_message(message_payload: MessagePayload):
             processed_message = self.model.embed_message(message_payload)
-            self.ports.output['processed_message_output'].stage_emit(processed_message=processed_message)
+            return self.ports.output['processed_message_output'].stage_emit(processed_message=processed_message)
 
         self.ports.add_input(name='message_input', unpack_payload_callback=process_message)
 

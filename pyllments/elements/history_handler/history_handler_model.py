@@ -13,7 +13,7 @@ from pyllments.payloads.structured.summary_contract import (
     is_summary_artifact,
     summary_artifact_entry_ids,
 )
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import schedule_task
 
 from .history_projection import (
     HistoryEntry,
@@ -94,11 +94,7 @@ class HistoryHandlerModel(Model):
 
     @staticmethod
     def _schedule_task(coro):
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = LoopRegistry.get_loop()
-        return loop.create_task(coro)
+        return schedule_task(coro)
 
     def _refresh_tier_intervals(self):
         self._tier_intervals = normalize_projection_tiers(

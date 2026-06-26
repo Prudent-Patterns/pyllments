@@ -45,8 +45,7 @@ class RetrieverElement(Element):
             chunks = self.model.retrieve(payload)
             self.logger.info(f"Retrieval completed. Time elapsed: {time.time() - start_time:.2f} seconds")
             if chunks:
-                self.ports.output['chunk_output'].stage_emit(chunk_payload=chunks)
-                self.logger.info(f"Chunks staged for emission. Time elapsed: {time.time() - start_time:.2f} seconds")
+                return self.ports.output['chunk_output'].stage_emit(chunk_payload=chunks)
         
         self.ports.add_input('message_input', unpack)
 

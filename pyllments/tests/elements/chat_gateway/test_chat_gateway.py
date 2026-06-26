@@ -31,7 +31,7 @@ async def test_submit_message_emits_user_payload():
     gateway = ChatGatewayElement()
     user_pipe = PipeElement(name="user_pipe")
 
-    await gateway.ports.output["message_output"].connect(user_pipe.ports.input["pipe_input"])
+    gateway.ports.output["message_output"].connect(user_pipe.ports.input["pipe_input"])
 
     turn = await gateway.submit_message_async("Hello")
     await gateway.ports.output["message_output"].drain()
@@ -47,7 +47,7 @@ async def test_turn_stream_receives_assistant_events():
     gateway = ChatGatewayElement()
     llm_pipe = PipeElement(name="llm_pipe")
 
-    await llm_pipe.ports.output["pipe_output"].connect(
+    llm_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["assistant_message_input"]
     )
 
@@ -59,8 +59,7 @@ async def test_turn_stream_receives_assistant_events():
         mode="stream",
         message_coroutine=_stream_chunks(),
     )
-    llm_pipe.send_payload(assistant)
-    await llm_pipe.ports.output["pipe_output"].drain()
+    await llm_pipe.async_send_payload(assistant)
 
     events = [event async for event in turn.stream()]
 
@@ -110,8 +109,8 @@ async def test_tool_events_output_on_tool_calls_complete():
     tool_pipe = PipeElement(name="tool_pipe")
     llm_pipe = PipeElement(name="llm_pipe")
 
-    await gateway.ports.output["tool_events_output"].connect(tool_pipe.ports.input["pipe_input"])
-    await llm_pipe.ports.output["pipe_output"].connect(
+    gateway.ports.output["tool_events_output"].connect(tool_pipe.ports.input["pipe_input"])
+    llm_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["assistant_message_input"]
     )
 
@@ -131,10 +130,9 @@ async def test_tool_events_output_on_tool_calls_complete():
 
     turn = await gateway.submit_message_async("tools?")
     await gateway.ports.output["message_output"].drain()
-    llm_pipe.send_payload(
+    await llm_pipe.async_send_payload(
         MessagePayload(role="assistant", mode="stream", message_coroutine=tool_stream())
     )
-    await llm_pipe.ports.output["pipe_output"].drain()
 
     async for event in turn.stream():
         if event.type == "done":
@@ -191,10 +189,10 @@ async def test_completed_tool_use_invokes_hook_only():
 
     gateway = ChatGatewayElement(on_tool_use=on_tool_use)
     tools_pipe = PipeElement(name="tools_pipe")
-    await gateway.ports.output["tool_use_approved_output"].connect(
+    gateway.ports.output["tool_use_approved_output"].connect(
         approved_pipe.ports.input["pipe_input"]
     )
-    await tools_pipe.ports.output["pipe_output"].connect(
+    tools_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["tool_use_input"]
     )
 
@@ -206,8 +204,7 @@ async def test_completed_tool_use_invokes_hook_only():
         completed=True,
         correlation_id=turn.turn_id,
     )
-    tools_pipe.send_payload(tools)
-    await tools_pipe.ports.output["pipe_output"].drain()
+    await tools_pipe.async_send_payload(tools)
     await asyncio.sleep(0.05)
 
     assert len(hook_calls) == 1
@@ -226,10 +223,10 @@ async def test_permission_required_creates_pending_request():
     gateway = ChatGatewayElement(on_permission_request=on_permission_request)
     approved_pipe = PipeElement(name="approved_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
-    await gateway.ports.output["tool_use_approved_output"].connect(
+    gateway.ports.output["tool_use_approved_output"].connect(
         approved_pipe.ports.input["pipe_input"]
     )
-    await tools_pipe.ports.output["pipe_output"].connect(
+    tools_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["tool_use_input"]
     )
 
@@ -237,8 +234,7 @@ async def test_permission_required_creates_pending_request():
     await gateway.ports.output["message_output"].drain()
 
     tools = _tool_use_payload(permission_required=True, correlation_id=turn.turn_id)
-    tools_pipe.send_payload(tools)
-    await tools_pipe.ports.output["pipe_output"].drain()
+    await tools_pipe.async_send_payload(tools)
     await asyncio.sleep(0.05)
 
     assert len(permission_events) == 1
@@ -254,10 +250,10 @@ async def test_approve_permission_request_emits_payload():
     gateway = ChatGatewayElement()
     approved_pipe = PipeElement(name="approved_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
-    await gateway.ports.output["tool_use_approved_output"].connect(
+    gateway.ports.output["tool_use_approved_output"].connect(
         approved_pipe.ports.input["pipe_input"]
     )
-    await tools_pipe.ports.output["pipe_output"].connect(
+    tools_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["tool_use_input"]
     )
 
@@ -265,8 +261,7 @@ async def test_approve_permission_request_emits_payload():
     await gateway.ports.output["message_output"].drain()
 
     tools = _tool_use_payload(permission_required=True, correlation_id=turn.turn_id)
-    tools_pipe.send_payload(tools)
-    await tools_pipe.ports.output["pipe_output"].drain()
+    await tools_pipe.async_send_payload(tools)
     await asyncio.sleep(0.05)
 
     approved = await gateway.approve_permission_request("perm-1")
@@ -283,10 +278,10 @@ async def test_deny_permission_request_emits_tool_use_payload():
     gateway = ChatGatewayElement()
     denied_pipe = PipeElement(name="denied_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
-    await gateway.ports.output["tool_use_denied_output"].connect(
+    gateway.ports.output["tool_use_denied_output"].connect(
         denied_pipe.ports.input["pipe_input"]
     )
-    await tools_pipe.ports.output["pipe_output"].connect(
+    tools_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["tool_use_input"]
     )
 
@@ -294,8 +289,7 @@ async def test_deny_permission_request_emits_tool_use_payload():
     await gateway.ports.output["message_output"].drain()
 
     tools = _tool_use_payload(permission_required=True, correlation_id=turn.turn_id)
-    tools_pipe.send_payload(tools)
-    await tools_pipe.ports.output["pipe_output"].drain()
+    await tools_pipe.async_send_payload(tools)
     await asyncio.sleep(0.05)
 
     denial = await gateway.deny_permission_request("perm-1", reason="User declined")
@@ -332,7 +326,7 @@ async def test_on_assistant_message_hook():
 
     gateway = ChatGatewayElement(on_assistant_message=on_assistant_message)
     llm_pipe = PipeElement(name="llm_pipe")
-    await llm_pipe.ports.output["pipe_output"].connect(
+    llm_pipe.ports.output["pipe_output"].connect(
         gateway.ports.input["assistant_message_input"]
     )
 
@@ -341,8 +335,7 @@ async def test_on_assistant_message_hook():
 
     assistant = MessagePayload(role="assistant", content="Hi", mode="atomic")
     assistant.model.ready = True
-    llm_pipe.send_payload(assistant)
-    await llm_pipe.ports.output["pipe_output"].drain()
+    await llm_pipe.async_send_payload(assistant)
     await asyncio.sleep(0.05)
 
     assert hook_turns == [turn.turn_id]

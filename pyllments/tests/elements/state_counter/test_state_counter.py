@@ -5,7 +5,6 @@ import pytest
 from pyllments.elements import StateCounterElement
 from pyllments.elements.pipe import PipeElement
 from pyllments.payloads import MessagePayload, StructuredPayload
-from pyllments.runtime.lifecycle_manager import LifecycleManager, manager as lifecycle_manager
 from pyllments.runtime.loop_registry import LoopRegistry
 
 
@@ -15,10 +14,8 @@ def loop():
 
 
 @pytest.fixture(autouse=True)
-def cleanup_output_ports(loop):
+def cleanup_output_ports():
     yield
-    loop.run_until_complete(lifecycle_manager.shutdown())
-    LifecycleManager.reset_for_tests()
 
 
 def _send_and_drain(sender: PipeElement, counter: StateCounterElement, payload, loop):
@@ -89,9 +86,9 @@ class TestStateCounterElement:
         reset_pipe = PipeElement(name="reset_pipe")
         count_pipe = PipeElement(name="count_pipe")
 
-        reset_pipe.ports.pipe_output > counter.ports.input["reset_emit_input"]
-        count_pipe.ports.pipe_output > counter.ports.input["count_emit_input"]
-        counter.ports.output["state_output"] > output_pipe.ports.input["pipe_input"]
+        reset_pipe.ports.pipe_output.connect(counter.ports.input["reset_emit_input"])
+        count_pipe.ports.pipe_output.connect(counter.ports.input["count_emit_input"])
+        counter.ports.output["state_output"].connect(output_pipe.ports.input["pipe_input"])
 
         _send_and_drain(
             reset_pipe,
@@ -121,8 +118,8 @@ class TestStateCounterElement:
             reset_predicate=lambda _p, _s: False,
         )
         sender = PipeElement()
-        sender.ports.pipe_output > counter.ports.input["count_emit_input"]
-        counter.ports.output["state_output"] > output_pipe.ports.input["pipe_input"]
+        sender.ports.pipe_output.connect(counter.ports.input["count_emit_input"])
+        counter.ports.output["state_output"].connect(output_pipe.ports.input["pipe_input"])
 
         _send_and_drain(
             sender,
@@ -144,8 +141,8 @@ class TestStateCounterElement:
 
         reset_pipe = PipeElement()
         count_pipe = PipeElement()
-        reset_pipe.ports.pipe_output > counter.ports.input["reset_emit_input"]
-        count_pipe.ports.pipe_output > counter.ports.input["count_emit_input"]
+        reset_pipe.ports.pipe_output.connect(counter.ports.input["reset_emit_input"])
+        count_pipe.ports.pipe_output.connect(counter.ports.input["count_emit_input"])
 
         _send_and_drain(reset_pipe, counter, StructuredPayload(data={"reset": True}), loop)
 
@@ -179,8 +176,8 @@ class TestStateCounterElement:
 
         reset_pipe = PipeElement()
         count_pipe = PipeElement()
-        reset_pipe.ports.pipe_output > counter.ports.input["reset_emit_input"]
-        count_pipe.ports.pipe_output > counter.ports.input["count_emit_input"]
+        reset_pipe.ports.pipe_output.connect(counter.ports.input["reset_emit_input"])
+        count_pipe.ports.pipe_output.connect(counter.ports.input["count_emit_input"])
 
         _send_and_drain(reset_pipe, counter, StructuredPayload(data={"reset": True}), loop)
         _send_and_drain(count_pipe, counter, MessagePayload(content="x"), loop)

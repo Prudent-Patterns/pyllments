@@ -7,7 +7,7 @@ import param
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import schedule_task
 
 from .history_handler_model import HistoryHandlerModel
 
@@ -88,7 +88,7 @@ class HistoryHandlerElement(Element):
                 if supported:
                     self.model.load_entries(supported)
 
-            LoopRegistry.get_loop().create_task(_handle())
+            schedule_task(_handle())
 
         self.ports.add_input(name="payload_input", unpack_payload_callback=unpack)
 
@@ -101,7 +101,7 @@ class HistoryHandlerElement(Element):
                     self.model.load_entries(supported)
                     await self._emit_outputs()
 
-            LoopRegistry.get_loop().create_task(_handle())
+            schedule_task(_handle())
 
         self.ports.add_input(name="payload_emit_input", unpack_payload_callback=unpack)
 
@@ -112,7 +112,7 @@ class HistoryHandlerElement(Element):
                     await payload.model.await_ready()
                 self.model.accept_summary_artifact(payload)
 
-            LoopRegistry.get_loop().create_task(_handle())
+            schedule_task(_handle())
 
         self.ports.add_input(name="summary_input", unpack_payload_callback=unpack)
 

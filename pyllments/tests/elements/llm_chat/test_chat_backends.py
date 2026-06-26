@@ -287,7 +287,7 @@ async def test_llm_chat_element_forwards_tools_input():
         tools=[{"type": "function", "function": {"name": "existing"}}],
     )
     pipe = PipeElement(name="tools_pipe")
-    await pipe.ports.output["pipe_output"].connect(element.ports.input["tools_input"])
+    pipe.ports.output["pipe_output"].connect(element.ports.input["tools_input"])
 
     tools = [{"type": "function", "function": {"name": "search"}}]
     await pipe.ports.output["pipe_output"].stage_emit(payload=StructuredPayload(data=tools))

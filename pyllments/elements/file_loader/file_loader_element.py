@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 import param
@@ -8,6 +9,7 @@ from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.elements.file_loader.file_loader_model import FileLoaderModel
 from pyllments.payloads.file import FilePayload
+from pyllments.runtime.scheduler import resolve_loop, schedule_task
 
 if TYPE_CHECKING:
     import panel as pn
@@ -93,9 +95,12 @@ class FileLoaderElement(Element):
     def emit_files(self, event=None):
         """Manually trigger file emission when the send button is clicked."""
         self.model.save_files()
-
-        self.ports.output['file_list_output'].stage_emit(file_list=self.model.file_list)
-
+        coro = self.ports.output['file_list_output'].stage_emit(file_list=self.model.file_list)
+        try:
+            asyncio.get_running_loop()
+            schedule_task(coro)
+        except RuntimeError:
+            resolve_loop().run_until_complete(coro)
         self.clear_files()
 
     def clear_files(self):

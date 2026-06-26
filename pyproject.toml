@@ -101,6 +101,11 @@ fallback-version = "0.0.1"
 [tool.hatch.build.hooks.vcs]
 version-file = "pyllments/_version.py"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+
 [tool.basedpyright]
 pythonVersion = "3.11"
 reportAttributeAccessIssue = false

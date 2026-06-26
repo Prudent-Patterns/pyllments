@@ -214,6 +214,7 @@ class TransformElement(Element):
             # Flag to indicate if processing was successful.
             processing_successful = False
             result = None
+            emit_coro = None
             
             # Strategy 1: Use build_fn if available (highest priority).
             if self.build_fn:
@@ -228,7 +229,7 @@ class TransformElement(Element):
                 try:
                     result = self.build_fn(**build_fn_kwargs)
                     if result is not None:
-                        transform_output.emit(result)
+                        emit_coro = transform_output.emit(result)
                         processing_successful = True
                 except Exception as e:
                     logger.error(f"Error in build_fn: {e}")
@@ -245,7 +246,7 @@ class TransformElement(Element):
                     try:
                         result = transform_fn(**fn_kwargs)
                         if result is not None:
-                            transform_output.emit(result)
+                            emit_coro = transform_output.emit(result)
                             processing_successful = True
                             c['inputs_used_in_transformation'].update(required_ports)
                     except Exception as e:
@@ -263,7 +264,7 @@ class TransformElement(Element):
                     try:
                         result = self.emit_fn(**fn_kwargs)
                         if result is not None:
-                            transform_output.emit(result)
+                            emit_coro = transform_output.emit(result)
                             processing_successful = True
                             c['inputs_used_in_transformation'].update(required_params)
                     except Exception as e:
@@ -277,6 +278,6 @@ class TransformElement(Element):
                         c['input_name_payload_dict'].pop(p_name, None)
                         c['inputs_used_in_transformation'].discard(p_name)
             
-            return result
+            return emit_coro if emit_coro is not None else result
         
         return transform_flow_fn

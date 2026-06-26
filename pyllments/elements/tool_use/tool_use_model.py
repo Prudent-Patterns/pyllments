@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, RootModel, create_model
 from pyllments.base.model_base import Model
 from pyllments.common.pydantic_models import CleanModel
 from pyllments.payloads import ToolUsePayload
-from pyllments.runtime.loop_registry import LoopRegistry
+from pyllments.runtime.scheduler import resolve_loop, schedule_task
 
 from .function_tool_adapter import FunctionToolAdapter
 from .mcp_tool_adapter import MCPToolAdapter
@@ -27,8 +27,8 @@ class ToolUseModel(Model):
     def __init__(self, adapters: list[ToolAdapter] | None = None, **params):
         super().__init__(**params)
         self.adapters = adapters or []
-        self.loop = LoopRegistry.get_loop()
-        self._setup_task = self.loop.create_task(self.setup())
+        self.loop = resolve_loop()
+        self._setup_task = schedule_task(self.setup())
 
     async def setup(self):
         for adapter in self.adapters:

@@ -22,7 +22,7 @@ class TextChunkerElement(Element):
             file_payload_list = payload if isinstance(payload, list) else [payload]
             for file_payload in file_payload_list:
                 chunks = self.model.make_chunks(file_payload)
-                self.ports.output['chunk_output'].stage_emit(chunks=chunks)
+                return self.ports.output['chunk_output'].stage_emit(chunks=chunks)
                 
         self.ports.add_input(name='file_input', unpack_payload_callback=unpack)
 

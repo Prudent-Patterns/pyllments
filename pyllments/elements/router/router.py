@@ -100,7 +100,6 @@ class Router(Element):
                 if predicate(payload):
                     if port_name in kwargs:
                         output_port = kwargs[port_name]
-                        output_port.emit(payload)
-                        return
+                        return output_port.emit(payload)
         
         return flow_fn
