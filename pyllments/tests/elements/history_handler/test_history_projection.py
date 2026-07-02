@@ -19,7 +19,7 @@ from pyllments.payloads.structured.summary_contract import (
 
 def _tool_use(content_text: str, ts: float) -> ToolUsePayload:
     payload = ToolUsePayload(timestamp=ts, executor_element_name="main_tools")
-    payload.model.add_tool_use(
+    index = payload.model.add_tool_call(
         adapter_name="mcp",
         provider_name="mcp",
         tool_name="search",
@@ -27,9 +27,8 @@ def _tool_use(content_text: str, ts: float) -> ToolUsePayload:
         description="search docs",
         parameters={"q": "test"},
     )
-    tool_use_id = next(iter(payload.model.tool_uses))
     payload.model.attach_result(
-        tool_use_id,
+        index,
         {"content": [{"type": "text", "text": content_text}], "raw": None, "metadata": {}},
     )
     return payload

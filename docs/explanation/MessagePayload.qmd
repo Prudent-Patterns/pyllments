@@ -29,7 +29,6 @@ Constructor arguments are passed to `MessageModel`. Common fields:
 | `mode` | `'atomic'` | `'atomic'` or `'stream'` |
 | `message_coroutine` | `None` | Atomic: awaitable response. Stream: async iterator (or awaitable that resolves to one) |
 | `aggregate_stream` | `True` | When streaming, update `content` / `tool_calls` on the model as events arrive |
-| `correlation_id` | `None` | Optional turn id (set by `ChatGatewayElement` on user messages) |
 | `tool_calls` | `[]` | Accumulated tool calls (stream or atomic) |
 | `streamed` | `False` | Whether the stream has finished |
 | `ready` | `False` | Whether the message is fully processed |
@@ -124,7 +123,7 @@ Views watch `model.content` and update reactively during streaming when aggregat
 
 Typical production flow:
 
-1. `ChatGatewayElement.submit_message()` emits a user `MessagePayload` (`correlation_id` = turn id).
+1. `ChatGatewayElement.submit_message()` emits a user `MessagePayload` and returns a `TurnHandle`.
 2. Graph runs (history → LLM).
 3. Assistant `MessagePayload` arrives on `assistant_message_input`.
 4. Application code uses `TurnHandle.stream()` → `message.model.aiter_events()`.

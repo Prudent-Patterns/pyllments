@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import param
 
 from pyllments.base.model_base import Model
+from pyllments.elements.chat_gateway.tool_permission import ToolPermissionRequest
 
 if TYPE_CHECKING:
     from pyllments.payloads import MessagePayload, ToolUsePayload
@@ -28,19 +29,19 @@ class TurnState:
 class PermissionRequestState:
     """Pending tool permission awaiting application approval."""
 
-    request_id: str
-    turn_id: str
     payload: ToolUsePayload
-    tool_names: list[str]
+    request: ToolPermissionRequest
+    pending_indices: list[int]
+    pending_record: Any = None
 
 
 class ChatGatewayModel(Model):
     """
     Tracks turns and pending tool permissions for :class:`ChatGatewayElement`.
 
-    Assistant responses match turns by ``correlation_id`` when present, otherwise
-    FIFO. Tool permission requests are keyed by ``request_id`` until approved or
-    denied by the outer application.
+    Assistant responses match turns in FIFO order. Tool permission requests are
+    held as mutable request objects until the outer application approves or denies
+    the tools they contain.
     """
 
     on_user_message_submitted = param.Callable(
@@ -53,24 +54,27 @@ class ChatGatewayModel(Model):
     )
     on_tool_event = param.Callable(
         default=None,
-        doc="``(event_dict, turn_id)`` when streaming tool calls complete.",
+        doc="``(event_dict)`` when streaming tool calls complete.",
     )
     on_tool_use = param.Callable(
         default=None,
-        doc="``(payload, turn_id)`` when a ToolUsePayload arrives at the gateway.",
+        doc="``(notice)`` when a ToolUsePayload arrives at the gateway.",
     )
     on_permission_request = param.Callable(
         default=None,
-        doc="``(request_dict, turn_id)`` when tools require user approval.",
+        doc="``(request)`` when tools require user approval.",
+    )
+    on_pending_permission_restored = param.Callable(
+        default=None,
+        doc="``(request)`` when pending permissions are hydrated on startup.",
     )
 
     def __init__(self, **params):
         super().__init__(**params)
         self._turn_counter = 0
-        self._permission_counter = 0
         self._pending_turn_ids: list[str] = []
         self._turn_states: dict[str, TurnState] = {}
-        self._permission_requests: dict[str, PermissionRequestState] = {}
+        self._permission_requests: list[PermissionRequestState] = []
 
     def get_turn_state(self, turn_id: str) -> TurnState | None:
         """Return runtime state for a turn, if it exists."""
@@ -80,11 +84,6 @@ class ChatGatewayModel(Model):
         """Generate a unique turn identifier."""
         self._turn_counter += 1
         return f"turn-{self._turn_counter}"
-
-    def create_permission_request_id(self) -> str:
-        """Generate a unique permission request identifier."""
-        self._permission_counter += 1
-        return f"perm-{self._permission_counter}"
 
     def register_turn(self, turn_id: str, user_message: MessagePayload) -> TurnState:
         """Register a new pending turn."""
@@ -102,12 +101,7 @@ class ChatGatewayModel(Model):
         str or None
             The matched turn id, or None if no pending turn exists.
         """
-        correlation_id = getattr(assistant_message.model, "correlation_id", None)
-        if correlation_id and correlation_id in self._turn_states:
-            turn_id = correlation_id
-            if turn_id in self._pending_turn_ids:
-                self._pending_turn_ids.remove(turn_id)
-        elif self._pending_turn_ids:
+        if self._pending_turn_ids:
             turn_id = self._pending_turn_ids.pop(0)
         else:
             assistant_message.model.cancel()
@@ -126,13 +120,8 @@ class ChatGatewayModel(Model):
         """
         Resolve the turn associated with a tool use payload.
 
-        Uses ``correlation_id`` on the payload model when set; otherwise prefers the
-        newest active (non-done, non-cancelled) turn.
+        Prefers the newest active (non-done, non-cancelled) turn.
         """
-        correlation_id = getattr(payload.model, "correlation_id", None) or payload.model.turn_id
-        if correlation_id and correlation_id in self._turn_states:
-            return correlation_id
-
         active_ids = [
             tid
             for tid in self._turn_states
@@ -156,50 +145,45 @@ class ChatGatewayModel(Model):
 
     def register_permission_request(
         self,
-        turn_id: str,
         payload: ToolUsePayload,
+        pending_indices: list[int] | None = None,
     ) -> PermissionRequestState:
         """Store a pending permission request and return its state."""
-        request_id = self.create_permission_request_id()
-        payload.model.apply_permission_request(request_id)
+        indices = pending_indices or self.pending_permission_indices(payload)
+        payload.model.apply_permission_request(indices)
+        request = ToolPermissionRequest.from_payload(payload)
         state = PermissionRequestState(
-            request_id=request_id,
-            turn_id=turn_id,
             payload=payload,
-            tool_names=self.pending_permission_tool_names(payload),
+            request=request,
+            pending_indices=indices,
         )
-        self._permission_requests[request_id] = state
+        self._permission_requests.append(state)
         return state
 
-    def get_permission_request(self, request_id: str) -> PermissionRequestState | None:
+    @staticmethod
+    def pending_permission_indices(payload: ToolUsePayload) -> list[int]:
+        """Return list indices for tool calls still awaiting permission."""
+        return payload.model.pending_permission_indices()
+
+    def get_permission_request(
+        self,
+        request: ToolPermissionRequest,
+    ) -> PermissionRequestState | None:
         """Return a pending permission request, if it exists."""
-        return self._permission_requests.get(request_id)
+        for state in self._permission_requests:
+            if state.request is request:
+                return state
+        return None
 
-    def pop_permission_request(self, request_id: str) -> PermissionRequestState | None:
+    def pop_permission_request(
+        self,
+        request: ToolPermissionRequest,
+    ) -> PermissionRequestState | None:
         """Remove and return a pending permission request."""
-        return self._permission_requests.pop(request_id, None)
-
-    def build_permission_request_event(self, state: PermissionRequestState) -> dict[str, Any]:
-        """Build a hook-friendly dict describing a permission request."""
-        tools = []
-        for record in state.payload.model.tool_uses.values():
-            if record.get("status") != "awaiting_permission":
-                continue
-            tools.append(
-                {
-                    "name": record.get("model_tool_name"),
-                    "adapter_name": record.get("adapter_name"),
-                    "provider_name": record.get("provider_name"),
-                    "tool_name": record.get("tool_name"),
-                    "description": record.get("description"),
-                    "parameters": record.get("parameters"),
-                }
-            )
-        return {
-            "request_id": state.request_id,
-            "turn_id": state.turn_id,
-            "tools": tools,
-        }
+        for index, state in enumerate(self._permission_requests):
+            if state.request is request:
+                return self._permission_requests.pop(index)
+        return None
 
     async def wait_for_assistant(self, turn_id: str) -> MessagePayload:
         """Wait until the assistant message for a turn is linked."""

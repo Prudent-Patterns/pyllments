@@ -1,15 +1,32 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, Callable
 
 import param
 
 from pyllments.base.element_base import Element
+from pyllments.elements.chat_gateway.chat_gateway_model import (
+    ChatGatewayModel,
+    PermissionRequestState,
+)
+from pyllments.elements.chat_gateway.pending_tool_use_store import (
+    PendingToolUseRecord,
+    PendingToolUseStore,
+    SQLitePendingToolUseStore,
+)
+from pyllments.elements.chat_gateway.tool_permission import (
+    ToolPermissionRequest,
+    ToolUseNotice,
+)
+from pyllments.elements.chat_gateway.turn_handle import TurnHandle
+from pyllments.elements.history_handler.history_store import (
+    _deserialize_tool_use,
+    _serialize_tool_use,
+)
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.runtime.scheduler import schedule_task
-from pyllments.elements.chat_gateway.chat_gateway_model import ChatGatewayModel
-from pyllments.elements.chat_gateway.turn_handle import TurnHandle
 
 
 class ChatGatewayElement(Element):
@@ -17,8 +34,8 @@ class ChatGatewayElement(Element):
     Production boundary between application code and Pyllments chat flows.
 
     Submits user messages into the graph, receives assistant and tool payloads from
-    downstream elements, surfaces optional hooks to the host app, and emits approved
-    or denied tool decisions back into the flow. Does not execute tool callables.
+    downstream elements, owns permission and execution timing, and emits tool results
+    for UI/history/context wiring.
 
     Ports
     -----
@@ -30,20 +47,24 @@ class ChatGatewayElement(Element):
         ``ToolUsePayload`` from tool lifecycle (pending, completed, or informational).
     tool_events_output : out
         Tool-call completion events as ``StructuredPayload``.
-    tool_use_approved_output : out
-        ``ToolUsePayload`` after the application approves a permission request.
-    tool_use_denied_output : out
-        ``ToolUsePayload`` with denied tool-use records for downstream routing.
+    tool_result_output : out
+        ``ToolUsePayload`` after gateway execution or denial.
     """
 
     default_aggregate_stream = param.Boolean(
         default=True,
         doc="Default aggregate_stream for assistant stream payloads (history compatibility)",
     )
+    pending_db_path = param.String(
+        default=None,
+        allow_None=True,
+        doc="Optional SQLite path for pending tool permission persistence.",
+    )
 
-    _ELEMENT_PARAMS = frozenset({"default_aggregate_stream"})
+    _ELEMENT_PARAMS = frozenset({"default_aggregate_stream", "pending_db_path"})
 
     def __init__(self, **params):
+        pending_store = params.pop("pending_store", None)
         super().__init__(**params)
         model_params = {
             key: value
@@ -51,6 +72,12 @@ class ChatGatewayElement(Element):
             if key not in self._ELEMENT_PARAMS
         }
         self.model = ChatGatewayModel(**model_params)
+        if pending_store is not None:
+            self.pending_store = pending_store
+        elif self.pending_db_path:
+            self.pending_store = SQLitePendingToolUseStore(db_path=self.pending_db_path)
+        else:
+            self.pending_store = None
         self._setup_ports()
 
     def _setup_ports(self):
@@ -58,8 +85,7 @@ class ChatGatewayElement(Element):
         self._assistant_message_input_setup()
         self._tool_use_input_setup()
         self._tool_events_output_setup()
-        self._tool_use_approved_output_setup()
-        self._tool_use_denied_output_setup()
+        self._tool_result_output_setup()
 
     @staticmethod
     async def _invoke_hook(callback: Callable | None, *args: Any, **kwargs: Any) -> None:
@@ -114,20 +140,7 @@ class ChatGatewayElement(Element):
                 )
                 return
 
-            await self._invoke_hook(
-                self.model.on_tool_use,
-                payload,
-                turn_id,
-            )
-
-            if self.model.tools_need_permission(payload):
-                perm_state = self.model.register_permission_request(turn_id, payload)
-                await self._invoke_hook(
-                    self.model.on_permission_request,
-                    self.model.build_permission_request_event(perm_state),
-                    turn_id,
-                )
-                return
+            await self._handle_tool_use_payload(payload, turn_id)
 
         self.ports.add_input(
             name="tool_use_input",
@@ -135,92 +148,211 @@ class ChatGatewayElement(Element):
             payload_type=ToolUsePayload,
         )
 
+    async def _handle_tool_use_payload(self, payload: ToolUsePayload, turn_id: str) -> None:
+        """Process an arriving tool-use payload: hook, execute, and gate permissions."""
+        notice = ToolUseNotice.from_payload(payload)
+        await self._invoke_hook(self.model.on_tool_use, notice)
+
+        if payload.model.completed:
+            return
+
+        if not self._ensure_payload_bound(payload):
+            self.logger.warning(
+                "ToolUsePayload could not be rebound to executor %s",
+                payload.model.executor_element_name,
+            )
+            payload.model.metadata["rebind_error"] = (
+                f"Executor not found: {payload.model.executor_element_name}"
+            )
+            await self._emit_tool_result(payload)
+            return
+
+        approved_indices = self._executable_tool_call_indices(payload)
+        if approved_indices:
+            await self._execute_and_emit(payload, approved_indices)
+
+        if self.model.tools_need_permission(payload):
+            perm_state = self.model.register_permission_request(payload)
+            await self._persist_pending_request(perm_state)
+            await self._invoke_hook(
+                self.model.on_permission_request,
+                perm_state.request,
+            )
+            if perm_state.request.has_decisions:
+                await self.resolve_permission_request(perm_state.request)
+
+    def _ensure_payload_bound(self, payload: ToolUsePayload) -> bool:
+        if payload.is_bound:
+            return True
+        return payload.bind_registered_executor()
+
+    @staticmethod
+    def _executable_tool_call_indices(payload: ToolUsePayload) -> list[int]:
+        return [
+            index
+            for index, record in enumerate(payload.model.tool_calls)
+            if record.get("status") == "approved"
+        ]
+
+    async def _execute_and_emit(
+        self,
+        payload: ToolUsePayload,
+        tool_call_indices: list[int] | None = None,
+    ) -> ToolUsePayload:
+        executed = await self._execute_tool_calls(payload, tool_call_indices)
+        await self._emit_tool_result(executed)
+        return executed
+
+    async def _execute_tool_calls(
+        self,
+        payload: ToolUsePayload,
+        tool_call_indices: list[int] | None = None,
+    ) -> ToolUsePayload:
+        return await payload.execute_approved(tool_call_indices=tool_call_indices)
+
+    async def _emit_tool_result(self, payload: ToolUsePayload) -> None:
+        await self.ports.output["tool_result_output"].stage_emit(payload=payload)
+
+    async def _persist_pending_request(self, state: PermissionRequestState) -> None:
+        if self.pending_store is None:
+            return
+        now = time.time()
+        if state.pending_record is None:
+            state.pending_record = PendingToolUseRecord(
+                payload_data=_serialize_tool_use(state.payload),
+                created_at=now,
+                updated_at=now,
+            )
+        else:
+            state.pending_record.payload_data = _serialize_tool_use(state.payload)
+            state.pending_record.updated_at = now
+        await self.pending_store.upsert_record(state.pending_record)
+
+    async def _delete_pending_request(self, state: PermissionRequestState) -> None:
+        if self.pending_store is None or state.pending_record is None:
+            return
+        await self.pending_store.delete_record(state.pending_record)
+        state.pending_record = None
+
+    async def _sync_pending_request(self, state: PermissionRequestState) -> None:
+        if self.model.tools_need_permission(state.payload):
+            await self._persist_pending_request(state)
+        else:
+            await self._delete_pending_request(state)
+
     def _tool_events_output_setup(self):
         async def pack(payload: dict) -> StructuredPayload:
             return StructuredPayload(data=payload)
 
         self.ports.add_output(name="tool_events_output", pack_payload_callback=pack)
 
-    def _tool_use_approved_output_setup(self):
+    def _tool_result_output_setup(self):
         async def pack(payload: ToolUsePayload) -> ToolUsePayload:
             return payload
 
-        self.ports.add_output(
-            name="tool_use_approved_output",
-            pack_payload_callback=pack,
-        )
-
-    def _tool_use_denied_output_setup(self):
-        async def pack(payload: ToolUsePayload) -> ToolUsePayload:
-            return payload
-
-        self.ports.add_output(
-            name="tool_use_denied_output",
-            pack_payload_callback=pack,
-        )
+        self.ports.add_output(name="tool_result_output", pack_payload_callback=pack)
 
     async def emit_tool_event(self, turn_id: str, tool_calls: list[dict]) -> None:
         """Emit tool-call completion for downstream tool routing."""
         if self.model.is_turn_cancelled(turn_id):
             return
-        event = {"turn_id": turn_id, "tool_calls": tool_calls}
-        await self._invoke_hook(self.model.on_tool_event, event, turn_id)
+        event = {"tool_calls": tool_calls}
+        await self._invoke_hook(self.model.on_tool_event, event)
         await self.ports.output["tool_events_output"].stage_emit(payload=event)
 
-    async def approve_permission_request(self, request_id: str) -> ToolUsePayload | None:
-        """
-        Approve a pending tool permission and emit the payload into the flow.
-
-        Returns
-        -------
-        ToolUsePayload or None
-            The approved payload, or None if ``request_id`` is unknown.
-        """
-        state = self.model.pop_permission_request(request_id)
-        if state is None:
-            self.logger.warning("Unknown permission request id: %s", request_id)
-            return None
-
-        state.payload.model.approve()
-        await self.ports.output["tool_use_approved_output"].stage_emit(
-            payload=state.payload
-        )
-        return state.payload
-
-    async def deny_permission_request(
+    async def resolve_permission_request(
         self,
-        request_id: str,
-        reason: str | None = None,
+        request: ToolPermissionRequest,
     ) -> ToolUsePayload | None:
         """
-        Deny a pending tool permission and emit a denied ToolUsePayload into the flow.
+        Apply application decisions from a permission request object.
 
         Returns
         -------
         ToolUsePayload or None
-            The denied payload, or None if ``request_id`` is unknown.
+            The updated payload, or None if ``request`` is no longer pending.
         """
-        state = self.model.pop_permission_request(request_id)
+        state = self.model.get_permission_request(request)
         if state is None:
-            self.logger.warning("Unknown permission request id: %s", request_id)
+            self.logger.warning("Unknown or already-resolved permission request")
             return None
 
-        state.payload.model.deny(reason=reason)
-        state.payload.model.metadata["denial_reason"] = reason
-        await self.ports.output["tool_use_denied_output"].stage_emit(payload=state.payload)
+        if not self._ensure_payload_bound(state.payload):
+            self.logger.warning(
+                "Cannot resolve permission request: executor %s unavailable",
+                state.payload.model.executor_element_name,
+            )
+            return None
+
+        approved_indices = [tool.index for tool in request.approved_tools]
+        denied_tools = request.denied_tools
+        if approved_indices:
+            await self._execute_tool_calls(state.payload, approved_indices)
+
+        if self.model.tools_need_permission(state.payload):
+            state.pending_indices = self.model.pending_permission_indices(state.payload)
+            await self._sync_pending_request(state)
+        else:
+            self.model.pop_permission_request(request)
+            await self._delete_pending_request(state)
+
+        if approved_indices or denied_tools:
+            await self._emit_tool_result(state.payload)
         return state.payload
 
-    def approve_permission_request_sync(self, request_id: str) -> None:
-        """Schedule :meth:`approve_permission_request` on the runtime loop."""
-        schedule_task(self.approve_permission_request(request_id))
+    async def hydrate_pending_tool_uses(self) -> list[ToolPermissionRequest]:
+        """
+        Restore pending permission requests from the optional pending store.
 
-    def deny_permission_request_sync(
-        self,
-        request_id: str,
-        reason: str | None = None,
-    ) -> None:
-        """Schedule :meth:`deny_permission_request` on the runtime loop."""
-        schedule_task(self.deny_permission_request(request_id, reason=reason))
+        Rebinds executors when available, recovers stale running records, and
+        invokes ``on_pending_permission_restored`` for each restored request.
+        """
+        if self.pending_store is None:
+            return []
+
+        restored: list[ToolPermissionRequest] = []
+        records = await self.pending_store.load_records()
+        for record in records:
+            payload = _deserialize_tool_use(record.payload_data)
+            payload.model.recover_stale_running()
+
+            if not self._ensure_payload_bound(payload):
+                self.logger.warning(
+                    "Pending tool request could not rebind executor %s; purging",
+                    payload.model.executor_element_name,
+                )
+                payload.model.metadata["rebind_error"] = (
+                    f"Executor not found: {payload.model.executor_element_name}"
+                )
+                await self.pending_store.delete_record(record)
+                continue
+
+            pending_indices = self.model.pending_permission_indices(payload)
+            if not pending_indices:
+                await self.pending_store.delete_record(record)
+                continue
+
+            request = ToolPermissionRequest.from_payload(payload)
+            state = PermissionRequestState(
+                payload=payload,
+                request=request,
+                pending_indices=pending_indices,
+                pending_record=record,
+            )
+            self.model._permission_requests.append(state)
+            restored.append(request)
+            await self._invoke_hook(
+                self.model.on_pending_permission_restored,
+                request,
+            )
+            if request.has_decisions:
+                await self.resolve_permission_request(request)
+
+        return restored
+
+    def resolve_permission_request_sync(self, request: ToolPermissionRequest) -> None:
+        """Schedule :meth:`resolve_permission_request` on the runtime loop."""
+        schedule_task(self.resolve_permission_request(request))
 
     async def submit_message_async(
         self,
@@ -233,7 +365,6 @@ class ChatGatewayElement(Element):
         user_message = MessagePayload(
             content=content,
             role=role,
-            correlation_id=turn_id,
             **kwargs,
         )
         self.model.register_turn(turn_id, user_message)
@@ -267,7 +398,6 @@ class ChatGatewayElement(Element):
         user_message = MessagePayload(
             content=content,
             role=role,
-            correlation_id=turn_id,
             **kwargs,
         )
         self.model.register_turn(turn_id, user_message)

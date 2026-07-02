@@ -50,12 +50,6 @@ class MessageModel(Model):
         doc="When True, aiter_events updates content and tool_calls on the model during streaming"
     )
 
-    correlation_id = param.String(
-        default=None,
-        allow_None=True,
-        doc="Optional identifier for matching this message to an application turn"
-    )
-
     embedding = param.Parameter(doc="Message embedding if generated")
 
     timestamp = param.Number(default=None, doc="Unix timestamp when the message was created")

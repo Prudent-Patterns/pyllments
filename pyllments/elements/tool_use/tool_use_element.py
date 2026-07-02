@@ -32,13 +32,9 @@ class ToolUseElement(Element):
         mcps=None,
         functions=None,
         tools_requiring_permission=None,
-        flow_id: str | None = None,
-        flow_version: str | None = None,
         **params,
     ):
         super().__init__(**params)
-        self.flow_id = flow_id
-        self.flow_version = flow_version
         adapter_list = build_adapters(
             adapters=adapters,
             mcps=mcps,
@@ -46,8 +42,15 @@ class ToolUseElement(Element):
             tools_requiring_permission=tools_requiring_permission,
         )
         self.model = ToolUseModel(adapters=adapter_list)
+        ToolUsePayload.register_executor(self)
         self._setup_ports()
         schedule_task(self._emit_latched_schema_outputs())
+
+    def __del__(self):
+        try:
+            ToolUsePayload.unregister_executor(self)
+        except Exception:
+            pass
 
     async def _emit_latched_schema_outputs(self):
         """Emit tool schemas when adapter resources are ready."""
@@ -107,20 +110,12 @@ class ToolUseElement(Element):
     def _build_tool_use_payload(
         self,
         requests: list[dict[str, Any]],
-        *,
-        turn_id: str | None = None,
     ) -> ToolUsePayload:
-        payload = ToolUsePayload(
-            turn_id=turn_id,
-            correlation_id=turn_id,
-            flow_id=self.flow_id,
-            flow_version=self.flow_version,
-            executor_element_name=self.name,
-        )
+        payload = ToolUsePayload(executor_element_name=self.name)
         for request in requests:
             model_tool_name = request["name"]
             spec = self.model.spec_for_model_tool(model_tool_name)
-            payload.model.add_tool_use(
+            payload.model.add_tool_call(
                 adapter_name=spec.adapter_name,
                 provider_name=spec.provider_name,
                 tool_name=spec.tool_name,
@@ -129,6 +124,7 @@ class ToolUseElement(Element):
                 parameters=request.get("parameters") or {},
                 permission_required=spec.permission_required,
             )
+        payload.bind_executor(self)
         return payload
 
     @staticmethod
@@ -152,17 +148,40 @@ class ToolUseElement(Element):
                 {
                     "name": function.get("name", ""),
                     "parameters": self._parse_tool_call_parameters(function.get("arguments")),
-                    "tool_use_id": tool_call.get("id"),
                 }
             )
         return requests
 
     async def _emit_tool_use(self, payload: ToolUsePayload):
         await self.ports.output["tool_use_output"].stage_emit(payload=payload)
-        if not payload.model.needs_permission():
-            payload.model.approve()
-            executed = await self._execute_payload(payload)
-            await self.ports.output["tool_result_output"].stage_emit(payload=executed)
+
+    async def execute_tool_use_payload(
+        self,
+        payload: ToolUsePayload,
+        tool_call_indices: list[int] | None = None,
+    ) -> ToolUsePayload:
+        """Execute approved tool records for a bound payload."""
+        payload.model.recover_stale_running()
+        tasks = []
+        selected_indices = []
+        for index in payload.model._iter_indices(tool_call_indices):
+            if not payload.model.can_execute(index):
+                continue
+            record = payload.model.tool_calls[index]
+            payload.model.mark_running(index)
+            selected_indices.append(index)
+            tasks.append(self.model.execute_tool_use(record))
+
+        if not tasks:
+            return payload
+
+        results = await asyncio.gather(*tasks)
+        for index, outcome in zip(selected_indices, results):
+            if "error" in outcome:
+                payload.model.attach_error(index, outcome["error"])
+            else:
+                payload.model.attach_result(index, outcome["result"])
+        return payload
 
     def _normalize_structured_requests(self, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [
@@ -172,28 +191,6 @@ class ToolUseElement(Element):
             }
             for item in data
         ]
-
-    async def _execute_payload(self, payload: ToolUsePayload) -> ToolUsePayload:
-        payload.model.recover_stale_running()
-        tasks = []
-        tool_use_ids = []
-        for tool_use_id, record in payload.model.tool_uses.items():
-            if not payload.model.can_execute(tool_use_id):
-                continue
-            payload.model.mark_running(tool_use_id)
-            tool_use_ids.append(tool_use_id)
-            tasks.append(self.model.execute_tool_use(record))
-
-        if not tasks:
-            return payload
-
-        results = await asyncio.gather(*tasks)
-        for tool_use_id, outcome in zip(tool_use_ids, results):
-            if "error" in outcome:
-                payload.model.attach_error(tool_use_id, outcome["error"])
-            else:
-                payload.model.attach_result(tool_use_id, outcome["result"])
-        return payload
 
     def _tools_schema_output_setup(self):
         async def pack(tools_schema: type[BaseModel]) -> SchemaPayload:
@@ -247,11 +244,10 @@ class ToolUseElement(Element):
                 await payload.model.aget_message()
             elif payload.model.mode == "stream" and not payload.model.streamed:
                 await payload.model.await_ready()
-            turn_id = getattr(payload.model, "correlation_id", None)
             requests = self._normalize_message_tool_calls(payload)
             if not requests:
                 return
-            tool_use = self._build_tool_use_payload(requests, turn_id=turn_id)
+            tool_use = self._build_tool_use_payload(requests)
             await self._emit_tool_use(tool_use)
 
         self.ports.add_input(
@@ -262,8 +258,10 @@ class ToolUseElement(Element):
 
     def _approved_tool_use_input_setup(self):
         async def unpack(payload: ToolUsePayload):
+            if not payload.is_bound:
+                payload.bind_executor(self)
             payload.model.approve()
-            executed = await self._execute_payload(payload)
+            executed = await self.execute_tool_use_payload(payload)
             await self.ports.output["tool_result_output"].stage_emit(payload=executed)
 
         self.ports.add_input(

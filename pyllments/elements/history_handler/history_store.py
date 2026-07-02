@@ -62,33 +62,27 @@ def _deserialize_message(data: dict) -> MessagePayload:
 
 def _serialize_tool_use(payload: ToolUsePayload) -> dict:
     return {
-        "payload_id": payload.model.payload_id,
-        "turn_id": payload.model.turn_id,
         "flow_id": payload.model.flow_id,
         "flow_version": payload.model.flow_version,
         "executor_element_name": payload.model.executor_element_name,
         "status": payload.model.status,
-        "tool_uses": payload.model.tool_uses,
+        "tool_calls": payload.model.tool_calls,
         "metadata": payload.model.metadata,
         "timestamp": payload.model.timestamp,
         "updated_at": payload.model.updated_at,
-        "correlation_id": payload.model.correlation_id,
     }
 
 
 def _deserialize_tool_use(data: dict) -> ToolUsePayload:
     return ToolUsePayload(
-        payload_id=data.get("payload_id"),
-        turn_id=data.get("turn_id"),
         flow_id=data.get("flow_id"),
         flow_version=data.get("flow_version"),
         executor_element_name=data.get("executor_element_name"),
         status=data.get("status", "pending"),
-        tool_uses=data.get("tool_uses", {}),
+        tool_calls=data.get("tool_calls", []),
         metadata=data.get("metadata", {}),
         timestamp=data.get("timestamp"),
         updated_at=data.get("updated_at"),
-        correlation_id=data.get("correlation_id"),
     )
 
 

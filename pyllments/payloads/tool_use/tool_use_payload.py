@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from typing import TYPE_CHECKING
 
 from jinja2 import Template
@@ -7,15 +8,26 @@ from jinja2 import Template
 from pyllments.base.component_base import Component
 from pyllments.base.payload_base import Payload
 
+from .tool_use_executor import ToolUseExecutor, ToolUseExecutorNotBoundError
 from .tool_use_model import ToolUseModel
 
 if TYPE_CHECKING:
     import panel as pn
 
+__all__ = ["ToolUsePayload", "ToolUseExecutorNotBoundError"]
+
+_EXECUTOR_REGISTRY: weakref.WeakValueDictionary[str, ToolUseExecutor] = (
+    weakref.WeakValueDictionary()
+)
+
 
 class ToolUsePayload(Payload):
     """
     Durable payload representing one or more tool calls across their lifecycle.
+
+    Execution is delegated to a bound runtime executor (typically ToolUseElement).
+    Each payload stores ``executor_element_name``; live ``ToolUseElement`` instances
+    register by name so hydrated payloads can rebind automatically.
     """
 
     parameters_template = Template("""```
@@ -29,6 +41,91 @@ class ToolUsePayload(Payload):
     def __init__(self, **params):
         super().__init__(**params)
         self.model = ToolUseModel(**params)
+        self._executor: ToolUseExecutor | None = None
+
+    @classmethod
+    def register_executor(cls, executor: ToolUseExecutor, name: str | None = None) -> None:
+        """Register a live ToolUseElement executor by element name."""
+        executor_name = name or getattr(executor, "name", None)
+        if not executor_name:
+            raise ValueError("Tool executor name is required for registration")
+        _EXECUTOR_REGISTRY[executor_name] = executor
+
+    @classmethod
+    def unregister_executor(cls, executor: ToolUseExecutor | str) -> None:
+        """Remove a registered executor when its element is torn down."""
+        if isinstance(executor, str):
+            _EXECUTOR_REGISTRY.pop(executor, None)
+            return
+        executor_name = getattr(executor, "name", None)
+        if executor_name and _EXECUTOR_REGISTRY.get(executor_name) is executor:
+            _EXECUTOR_REGISTRY.pop(executor_name, None)
+
+    @classmethod
+    def resolve_executor(cls, name: str | None) -> ToolUseExecutor | None:
+        """Look up a registered executor by ToolUseElement name."""
+        if not name:
+            return None
+        return _EXECUTOR_REGISTRY.get(name)
+
+    @classmethod
+    def clear_executor_registry(cls) -> None:
+        """Clear all registered executors. Intended for test isolation."""
+        _EXECUTOR_REGISTRY.clear()
+
+    def bind_executor(self, executor: ToolUseExecutor) -> ToolUsePayload:
+        """Attach a live executor for in-memory execution delegation."""
+        self._executor = executor
+        return self
+
+    def bind_registered_executor(self) -> bool:
+        """
+        Rebind this payload to a registered executor by ``executor_element_name``.
+
+        Returns
+        -------
+        bool
+            True when a live executor was found and bound.
+        """
+        executor = self.resolve_executor(self.model.executor_element_name)
+        if executor is None:
+            return False
+        self.bind_executor(executor)
+        return True
+
+    @property
+    def is_bound(self) -> bool:
+        """Return whether this payload can execute approved tool records."""
+        return self._executor is not None
+
+    async def execute_approved(
+        self,
+        tool_call_indices: list[int] | None = None,
+    ) -> ToolUsePayload:
+        """
+        Execute approved tool records through the bound executor.
+
+        Parameters
+        ----------
+        tool_call_indices : list[int] or None
+            Optional subset of tool-call list indices to execute.
+
+        Raises
+        ------
+        ToolUseExecutorNotBoundError
+            If execution is attempted before rebinding.
+        """
+        if not self.is_bound:
+            self.bind_registered_executor()
+        if not self.is_bound:
+            raise ToolUseExecutorNotBoundError(
+                "ToolUsePayload is not bound to an executor. "
+                f"No live ToolUseElement named {self.model.executor_element_name!r} is registered."
+            )
+        return await self._executor.execute_tool_use_payload(
+            self,
+            tool_call_indices=tool_call_indices,
+        )
 
     @Component.view
     def create_tool_use_view(
@@ -56,7 +153,7 @@ class ToolUsePayload(Payload):
         }
 
         cards = []
-        for record in self.model.tool_uses.values():
+        for record in self.model.tool_calls:
             provider = record.get('provider_name') or record.get('adapter_name', '')
             tool_label = record.get('tool_name') or record.get('model_tool_name', '')
             status = record.get('status', 'pending')

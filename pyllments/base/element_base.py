@@ -22,8 +22,6 @@ class Element(Component):
         Default execution policy for port lifecycle hooks on this element.""")
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
-    # view_cache = param.Dict(default={}, doc=""" TODO: Removeif no interference
-    #     Cache for views - Set on the Instance Level""")
     payload_css_cache = param.Dict(default={}, doc="""
         Cache for CSS files - Set on the Class Level
         Structure: payload_name: {}""")

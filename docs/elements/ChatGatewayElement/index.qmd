@@ -28,11 +28,14 @@ Use it when your application owns the HTTP/WebSocket layer (FastAPI, SSE, custom
 `default_aggregate_stream: bool = True`<br>
 <span class="tab">When assistant messages arrive in `stream` mode, whether `MessageModel.aggregate_stream` is enabled so `content` and `tool_calls` are updated during consumption. Keep `True` when `HistoryHandlerElement` (or similar) must await a completed message. Set `False` only if your app fully owns aggregation and history is handled separately.</span>
 
+`pending_db_path: str, optional`<br>
+<span class="tab">SQLite path for pending tool permission requests. Use this when pending approvals should survive app refresh or backend restart.</span>
+
 ## Application API
 
 ### `submit_message(content, role='user', **kwargs) -> TurnHandle`
 
-Creates a user `MessagePayload` with `correlation_id` set to the turn id, registers the turn, and schedules emission on `message_output`. Returns immediately with a `TurnHandle`.
+Creates a user `MessagePayload`, registers the turn, and schedules emission on `message_output`. Returns immediately with a `TurnHandle`.
 
 Additional `**kwargs` are passed through to `MessagePayload` / `MessageModel` (for example `mode`, `timestamp`).
 
@@ -87,8 +90,6 @@ Configure `LLMChatElement` with `generate_content_on_emit=False` and `output_mod
 
 Phase 1 uses **FIFO** matching: the oldest pending turn receives the next assistant `MessagePayload` on `assistant_message_input`.
 
-User messages set `MessageModel.correlation_id` to the turn id for forward-compatible explicit matching when assistant payloads also carry that id.
-
 Cancelled turns discard or cancel late-arriving assistant messages.
 
 ## Input Ports
@@ -96,7 +97,7 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
 | `assistant_message_input` | `MessagePayload` | Receives assistant responses (typically from `LLMChatElement.message_output`). Links payload to the pending turn and applies `default_aggregate_stream` for stream mode. |
-| `tool_use_input` | `ToolUsePayload` | Receives tool-use payloads from `ToolUseElement.tool_use_output`. Invokes application hooks; registers permission requests when any record requires approval. Does not execute tools. |
+| `tool_use_input` | `ToolUsePayload` | Receives tool-use payloads from `ToolUseElement.tool_use_output`. Invokes application hooks, auto-executes approved/no-permission records, and registers permission requests when needed. |
 
 : {.hover}
 
@@ -105,38 +106,69 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
 | `message_output` | `MessagePayload` | Emits user messages into the flow (history, context builder, etc.). |
-| `tool_events_output` | `StructuredPayload` | Emits `{"turn_id": str, "tool_calls": list}` when a stream completes with tool calls. |
-| `tool_use_approved_output` | `ToolUsePayload` | Emits an approved `ToolUsePayload` back to `ToolUseElement.approved_tool_use_input`. |
-| `tool_use_denied_output` | `ToolUsePayload` | Emits a denied `ToolUsePayload` for history routing or `ToolUseElement.denied_tool_use_input`. |
+| `tool_events_output` | `StructuredPayload` | Emits `{"tool_calls": list}` when a stream completes with tool calls. |
+| `tool_result_output` | `ToolUsePayload` | Emits executed or denied tool-use payloads for history/UI/context. |
 
 : {.hover}
 
-## Tool-Use Permission Flow
+## Tool-Use Permission and Execution Flow
 
-The gateway is a permission boundary only—it gates tool execution but does not run tools itself.
+The gateway owns permission timing and execution of approved tool records. Tool
+implementations remain in ``ToolUseElement``; hydrated payloads rebind automatically
+through ``ToolUsePayload``'s name-based executor registry.
 
 ```python
+tool_use_el = ToolUseElement(name="main_tools", functions=[...])
+gateway = ChatGatewayElement()
+
 tool_use_el.ports.tool_use_output > gateway.ports.tool_use_input
-gateway.ports.tool_use_approved_output > tool_use_el.ports.approved_tool_use_input
-gateway.ports.tool_use_denied_output > tool_use_el.ports.denied_tool_use_input
-tool_use_el.ports.tool_result_output > history_handler_el.ports.payload_emit_input
+gateway.ports.tool_result_output > history_handler_el.ports.payload_emit_input
 ```
 
-When a `ToolUsePayload` arrives on `tool_use_input` with records where `permission_required=True` and `status='awaiting_permission'`, the gateway registers a permission request and invokes `on_permission_request`. Your application approves or denies via:
+When a `ToolUsePayload` arrives on `tool_use_input`:
 
-- `await gateway.approve_permission_request(request_id)` — marks records approved and emits on `tool_use_approved_output`
-- `await gateway.deny_permission_request(request_id, reason=...)` — marks records denied and emits on `tool_use_denied_output`
+- `on_tool_use(notice)` receives a `ToolUseNotice` containing handles for every tool call in the payload, whether or not permission is required. Use this for app-visible auditing, progress UI, or conceal/show decisions.
+- Records that do not require permission are auto-executed after the notice hook returns.
+- Records that require permission are persisted (optional pending store) and surfaced via `on_permission_request(request)`.
+- Executed or denied results are emitted on `tool_result_output`.
 
-Sync helpers `approve_permission_request_sync` and `deny_permission_request_sync` schedule the async methods on the runtime loop.
+When a `ToolUsePayload` contains records where `permission_required=True` and `status='awaiting_permission'`, the gateway builds a `ToolPermissionRequest`. Its `tools` list contains only the tool calls awaiting approval. Your application can decide immediately:
 
-Payloads that do not require permission pass through `tool_use_input` without gateway action; `ToolUseElement` executes them directly.
+```python
+async def on_permission_request(request):
+    for tool in request.tools:
+        app.show_tool_prompt(
+            name=tool.name,
+            description=tool.description,
+            parameters=tool.parameters,
+        )
+
+    if await app.user_approved():
+        request.approve_all()
+    else:
+        request.deny_all(reason="User declined")
+```
+
+If the UI resolves later, keep the request object and pass it back after mutating tool decisions:
+
+```python
+pending_request = request
+pending_request.tools[0].approve()
+await gateway.resolve_permission_request(pending_request)
+```
+
+When `on_permission_request` returns with decisions already set, the gateway resolves the request automatically. `resolve_permission_request_sync(request)` schedules the same resolution on the runtime loop for synchronous UI callbacks.
+
+For cold start, configure `pending_db_path` or pass a `pending_store`, recreate the `ToolUseElement` instances with the same `name` values stored on pending payloads, then call `await gateway.hydrate_pending_tool_uses()` to restore pending prompts via `on_pending_permission_restored(request)`.
+
+Name important `ToolUseElement` instances explicitly (for example `name="main_tools"` or `name=f"{chat_id}:main_tools"`) so serialized payloads can rebind after restart.
 
 ## Tool events
 
 While iterating `turn.stream()`, when a `tool_calls_complete` event is observed, the gateway emits on `tool_events_output`:
 
 ```python
-{"turn_id": "turn-1", "tool_calls": [{"id": "...", "type": "function", "function": {...}}]}
+{"tool_calls": [{"id": "...", "type": "function", "function": {...}}]}
 ```
 
 Wire `tool_events_output` to `ToolUseElement.tool_request_message_input` (via a message builder) or handle tool routing in application code.

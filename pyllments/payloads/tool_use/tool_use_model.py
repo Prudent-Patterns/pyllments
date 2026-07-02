@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import time
 from typing import Any
-from uuid import uuid4
 
 import jinja2
 import param
@@ -14,14 +13,6 @@ TERMINAL_STATUSES = frozenset({"succeeded", "failed", "denied", "cancelled"})
 NON_EXECUTABLE_STATUSES = TERMINAL_STATUSES | frozenset({"awaiting_permission", "running"})
 
 
-def new_tool_use_id() -> str:
-    return f"tooluse_{uuid4().hex[:12]}"
-
-
-def new_payload_id() -> str:
-    return f"tup_{uuid4().hex[:12]}"
-
-
 class ToolUseModel(Model):
     """
     Durable model for one or more tool calls and their lifecycle state.
@@ -30,52 +21,49 @@ class ToolUseModel(Model):
     execution, and result/error attachment without storing executable callables.
     """
 
-    payload_id = param.String(default=None, doc="Stable id for this payload instance")
-    turn_id = param.String(default=None, allow_None=True, doc="Application turn id")
-    flow_id = param.String(default=None, allow_None=True, doc="Flow identifier for routing")
-    flow_version = param.String(default=None, allow_None=True, doc="Flow version for durable routing")
+    flow_id = param.String(
+        default=None,
+        allow_None=True,
+        doc="Optional application-level flow identifier (not used for executor rebinding)",
+    )
+    flow_version = param.String(
+        default=None,
+        allow_None=True,
+        doc="Optional application-level flow version (not used for executor rebinding)",
+    )
     executor_element_name = param.String(
         default=None,
         allow_None=True,
         doc="Name of the ToolUseElement that executes this payload",
     )
     status = param.String(default="pending", doc="Aggregate lifecycle status")
-    tool_uses = param.Dict(default={}, doc="Tool-use records keyed by tool_use_id")
+    tool_calls = param.List(default=[], item_type=dict, doc="Ordered tool-call records")
     metadata = param.Dict(default={}, doc="Optional payload-level metadata")
     timestamp = param.Number(default=None, doc="Unix timestamp when the payload was created")
     updated_at = param.Number(default=None, doc="Unix timestamp of the last mutation")
-    correlation_id = param.String(
-        default=None,
-        allow_None=True,
-        doc="Optional turn/correlation identifier for gateway matching",
-    )
     _content = param.String(default="", doc="Rendered model-facing content string")
     template = param.ClassSelector(default=None, class_=jinja2.Template)
-    completed = param.Boolean(default=False, doc="True when all tool uses are terminal")
+    completed = param.Boolean(default=False, doc="True when all tool calls are terminal")
 
     def __init__(self, **params):
         super().__init__(**params)
         now = time.time()
-        if self.payload_id is None:
-            self.payload_id = new_payload_id()
         if self.timestamp is None:
             self.timestamp = now
         if self.updated_at is None:
             self.updated_at = self.timestamp
-        if self.correlation_id is None and self.turn_id is not None:
-            self.correlation_id = self.turn_id
         self.set_template()
         self._refresh_aggregate_status()
 
     @property
     def content(self) -> str:
         if not self._content:
-            self._content = self.template.render(tool_uses=self.tool_uses)
+            self._content = self.template.render(tool_calls=self.tool_calls)
         return self._content
 
     def set_template(self):
         self.template = jinja2.Template("""The following tool results are available:
-{%- for tool_use_id, record in tool_uses.items() %}
+{%- for record in tool_calls %}
 {%- if record.status == 'succeeded' and record.result %}
 ### Tool: {{ record.model_tool_name }}
 {%- if record.parameters %}
@@ -105,7 +93,7 @@ Reason: {{ record.permission.reason }}
         self._refresh_aggregate_status()
 
     def _refresh_aggregate_status(self):
-        records = list((self.tool_uses or {}).values())
+        records = list(self.tool_calls or [])
         if not records:
             self.status = "pending"
             self.completed = False
@@ -133,13 +121,20 @@ Reason: {{ record.permission.reason }}
     def default_permission(*, required: bool) -> dict[str, Any]:
         return {
             "status": "awaiting" if required else "not_required",
-            "request_id": None,
             "decided_at": None,
             "decided_by": None,
             "reason": None,
         }
 
-    def add_tool_use(
+    def _iter_indices(self, indices: list[int] | None = None):
+        if indices is None:
+            yield from range(len(self.tool_calls))
+            return
+        for index in indices:
+            if 0 <= index < len(self.tool_calls):
+                yield index
+
+    def add_tool_call(
         self,
         *,
         adapter_name: str,
@@ -149,16 +144,13 @@ Reason: {{ record.permission.reason }}
         provider_name: str | None = None,
         description: str = "",
         permission_required: bool = False,
-        tool_use_id: str | None = None,
         metadata: dict | None = None,
-    ) -> str:
-        """Register a proposed tool use and return its stable id."""
-        tool_use_id = tool_use_id or new_tool_use_id()
+    ) -> int:
+        """Register a proposed tool call and return its list index."""
         now = time.time()
         status = "awaiting_permission" if permission_required else "approved"
         permission = self.default_permission(required=permission_required)
-        self.tool_uses[tool_use_id] = {
-            "tool_use_id": tool_use_id,
+        record = {
             "adapter_name": adapter_name,
             "provider_name": provider_name,
             "tool_name": tool_name,
@@ -174,28 +166,26 @@ Reason: {{ record.permission.reason }}
             "updated_at": now,
             "metadata": metadata or {},
         }
+        self.tool_calls = [*self.tool_calls, record]
         self._touch()
-        return tool_use_id
+        return len(self.tool_calls) - 1
 
-    def apply_permission_request(self, request_id: str, tool_use_ids: list[str] | None = None):
-        """Mark permission as awaiting with a gateway request id."""
-        for tool_use_id, record in self.tool_uses.items():
-            if tool_use_ids is not None and tool_use_id not in tool_use_ids:
-                continue
+    def apply_permission_request(self, indices: list[int] | None = None):
+        """Mark permission-gated tool calls as awaiting an application decision."""
+        for index in self._iter_indices(indices):
+            record = self.tool_calls[index]
             if not record.get("permission_required"):
                 continue
             record["permission"]["status"] = "awaiting"
-            record["permission"]["request_id"] = request_id
             record["status"] = "awaiting_permission"
             record["updated_at"] = time.time()
         self._touch()
 
-    def approve(self, tool_use_ids: list[str] | None = None, *, decided_by: str | None = None):
-        """Approve one or all permission-gated tool uses."""
+    def approve(self, indices: list[int] | None = None, *, decided_by: str | None = None):
+        """Approve one or all permission-gated tool calls."""
         now = time.time()
-        for tool_use_id, record in self.tool_uses.items():
-            if tool_use_ids is not None and tool_use_id not in tool_use_ids:
-                continue
+        for index in self._iter_indices(indices):
+            record = self.tool_calls[index]
             if record.get("status") not in {"awaiting_permission", "proposed"}:
                 continue
             record["permission"]["status"] = "approved"
@@ -207,16 +197,15 @@ Reason: {{ record.permission.reason }}
 
     def deny(
         self,
-        tool_use_ids: list[str] | None = None,
+        indices: list[int] | None = None,
         *,
         reason: str | None = None,
         decided_by: str | None = None,
     ):
-        """Deny one or all permission-gated tool uses."""
+        """Deny one or all permission-gated tool calls."""
         now = time.time()
-        for tool_use_id, record in self.tool_uses.items():
-            if tool_use_ids is not None and tool_use_id not in tool_use_ids:
-                continue
+        for index in self._iter_indices(indices):
+            record = self.tool_calls[index]
             if record.get("status") in TERMINAL_STATUSES:
                 continue
             record["permission"]["status"] = "denied"
@@ -227,26 +216,27 @@ Reason: {{ record.permission.reason }}
             record["updated_at"] = now
         self._touch()
 
-    def can_execute(self, tool_use_id: str) -> bool:
-        record = self.tool_uses.get(tool_use_id, {})
-        return record.get("status") == "approved"
+    def can_execute(self, index: int) -> bool:
+        if index < 0 or index >= len(self.tool_calls):
+            return False
+        return self.tool_calls[index].get("status") == "approved"
 
-    def mark_running(self, tool_use_id: str):
-        record = self.tool_uses[tool_use_id]
+    def mark_running(self, index: int):
+        record = self.tool_calls[index]
         record["status"] = "running"
         record["updated_at"] = time.time()
         self._touch()
 
-    def attach_result(self, tool_use_id: str, result: dict[str, Any]):
-        record = self.tool_uses[tool_use_id]
+    def attach_result(self, index: int, result: dict[str, Any]):
+        record = self.tool_calls[index]
         record["result"] = result
         record["error"] = None
         record["status"] = "succeeded"
         record["updated_at"] = time.time()
         self._touch()
 
-    def attach_error(self, tool_use_id: str, error: dict[str, Any]):
-        record = self.tool_uses[tool_use_id]
+    def attach_error(self, index: int, error: dict[str, Any]):
+        record = self.tool_calls[index]
         record["error"] = error
         record["status"] = "failed"
         record["updated_at"] = time.time()
@@ -254,7 +244,7 @@ Reason: {{ record.permission.reason }}
 
     def recover_stale_running(self):
         """Mark interrupted running calls as failed with retryable=true."""
-        for record in self.tool_uses.values():
+        for record in self.tool_calls:
             if record.get("status") == "running":
                 record["status"] = "failed"
                 record["error"] = {
@@ -269,7 +259,16 @@ Reason: {{ record.permission.reason }}
     def pending_permission_tool_names(self) -> list[str]:
         return [
             record["model_tool_name"]
-            for record in self.tool_uses.values()
+            for record in self.tool_calls
+            if record.get("permission_required")
+            and record.get("status") == "awaiting_permission"
+        ]
+
+    def pending_permission_indices(self) -> list[int]:
+        """Return list indices for tool calls still awaiting permission."""
+        return [
+            index
+            for index, record in enumerate(self.tool_calls)
             if record.get("permission_required")
             and record.get("status") == "awaiting_permission"
         ]

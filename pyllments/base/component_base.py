@@ -1,8 +1,8 @@
 import sys
 import inspect
+import warnings
 from functools import wraps
 from pathlib import Path
-from uuid import uuid4
 
 import param
 from loguru import logger
@@ -14,18 +14,45 @@ from pyllments.common.panel_optional import import_panel
 class Component(param.Parameterized):
     """Base class for all components(Elements and Payloads)"""
     model = param.ClassSelector(class_=Model)
-    id = param.String()
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False, doc="""
         Cache for CSS files - Set on the Class Level""")
     _watchers = param.Dict(default={}, doc="""
         Registry for watchers to prevent duplicates.""")
 
     def __init__(self, **params):
-        self.id = str(uuid4())
+        legacy_id = params.pop("id", None)
+        if legacy_id is not None:
+            warnings.warn(
+                "Passing id= to Component is deprecated; use object identity or .name.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self._legacy_id = legacy_id
         known_params = {k: v for k, v in params.items() if k in self.param}
         super().__init__(**known_params)
         # Mapping: view_name -> list[(owner, watcher)]
         self._view_watchers: dict[str, list] = {}
+
+    @property
+    def id(self):
+        """Deprecated. Use object identity or Element.name for named components."""
+        warnings.warn(
+            "Component.id is deprecated; use object identity or .name.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if self._legacy_id is not None:
+            return self._legacy_id
+        return getattr(self, "name", None)
+
+    @id.setter
+    def id(self, value):
+        warnings.warn(
+            "Component.id is deprecated; use object identity or .name.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._legacy_id = value
 
     @classmethod
     def _get_module_path(cls):
@@ -37,16 +64,6 @@ class Component(param.Parameterized):
         module = sys.modules[cls.__module__]
         # Return the parent directory of the module's file
         return Path(module.__file__).parent
-
-    def __hash__(self):
-        """Return a hash of the component's id for use in hash-based collections."""
-        return hash(self.id)
-
-    def __eq__(self, other):
-        """Check equality based on the component's id."""
-        if not isinstance(other, Component):
-            return NotImplemented
-        return self.id == other.id
 
     @classmethod
     def view(cls, func):

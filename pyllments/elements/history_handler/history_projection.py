@@ -127,7 +127,7 @@ def payload_token_count(payload: Any, tokenizer_model: str) -> int:
     if isinstance(payload, MessagePayload):
         return get_token_len(payload.model.content or "", tokenizer_model)
     if isinstance(payload, ToolUsePayload):
-        if not payload.model.tool_uses:
+        if not payload.model.tool_calls:
             return 0
         return get_token_len(payload.model.content or "", tokenizer_model)
     if isinstance(payload, StructuredPayload):
@@ -151,8 +151,8 @@ def abridge_tool_use(
     max_text_chars: int = 500,
 ) -> ToolUsePayload:
     """Return a copy with truncated tool result text."""
-    new_tool_uses: Dict[str, Any] = {}
-    for tool_use_id, record in payload.model.tool_uses.items():
+    new_tool_calls: list[dict[str, Any]] = []
+    for record in payload.model.tool_calls:
         new_record = dict(record)
         result = new_record.get("result")
         if result and result.get("content"):
@@ -163,12 +163,10 @@ def abridge_tool_use(
                     text = text[:max_text_chars] + "... [truncated]"
                 new_content.append({**item, "text": text})
             new_record["result"] = {**result, "content": new_content}
-        new_tool_uses[tool_use_id] = new_record
+        new_tool_calls.append(new_record)
     return ToolUsePayload(
-        tool_uses=new_tool_uses,
+        tool_calls=new_tool_calls,
         timestamp=payload.model.timestamp,
-        payload_id=payload.model.payload_id,
-        turn_id=payload.model.turn_id,
         status=payload.model.status,
     )
 
@@ -178,26 +176,26 @@ def stub_tool_use(
     context: ProjectionContext,
 ) -> ToolUsePayload:
     """Return a minimal copy preserving tool identity and high-level outcome."""
-    stub_uses: Dict[str, Any] = {}
-    for tool_use_id, record in payload.model.tool_uses.items():
-        tool_name = record.get("model_tool_name", tool_use_id)
+    stub_calls: list[dict[str, Any]] = []
+    for record in payload.model.tool_calls:
+        tool_name = record.get("model_tool_name", record.get("tool_name", "tool"))
         status = record.get("status", "completed")
         outcome = status if status in {"failed", "denied"} else "completed"
-        stub_uses[tool_use_id] = {
-            **record,
-            "parameters": None,
-            "result": {
-                "content": [
-                    {"type": "text", "text": f"Tool {tool_name} {outcome}."}
-                ],
-                "raw": None,
-                "metadata": {},
-            },
-        }
+        stub_calls.append(
+            {
+                **record,
+                "parameters": None,
+                "result": {
+                    "content": [
+                        {"type": "text", "text": f"Tool {tool_name} {outcome}."}
+                    ],
+                    "raw": None,
+                    "metadata": {},
+                },
+            }
+        )
     return ToolUsePayload(
-        tool_uses=stub_uses,
+        tool_calls=stub_calls,
         timestamp=payload.model.timestamp,
-        payload_id=payload.model.payload_id,
-        turn_id=payload.model.turn_id,
         status=payload.model.status,
     )

@@ -7,7 +7,6 @@ import param
 from pyllments.base.component_base import Component
 from pyllments.base.element_base import Element
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
-from pyllments.runtime.scheduler import schedule_task
 
 from .history_handler_model import HistoryHandlerModel
 
@@ -30,6 +29,7 @@ class HistoryHandlerElement(Element):
     -----
     payload_input : ingest without emission
     payload_emit_input : ingest and emit context + summary candidates
+    payload_pre_emit_input : emit current context, then ingest the triggering payload
     summary_input : summarizer artifacts (e.g. StructuredPayload)
     context_output : projected payload list for ContextBuilderElement
     summary_candidate_output : StructuredPayload summary_request for SummarizerElement
@@ -47,9 +47,14 @@ class HistoryHandlerElement(Element):
 
         self._payload_input_setup()
         self._payload_emit_input_setup()
+        self._payload_pre_emit_input_setup()
         self._summary_input_setup()
         self._context_output_setup()
         self._summary_candidate_output_setup()
+
+    async def _ensure_store_ready(self):
+        """Wait for persisted history hydration before context-sensitive operations."""
+        await self.model.await_store_ready()
 
     @staticmethod
     async def _normalize_payloads(payload: PayloadInput) -> List[Any]:
@@ -80,39 +85,44 @@ class HistoryHandlerElement(Element):
                 context=request
             )
 
+    async def _ingest_payloads(self, payload: PayloadInput) -> List[Any]:
+        """Normalize and load supported payloads into the ledger."""
+        items = await self._normalize_payloads(payload)
+        supported = self._supported_only(items)
+        if supported:
+            self.model.load_entries(supported)
+        return supported
+
     def _payload_input_setup(self):
         async def unpack(payload: PayloadInput):
-            async def _handle():
-                items = await self._normalize_payloads(payload)
-                supported = self._supported_only(items)
-                if supported:
-                    self.model.load_entries(supported)
-
-            schedule_task(_handle())
+            await self._ingest_payloads(payload)
 
         self.ports.add_input(name="payload_input", unpack_payload_callback=unpack)
 
     def _payload_emit_input_setup(self):
         async def unpack(payload: PayloadInput):
-            async def _handle():
-                items = await self._normalize_payloads(payload)
-                supported = self._supported_only(items)
-                if supported:
-                    self.model.load_entries(supported)
-                    await self._emit_outputs()
-
-            schedule_task(_handle())
+            supported = await self._ingest_payloads(payload)
+            if supported:
+                await self._emit_outputs()
 
         self.ports.add_input(name="payload_emit_input", unpack_payload_callback=unpack)
 
+    def _payload_pre_emit_input_setup(self):
+        async def unpack(payload: PayloadInput):
+            await self._ensure_store_ready()
+            await self._emit_outputs()
+            await self._ingest_payloads(payload)
+
+        self.ports.add_input(
+            name="payload_pre_emit_input",
+            unpack_payload_callback=unpack,
+        )
+
     def _summary_input_setup(self):
         async def unpack(payload: Any):
-            async def _handle():
-                if hasattr(payload, "model") and hasattr(payload.model, "await_ready"):
-                    await payload.model.await_ready()
-                self.model.accept_summary_artifact(payload)
-
-            schedule_task(_handle())
+            if hasattr(payload, "model") and hasattr(payload.model, "await_ready"):
+                await payload.model.await_ready()
+            self.model.accept_summary_artifact(payload)
 
         self.ports.add_input(name="summary_input", unpack_payload_callback=unpack)
 

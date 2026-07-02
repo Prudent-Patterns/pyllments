@@ -1,8 +1,5 @@
-from functools import wraps
-from inspect import signature
 from pathlib import Path
 import warnings
-import re
 
 import param
 
@@ -11,8 +8,6 @@ from pyllments.base.component_base import Component
 class Payload(Component):
     css_cache = param.Dict(default={}, instantiate=False, per_instance=False,
         doc="""Cache for CSS files - Set on the Class Level""")
-    view_cache = param.Dict(default={}, doc="""
-        Cache for views - Set on the Instance Level""")
 
     def __init__(self, **params):
         super().__init__(**params)

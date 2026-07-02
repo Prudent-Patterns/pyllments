@@ -20,9 +20,7 @@ flowchart LR
     LLMChatElement -->|MessagePayload with tool_calls| ToolUseElement
     StructuredRouter -->|StructuredPayload tools| ToolUseElement
     ToolUseElement -->|ToolUsePayload awaiting permission| ChatGateway
-    ChatGateway -->|approved ToolUsePayload| ToolUseElement
-    ChatGateway -->|denied ToolUsePayload| HistoryHandler
-    ToolUseElement -->|ToolUsePayload with results| HistoryHandler
+    ChatGateway -->|ToolUsePayload with results| HistoryHandler
     HistoryHandler -->|context| LLMChatElement
 ```
 
@@ -42,11 +40,8 @@ flowchart LR
 `tools_requiring_permission: list[str], optional`<br>
 <span class="tab">Tool names that require user approval before execution (used with `functions=`).</span>
 
-`flow_id: str, optional`<br>
-<span class="tab">Flow identifier stored on emitted `ToolUsePayload` instances.</span>
-
-`flow_version: str, optional`<br>
-<span class="tab">Flow version for durable routing metadata on payloads.</span>
+`name: str, optional`<br>
+<span class="tab">Durable executor identity stored on emitted `ToolUsePayload.executor_element_name`. Each `ToolUseElement` registers itself by this name when constructed. Set explicitly (for example `name="main_tools"`) when multiple chats or flows are active. For dynamic multi-chat flows, prefix with the application chat/flow id (for example `name=f"{chat_id}:main_tools"`). Generated names are acceptable only when construction order is deterministic and the flow does not rely on cross-restart identity.</span>
 
 **Example:**
 
@@ -54,6 +49,7 @@ flowchart LR
 from pyllments.elements import ToolUseElement
 
 tool_use_el = ToolUseElement(
+    name="main_tools",
     mcps={
         "todo": {
             "type": "script",
@@ -71,8 +67,8 @@ tool_use_el = ToolUseElement(
 |-----------|--------------|----------|
 | `tool_request_structured_input` | `StructuredPayload` | Receives `model.data` as a list of `{"name": str, "parameters": dict}` entries from structured-router flows. Builds a `ToolUsePayload` and emits on `tool_use_output`. Executes immediately when no permission is required. [Example](#sec-tool_request_structured_input) |
 | `tool_request_message_input` | `MessagePayload` | Reads native `model.tool_calls` (OpenAI/LiteLLM shape) after the message is ready. Parses `function.arguments` JSON into parameters and preserves turn/correlation metadata. [Example](#sec-tool_request_message_input) |
-| `approved_tool_use_input` | `ToolUsePayload` | Receives gateway-approved payloads, executes eligible tool uses, and emits results on `tool_result_output`. |
-| `denied_tool_use_input` | `ToolUsePayload` | Marks tool uses as denied and emits the payload on `tool_result_output` without execution. |
+| `approved_tool_use_input` | `ToolUsePayload` | Compatibility input for direct approval flows. Gateway-controlled flows execute through the payload binding instead. |
+| `denied_tool_use_input` | `ToolUsePayload` | Compatibility input for direct denial flows. Gateway-controlled flows emit denial results from the gateway. |
 
 : {.hover}
 
@@ -90,15 +86,33 @@ tool_use_el = ToolUseElement(
 
 ## Permission Flow
 
-When a tool spec has `permission_required=True`, the element emits the payload on `tool_use_output` and waits. Wire the gateway boundary:
+When a tool spec has `permission_required=True`, the element emits the payload on `tool_use_output` and waits for the gateway/application to decide. Wire the gateway boundary:
 
 ```python
+tool_use_el = ToolUseElement(name="main_tools", functions=[...])
+gateway = ChatGatewayElement()
+
 tool_use_el.ports.tool_use_output > gateway.ports.tool_use_input
-gateway.ports.tool_use_approved_output > tool_use_el.ports.approved_tool_use_input
-gateway.ports.tool_use_denied_output > tool_use_el.ports.denied_tool_use_input
+gateway.ports.tool_result_output > history_handler_el.ports.payload_emit_input
 ```
 
-The gateway inspects per-record `permission_required`, `permission.status`, and `status`. It does not execute tools itself. After approval, the same `ToolUsePayload` returns to `approved_tool_use_input` for execution.
+The gateway inspects per-record `permission_required`, `permission.status`, and `status`. It approves or denies selected records and executes approved records through the payload's assigned `ToolUseElement`. Hydrated payloads rebind automatically by `executor_element_name` against the live `ToolUsePayload` executor registry.
+
+## Executor Identity and Rebinding
+
+Each `ToolUseElement` registers itself with `ToolUsePayload` at construction time. Emitted payloads store the durable owner name:
+
+```python
+payload.model.executor_element_name == tool_use_el.name
+```
+
+For multiple active chats or cold-start recovery, give each flow a unique tool element name:
+
+```python
+tool_use_el = ToolUseElement(name=f"{chat_id}:main_tools", functions=[...])
+```
+
+After restart, recreate the `ToolUseElement` with the same name before hydrating pending tool permissions.
 
 ## Data Flow Details
 
@@ -132,26 +146,25 @@ The gateway inspects per-record `permission_required`, `permission.status`, and 
 
 ### tool_result_output payload {#sec-tool_result_output}
 
-**payload.model.tool_uses** (serializable records keyed by `tool_use_id`):
+**payload.model.tool_calls** (ordered serializable records):
 
 ```python
-{
-    "tooluse_a1b2c3d4e5f6": {
-        "tool_use_id": "tooluse_a1b2c3d4e5f6",
+[
+    {
         "adapter_name": "mcp",
         "provider_name": "weather",
         "tool_name": "get",
         "model_tool_name": "weather_get",
         "parameters": {"city": "SF"},
         "permission_required": False,
-        "permission": {"status": "not_required", "request_id": None},
+        "permission": {"status": "not_required"},
         "status": "succeeded",
         "result": {
             "content": [{"type": "text", "text": "54F in San Francisco"}],
         },
         "error": None,
     }
-}
+]
 ```
 
 Aggregate payload status progresses through `pending`, `awaiting_permission`, `approved`, `running`, and terminal states (`succeeded`, `failed`, `denied`, `cancelled`).

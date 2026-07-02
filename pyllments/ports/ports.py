@@ -1,7 +1,6 @@
 from typing import Union, get_origin, get_args, get_type_hints, Any, TypeVar
 import inspect
 import asyncio
-from uuid import uuid4
 
 import param
 from loguru import logger as _logger
@@ -41,13 +40,11 @@ class Port(param.Parameterized):
     """Base implementation of Port - InputPort and OutputPort inherit from this"""
     payload_type = param.Parameter(doc="The type of payload this port handles")
     connected_elements = param.List(doc="List of elements connected to this port")
-    id = param.String(doc="Unique identifier for the port")
 
     def __init__(self, containing_element=None, hooks=None, **params):
         super().__init__(**params)
         self.containing_element = containing_element
         self.hooks = hooks
-        self.id = str(uuid4())
 
     async def _fire_hook(self, event_type: str, **kwargs) -> None:
         """Fire a lifecycle hook on this port, if configured."""
@@ -63,16 +60,6 @@ class Port(param.Parameterized):
         )
         await fire_port_hook(self.hooks, event, resolve_hook_policy(self))
 
-    def __hash__(self):
-        """Return a hash of the component's id for use in hash-based collections."""
-        return hash(self.id)
-
-    def __eq__(self, other):
-        """Check equality based on the component's id."""
-        if not isinstance(other, Port):
-            return NotImplemented
-        return self.id == other.id
-    
     @staticmethod
     def is_payload_compatible(output_type: type, input_type: type) -> bool:
         """
@@ -191,8 +178,8 @@ class InputPort(Port):
         self.readiness_check = readiness_check  # Optional coroutine to await before unpack
         self._is_ready = False  # Flag to avoid repeated readiness checks
         
-        # Cache for validated output ports
-        self._validated_output_ports = set()
+        # Cache for validated output ports (object identity, not hash/equality)
+        self._validated_output_ports = []
         
         # Sequential processing lock
         self._processing_lock = asyncio.Lock()
@@ -240,12 +227,12 @@ class InputPort(Port):
             self._is_ready = True  # Cache readiness to avoid future checks
         
         # Validate payload type if not already validated for this output port
-        if output_port not in self._validated_output_ports:
+        if not any(port is output_port for port in self._validated_output_ports):
             valid = await self._validate_payload(payload)
             if not valid:
                 raise TypeError(f"Incompatible payload type for port '{self.name}'. "
                                f"Expected {self.payload_type}, got {type(payload)}")
-            self._validated_output_ports.add(output_port)
+            self._validated_output_ports.append(output_port)
         
         # Log reception 
         log_receive(self, payload)
@@ -726,13 +713,13 @@ class OutputPort(Port):
 
     async def close(self):
         """Clear port connections and staged state."""
-        logger.trace("Closing port {} ({})", self.name, self.id)
+        logger.trace("Closing port {}", self.name)
         self.input_ports.clear()
         self.connected_elements.clear()
         self.emit_ready = False
         for item in self.required_items.values():
             item["value"] = None
-        logger.trace("Port {} ({}) closed successfully.", self.name, self.id)
+        logger.trace("Port {} closed successfully.", self.name)
 
     async def drain(self):
         """

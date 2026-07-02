@@ -26,15 +26,15 @@ def test_sqlite_roundtrip_message_and_tool():
                 executor_element_name="main_tools",
                 timestamp=2.0,
             )
-            tool.model.add_tool_use(
+            tool.model.add_tool_call(
                 adapter_name="mcp",
                 provider_name="m",
                 tool_name="fn",
                 model_tool_name="m_fn",
             )
-            tool_use_id = next(iter(tool.model.tool_uses))
+            index = 0
             tool.model.attach_result(
-                tool_use_id,
+                index,
                 {"content": [{"type": "text", "text": "ok"}], "raw": None, "metadata": {}},
             )
             records = [
@@ -50,6 +50,8 @@ def test_sqlite_roundtrip_message_and_tool():
             assert isinstance(payloads[0], MessagePayload)
             assert payloads[0].model.content == "hello"
             assert isinstance(payloads[1], ToolUsePayload)
+            assert not payloads[1].is_bound
+            assert payloads[1].model.executor_element_name == "main_tools"
 
         asyncio.run(_run())
 

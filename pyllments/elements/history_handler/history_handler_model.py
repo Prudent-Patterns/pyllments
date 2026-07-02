@@ -130,7 +130,7 @@ class HistoryHandlerModel(Model):
             await self._store_load_task
 
     def _wrap_payload(self, payload: SupportedPayload) -> Optional[HistoryEntry]:
-        if isinstance(payload, ToolUsePayload) and not payload.model.tool_uses:
+        if isinstance(payload, ToolUsePayload) and not payload.model.tool_calls:
             return None
         raw_tokens = payload_token_count(payload, self.tokenizer_model)
         if raw_tokens == 0 and isinstance(payload, ToolUsePayload):
