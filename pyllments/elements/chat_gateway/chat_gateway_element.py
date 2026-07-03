@@ -9,7 +9,7 @@ import param
 from pyllments.base.element_base import Element
 from pyllments.elements.chat_gateway.chat_gateway_model import (
     ChatGatewayModel,
-    PermissionRequestState,
+    PendingToolUseState,
 )
 from pyllments.elements.chat_gateway.pending_tool_use_store import (
     PendingToolUseRecord,
@@ -17,8 +17,12 @@ from pyllments.elements.chat_gateway.pending_tool_use_store import (
     SQLitePendingToolUseStore,
 )
 from pyllments.elements.chat_gateway.tool_permission import (
-    ToolPermissionRequest,
-    ToolUseNotice,
+    apply_policy_decisions,
+    build_tool_result_notice,
+    build_tool_use_review,
+    normalize_policy_response,
+    pending_permission_indices,
+    refresh_tool_use_review,
 )
 from pyllments.elements.chat_gateway.turn_handle import TurnHandle
 from pyllments.elements.history_handler.history_store import (
@@ -34,21 +38,50 @@ class ChatGatewayElement(Element):
     Production boundary between application code and Pyllments chat flows.
 
     Submits user messages into the graph, receives assistant and tool payloads from
-    downstream elements, owns permission and execution timing, and emits tool results
-    for UI/history/context wiring.
+    downstream elements, owns permission policy and routing, and exposes tool results
+    to application code and downstream history/context wiring.
+
+    The gateway is intentionally a boundary, not a tool executor. Tool calls enter
+    through ``tool_use_input`` and are first presented to the application via
+    ``on_tool_use(review)``. The gateway then mutates the original
+    ``ToolUsePayload`` lifecycle state and emits it through one of the tool-use
+    trigger ports. ``ToolUseElement`` remains responsible for actually running the
+    tools.
+
+    User cancellation and replacement messages are handled as branch supersession.
+    Each routed tool payload is stamped with an internal ``execution_owner`` token.
+    When ``cancel()`` or a new submitted user message supersedes that owner, pending
+    permission reviews are cleared and active tool invocations receive cancellation
+    through their runtime contexts. Late results from superseded owners still reach
+    ``on_tool_result`` as orphaned notices, but they are intentionally suppressed
+    from ``tool_result_output`` so history/context/model wiring does not act on
+    stale tool output.
 
     Ports
     -----
     message_output : out
-        User ``MessagePayload`` instances into the flow.
+        User ``MessagePayload`` instances into the flow. Calling
+        ``submit_message()`` or ``submit_message_async()`` first supersedes prior
+        pending/running tool work, then emits the new message.
     assistant_message_input : in
         Assistant ``MessagePayload`` from ``LLMChatElement``.
     tool_use_input : in
-        ``ToolUsePayload`` from tool lifecycle (pending, completed, or informational).
+        ``ToolUsePayload`` from ``ToolUseElement.tool_use_output``. Every arriving
+        payload passes through the application policy gate before execution.
+    approved_tool_use_output : out
+        Permissioned payloads routed to ``ToolUseElement.approved_tool_use_input``.
+        This output is the trigger for approved tool execution.
+    denied_tool_use_output : out
+        Denied payloads routed to ``ToolUseElement.denied_tool_use_input``. This
+        output lets denials produce a terminal tool result without executing
+        functions.
+    tool_result_input : in
+        Completed ``ToolUsePayload`` from ``ToolUseElement.tool_result_output``.
     tool_events_output : out
         Tool-call completion events as ``StructuredPayload``.
     tool_result_output : out
-        ``ToolUsePayload`` after gateway execution or denial.
+        Active ``ToolUsePayload`` results after execution or denial for
+        history/UI/context. Results from superseded owners are not emitted here.
     """
 
     default_aggregate_stream = param.Boolean(
@@ -84,17 +117,21 @@ class ChatGatewayElement(Element):
         self._message_output_setup()
         self._assistant_message_input_setup()
         self._tool_use_input_setup()
+        self._approved_tool_use_output_setup()
+        self._denied_tool_use_output_setup()
+        self._tool_result_input_setup()
         self._tool_events_output_setup()
         self._tool_result_output_setup()
 
     @staticmethod
-    async def _invoke_hook(callback: Callable | None, *args: Any, **kwargs: Any) -> None:
-        """Run a sync or async application hook."""
+    async def _invoke_hook(callback: Callable | None, *args: Any, **kwargs: Any) -> Any:
+        """Run a sync or async application hook and return its result."""
         if callback is None:
-            return
+            return None
         result = callback(*args, **kwargs)
         if asyncio.iscoroutine(result):
-            await result
+            result = await result
+        return result
 
     def _message_output_setup(self):
         async def pack(payload: MessagePayload) -> MessagePayload:
@@ -140,7 +177,7 @@ class ChatGatewayElement(Element):
                 )
                 return
 
-            await self._handle_tool_use_payload(payload, turn_id)
+            await self._handle_tool_use_payload(payload)
 
         self.ports.add_input(
             name="tool_use_input",
@@ -148,10 +185,55 @@ class ChatGatewayElement(Element):
             payload_type=ToolUsePayload,
         )
 
-    async def _handle_tool_use_payload(self, payload: ToolUsePayload, turn_id: str) -> None:
-        """Process an arriving tool-use payload: hook, execute, and gate permissions."""
-        notice = ToolUseNotice.from_payload(payload)
-        await self._invoke_hook(self.model.on_tool_use, notice)
+    def _tool_result_input_setup(self):
+        async def unpack(payload: ToolUsePayload):
+            # Results from superseded branches are visible to the application but
+            # must not re-enter model/history/context wiring.
+            owner = payload.model.metadata.get("execution_owner")
+            active = self.model.is_execution_owner_active(owner)
+            notice = build_tool_result_notice(payload)
+            if not active:
+                notice["orphaned"] = True
+            await self._invoke_hook(self.model.on_tool_result, notice)
+            if active:
+                await self.ports.output["tool_result_output"].stage_emit(payload=payload)
+
+        self.ports.add_input(
+            name="tool_result_input",
+            unpack_payload_callback=unpack,
+            payload_type=ToolUsePayload,
+        )
+
+    def _approved_tool_use_output_setup(self):
+        async def pack(payload: ToolUsePayload) -> ToolUsePayload:
+            return payload
+
+        self.ports.add_output(
+            name="approved_tool_use_output",
+            pack_payload_callback=pack,
+        )
+
+    def _denied_tool_use_output_setup(self):
+        async def pack(payload: ToolUsePayload) -> ToolUsePayload:
+            return payload
+
+        self.ports.add_output(
+            name="denied_tool_use_output",
+            pack_payload_callback=pack,
+        )
+
+    async def _handle_tool_use_payload(self, payload: ToolUsePayload) -> None:
+        """
+        Process an arriving tool-use payload through the application policy gate.
+
+        ``on_tool_use(review)`` is the single application boundary for tool calls.
+        It receives plain data for all records before execution, whether those
+        records require explicit permission or are already approved by policy. The
+        callback may return immediate decision data or ``None`` to acknowledge the
+        review and leave permission-required records pending.
+        """
+        review = build_tool_use_review(payload)
+        response = await self._invoke_hook(self.model.on_tool_use, review)
 
         if payload.model.completed:
             return
@@ -164,56 +246,118 @@ class ChatGatewayElement(Element):
             payload.model.metadata["rebind_error"] = (
                 f"Executor not found: {payload.model.executor_element_name}"
             )
-            await self._emit_tool_result(payload)
+            await self.ports.output["tool_result_output"].stage_emit(payload=payload)
             return
 
-        approved_indices = self._executable_tool_call_indices(payload)
-        if approved_indices:
-            await self._execute_and_emit(payload, approved_indices)
+        await self._apply_policy_response(payload, review, response)
 
-        if self.model.tools_need_permission(payload):
-            perm_state = self.model.register_permission_request(payload)
-            await self._persist_pending_request(perm_state)
-            await self._invoke_hook(
-                self.model.on_permission_request,
-                perm_state.request,
+    async def _apply_policy_response(
+        self,
+        payload: ToolUsePayload,
+        review: dict[str, Any],
+        response: Any,
+    ) -> ToolUsePayload | None:
+        """
+        Apply application policy data and route the payload.
+
+        Decisions are matched against the current ordered subset of tool calls that
+        are awaiting permission. Records without pending permission remain in their
+        existing state, which lets no-permission tools execute while permission
+        tools from the same payload remain pending.
+        """
+        indices = pending_permission_indices(payload)
+        decisions = (
+            normalize_policy_response(response, indices)
+            if indices
+            else None
+        )
+        if decisions:
+            apply_policy_decisions(payload, indices, decisions)
+
+        refresh_tool_use_review(review, payload)
+        await self._route_tool_use_payload(payload)
+        await self._sync_pending_state(payload, review, indices)
+        return payload
+
+    async def _route_tool_use_payload(self, payload: ToolUsePayload) -> None:
+        """
+        Emit permissioned payloads to ToolUseElement trigger ports.
+
+        The gateway stamps each routed payload with the active internal execution
+        owner before emitting. ToolUseElement copies this owner into runtime
+        invocation contexts, which is how later cancellation or new-message
+        supersession can abort running tools and suppress stale results.
+        """
+        payload.model.metadata["execution_owner"] = self.model.current_execution_owner()
+        if self._has_executable_approved(payload):
+            await self.ports.output["approved_tool_use_output"].stage_emit(
+                payload=payload
             )
-            if perm_state.request.has_decisions:
-                await self.resolve_permission_request(perm_state.request)
+            return
+        if self._is_denied_only(payload):
+            await self.ports.output["denied_tool_use_output"].stage_emit(payload=payload)
+
+    @staticmethod
+    def _has_executable_approved(payload: ToolUsePayload) -> bool:
+        return any(
+            record.get("status") == "approved"
+            for record in payload.model.tool_calls
+        )
+
+    @staticmethod
+    def _is_denied_only(payload: ToolUsePayload) -> bool:
+        records = payload.model.tool_calls
+        if not records:
+            return False
+        return all(record.get("status") == "denied" for record in records)
+
+    async def _sync_pending_state(
+        self,
+        payload: ToolUsePayload,
+        review: dict[str, Any],
+        pending_indices: list[int],
+    ) -> None:
+        """
+        Persist or clear pending tool reviews based on remaining permission state.
+
+        Pending reviews are data-only objects handed to application code. The
+        gateway keeps the original review object alive for delayed in-process UI
+        resolution and persists only the payload ledger for cold-start recovery.
+        """
+        existing = self._find_pending_state_for_payload(payload)
+        if self.model.tools_need_permission(payload):
+            if existing is None:
+                state = self.model.register_pending_tool_use(
+                    payload,
+                    review,
+                    pending_indices=payload.model.pending_permission_indices(),
+                )
+            else:
+                state = existing
+                state.review = review
+                state.pending_indices = payload.model.pending_permission_indices()
+            await self._persist_pending_request(state)
+            return
+
+        if existing is not None:
+            self.model.pop_pending_tool_use(existing.review)
+            await self._delete_pending_request(existing)
+
+    def _find_pending_state_for_payload(
+        self,
+        payload: ToolUsePayload,
+    ) -> PendingToolUseState | None:
+        for state in self.model._pending_tool_uses:
+            if state.payload is payload:
+                return state
+        return None
 
     def _ensure_payload_bound(self, payload: ToolUsePayload) -> bool:
         if payload.is_bound:
             return True
         return payload.bind_registered_executor()
 
-    @staticmethod
-    def _executable_tool_call_indices(payload: ToolUsePayload) -> list[int]:
-        return [
-            index
-            for index, record in enumerate(payload.model.tool_calls)
-            if record.get("status") == "approved"
-        ]
-
-    async def _execute_and_emit(
-        self,
-        payload: ToolUsePayload,
-        tool_call_indices: list[int] | None = None,
-    ) -> ToolUsePayload:
-        executed = await self._execute_tool_calls(payload, tool_call_indices)
-        await self._emit_tool_result(executed)
-        return executed
-
-    async def _execute_tool_calls(
-        self,
-        payload: ToolUsePayload,
-        tool_call_indices: list[int] | None = None,
-    ) -> ToolUsePayload:
-        return await payload.execute_approved(tool_call_indices=tool_call_indices)
-
-    async def _emit_tool_result(self, payload: ToolUsePayload) -> None:
-        await self.ports.output["tool_result_output"].stage_emit(payload=payload)
-
-    async def _persist_pending_request(self, state: PermissionRequestState) -> None:
+    async def _persist_pending_request(self, state: PendingToolUseState) -> None:
         if self.pending_store is None:
             return
         now = time.time()
@@ -228,17 +372,64 @@ class ChatGatewayElement(Element):
             state.pending_record.updated_at = now
         await self.pending_store.upsert_record(state.pending_record)
 
-    async def _delete_pending_request(self, state: PermissionRequestState) -> None:
+    async def _delete_pending_request(self, state: PendingToolUseState) -> None:
         if self.pending_store is None or state.pending_record is None:
             return
         await self.pending_store.delete_record(state.pending_record)
         state.pending_record = None
 
-    async def _sync_pending_request(self, state: PermissionRequestState) -> None:
-        if self.model.tools_need_permission(state.payload):
-            await self._persist_pending_request(state)
-        else:
+    async def _clear_pending_tool_uses(self, *, reason: str) -> None:
+        """
+        Drop pending permission reviews and cancel their unresolved tool records.
+
+        This is used when a user cancels the turn or submits a replacement message.
+        The app should no longer resolve those reviews because they belong to a
+        stale conversational branch.
+        """
+        for state in self.model.pop_all_pending_tool_uses():
+            state.payload.model.cancel_non_terminal_calls(
+                state.pending_indices,
+                reason=reason,
+            )
             await self._delete_pending_request(state)
+
+    async def _cancel_running_tools(self, execution_owner: str) -> None:
+        """Propagate cancellation to ToolUseElement invocations for an owner."""
+        await ToolUsePayload.cancel_execution_for_owner(execution_owner)
+
+    async def _abort_branch_tool_work(
+        self,
+        execution_owner: str | None,
+        *,
+        reason: str,
+    ) -> None:
+        """
+        Clear pending reviews and cancel running tools for a superseded branch.
+
+        Pending decisions are removed immediately. Running tools receive cooperative
+        cancellation through their ``ToolInvocationContext`` and may stop, drain, or
+        detach depending on their interrupt policy. Any late result is treated as
+        orphaned by ``tool_result_input``.
+        """
+        await self._clear_pending_tool_uses(reason=reason)
+        if execution_owner:
+            await self._cancel_running_tools(execution_owner)
+
+    async def _prepare_new_user_message(self) -> str:
+        """
+        Supersede prior tool work before emitting a new user message.
+
+        A new user message means the user has moved the conversation to a fresh
+        branch. Previous permission prompts and running tool calls should no longer
+        influence model/history/context state for the new branch.
+        """
+        previous_owner, new_owner = self.model.begin_new_execution_branch()
+        if previous_owner:
+            await self._abort_branch_tool_work(
+                previous_owner,
+                reason="Superseded by new user message",
+            )
+        return new_owner
 
     def _tool_events_output_setup(self):
         async def pack(payload: dict) -> StructuredPayload:
@@ -253,64 +444,81 @@ class ChatGatewayElement(Element):
         self.ports.add_output(name="tool_result_output", pack_payload_callback=pack)
 
     async def emit_tool_event(self, turn_id: str, tool_calls: list[dict]) -> None:
-        """Emit tool-call completion for downstream tool routing."""
+        """
+        Emit streamed tool-call completion for downstream tool routing.
+
+        ``TurnHandle.stream()`` calls this when the assistant stream produces a
+        ``tool_calls_complete`` event. The emitted structured payload is a routing
+        event; it is not itself a permission decision or execution result.
+        """
         if self.model.is_turn_cancelled(turn_id):
             return
         event = {"tool_calls": tool_calls}
         await self._invoke_hook(self.model.on_tool_event, event)
         await self.ports.output["tool_events_output"].stage_emit(payload=event)
 
-    async def resolve_permission_request(
+    async def resolve_tool_use(
         self,
-        request: ToolPermissionRequest,
+        review: dict[str, Any],
+        decisions: list[dict[str, Any]] | dict[str, Any],
     ) -> ToolUsePayload | None:
         """
-        Apply application decisions from a permission request object.
+        Apply delayed application decisions to a pending tool review.
+
+        This is the durable/data-contract counterpart to immediate
+        ``on_tool_use(review)`` responses. The application passes back the same
+        review object it previously received plus ordered decision data. If the
+        review was superseded by cancellation or a new message, the gateway returns
+        ``None`` and emits nothing.
 
         Returns
         -------
         ToolUsePayload or None
-            The updated payload, or None if ``request`` is no longer pending.
+            The updated payload, or None if ``review`` is no longer pending.
         """
-        state = self.model.get_permission_request(request)
+        state = self.model.get_pending_tool_use(review)
         if state is None:
-            self.logger.warning("Unknown or already-resolved permission request")
+            self.logger.warning("Unknown or already-resolved tool review")
             return None
 
         if not self._ensure_payload_bound(state.payload):
             self.logger.warning(
-                "Cannot resolve permission request: executor %s unavailable",
+                "Cannot resolve tool review: executor %s unavailable",
                 state.payload.model.executor_element_name,
             )
             return None
 
-        approved_indices = [tool.index for tool in request.approved_tools]
-        denied_tools = request.denied_tools
-        if approved_indices:
-            await self._execute_tool_calls(state.payload, approved_indices)
+        normalized = normalize_policy_response(decisions, state.pending_indices)
+        if normalized is None:
+            return None
+
+        apply_policy_decisions(state.payload, state.pending_indices, normalized)
+        refresh_tool_use_review(state.review, state.payload)
+        await self._route_tool_use_payload(state.payload)
 
         if self.model.tools_need_permission(state.payload):
-            state.pending_indices = self.model.pending_permission_indices(state.payload)
-            await self._sync_pending_request(state)
+            state.pending_indices = state.payload.model.pending_permission_indices()
+            await self._persist_pending_request(state)
         else:
-            self.model.pop_permission_request(request)
+            self.model.pop_pending_tool_use(review)
             await self._delete_pending_request(state)
 
-        if approved_indices or denied_tools:
-            await self._emit_tool_result(state.payload)
         return state.payload
 
-    async def hydrate_pending_tool_uses(self) -> list[ToolPermissionRequest]:
+    async def hydrate_pending_tool_uses(self) -> list[dict[str, Any]]:
         """
-        Restore pending permission requests from the optional pending store.
+        Restore pending tool reviews from the optional pending store.
 
         Rebinds executors when available, recovers stale running records, and
-        invokes ``on_pending_permission_restored`` for each restored request.
+        invokes ``on_pending_tool_use_restored`` for each restored review.
+        Hydration restores application-visible review data only for payloads that
+        still require permission; already-resolved or unbindable records are purged
+        from the store.
         """
         if self.pending_store is None:
             return []
 
-        restored: list[ToolPermissionRequest] = []
+        restored: list[dict[str, Any]] = []
         records = await self.pending_store.load_records()
         for record in records:
             payload = _deserialize_tool_use(record.payload_data)
@@ -318,7 +526,7 @@ class ChatGatewayElement(Element):
 
             if not self._ensure_payload_bound(payload):
                 self.logger.warning(
-                    "Pending tool request could not rebind executor %s; purging",
+                    "Pending tool review could not rebind executor %s; purging",
                     payload.model.executor_element_name,
                 )
                 payload.model.metadata["rebind_error"] = (
@@ -327,32 +535,34 @@ class ChatGatewayElement(Element):
                 await self.pending_store.delete_record(record)
                 continue
 
-            pending_indices = self.model.pending_permission_indices(payload)
-            if not pending_indices:
+            indices = payload.model.pending_permission_indices()
+            if not indices:
                 await self.pending_store.delete_record(record)
                 continue
 
-            request = ToolPermissionRequest.from_payload(payload)
-            state = PermissionRequestState(
+            review = build_tool_use_review(payload)
+            state = PendingToolUseState(
                 payload=payload,
-                request=request,
-                pending_indices=pending_indices,
+                review=review,
+                pending_indices=indices,
                 pending_record=record,
             )
-            self.model._permission_requests.append(state)
-            restored.append(request)
+            self.model._pending_tool_uses.append(state)
+            restored.append(review)
             await self._invoke_hook(
-                self.model.on_pending_permission_restored,
-                request,
+                self.model.on_pending_tool_use_restored,
+                review,
             )
-            if request.has_decisions:
-                await self.resolve_permission_request(request)
 
         return restored
 
-    def resolve_permission_request_sync(self, request: ToolPermissionRequest) -> None:
-        """Schedule :meth:`resolve_permission_request` on the runtime loop."""
-        schedule_task(self.resolve_permission_request(request))
+    def resolve_tool_use_sync(
+        self,
+        review: dict[str, Any],
+        decisions: list[dict[str, Any]] | dict[str, Any],
+    ) -> None:
+        """Schedule :meth:`resolve_tool_use` on the runtime loop."""
+        schedule_task(self.resolve_tool_use(review, decisions))
 
     async def submit_message_async(
         self,
@@ -360,7 +570,15 @@ class ChatGatewayElement(Element):
         role: str = "user",
         **kwargs,
     ) -> TurnHandle:
-        """Async variant that awaits emission onto ``message_output``."""
+        """
+        Submit a user message and await its emission onto ``message_output``.
+
+        Submission starts a new execution branch. Before the user message enters
+        the graph, the gateway clears stale permission prompts and asks running
+        tools from the previous branch to cancel. This keeps a replacement user
+        message from racing against tool output that the backend should ignore.
+        """
+        await self._prepare_new_user_message()
         turn_id = self.model.create_turn_id()
         user_message = MessagePayload(
             content=content,
@@ -379,6 +597,11 @@ class ChatGatewayElement(Element):
     def submit_message(self, content: str, role: str = "user", **kwargs) -> TurnHandle:
         """
         Inject a user message into the flow and return a turn handle.
+
+        This synchronous convenience method schedules the same branch-supersession
+        workflow as ``submit_message_async()`` before emitting the message. Use the
+        returned ``TurnHandle`` for live stream consumption and cancellation; do not
+        use it as durable application identity.
 
         Parameters
         ----------
@@ -403,6 +626,7 @@ class ChatGatewayElement(Element):
         self.model.register_turn(turn_id, user_message)
 
         async def _emit():
+            await self._prepare_new_user_message()
             await self._invoke_hook(
                 self.model.on_user_message_submitted,
                 user_message,
@@ -414,5 +638,20 @@ class ChatGatewayElement(Element):
         return TurnHandle(turn_id=turn_id, user_message=user_message, gateway=self)
 
     def cancel(self, turn_id: str) -> None:
-        """Cancel an in-flight turn by id."""
+        """
+        Cancel an in-flight turn and supersede its tool work.
+
+        Cancellation stops the linked assistant stream when possible, clears any
+        pending tool permission reviews, and forwards cancellation to active tool
+        invocations for the current execution owner. Late tool results can still be
+        observed by ``on_tool_result`` as orphaned notices, but they are suppressed
+        from ``tool_result_output`` so downstream backend flow does not act on them.
+        """
         self.model.cancel_turn(turn_id)
+        owner = self.model.current_execution_owner()
+        self.model.supersede_owner(owner)
+
+        async def _abort():
+            await self._abort_branch_tool_work(owner, reason="Turn cancelled by user")
+
+        schedule_task(_abort())

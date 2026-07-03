@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import param
 
 from pyllments.base.model_base import Model
-from pyllments.elements.chat_gateway.tool_permission import ToolPermissionRequest
 
 if TYPE_CHECKING:
     from pyllments.payloads import MessagePayload, ToolUsePayload
@@ -26,22 +25,21 @@ class TurnState:
 
 
 @dataclass
-class PermissionRequestState:
-    """Pending tool permission awaiting application approval."""
+class PendingToolUseState:
+    """Pending tool-use review awaiting application policy decisions."""
 
     payload: ToolUsePayload
-    request: ToolPermissionRequest
+    review: dict[str, Any]
     pending_indices: list[int]
     pending_record: Any = None
 
 
 class ChatGatewayModel(Model):
     """
-    Tracks turns and pending tool permissions for :class:`ChatGatewayElement`.
+    Tracks turns and pending tool reviews for :class:`ChatGatewayElement`.
 
-    Assistant responses match turns in FIFO order. Tool permission requests are
-    held as mutable request objects until the outer application approves or denies
-    the tools they contain.
+    Assistant responses match turns in FIFO order. Tool reviews are held until
+    the outer application acknowledges or returns policy decisions.
     """
 
     on_user_message_submitted = param.Callable(
@@ -58,23 +56,66 @@ class ChatGatewayModel(Model):
     )
     on_tool_use = param.Callable(
         default=None,
-        doc="``(notice)`` when a ToolUsePayload arrives at the gateway.",
+        doc=(
+            "``(review) -> response | None`` when a ToolUsePayload arrives. "
+            "Return None to acknowledge non-permission tools, or return decisions "
+            "for pending permission tools."
+        ),
     )
-    on_permission_request = param.Callable(
+    on_tool_result = param.Callable(
         default=None,
-        doc="``(request)`` when tools require user approval.",
+        doc="``(result_notice)`` when a completed ToolUsePayload returns to the gateway.",
     )
-    on_pending_permission_restored = param.Callable(
+    on_pending_tool_use_restored = param.Callable(
         default=None,
-        doc="``(request)`` when pending permissions are hydrated on startup.",
+        doc="``(review)`` when pending tool reviews are hydrated on startup.",
     )
 
     def __init__(self, **params):
         super().__init__(**params)
         self._turn_counter = 0
+        self._branch_counter = 0
+        self._execution_owner: str | None = None
+        self._superseded_owners: set[str] = set()
         self._pending_turn_ids: list[str] = []
         self._turn_states: dict[str, TurnState] = {}
-        self._permission_requests: list[PermissionRequestState] = []
+        self._pending_tool_uses: list[PendingToolUseState] = []
+
+    def begin_new_execution_branch(self) -> tuple[str | None, str]:
+        """
+        Start a new execution branch and supersede the previous one.
+
+        Returns
+        -------
+        tuple[str | None, str]
+            Previous owner (if any) and the new active owner token.
+        """
+        previous = self._execution_owner
+        self._branch_counter += 1
+        self._execution_owner = f"branch-{self._branch_counter}"
+        if previous:
+            self._superseded_owners.add(previous)
+        return previous, self._execution_owner
+
+    def current_execution_owner(self) -> str:
+        """Return the active execution owner, creating one when needed."""
+        if self._execution_owner is None:
+            self._branch_counter += 1
+            self._execution_owner = f"branch-{self._branch_counter}"
+        return self._execution_owner
+
+    def supersede_owner(self, owner: str | None) -> None:
+        """Mark an execution owner inactive without starting a new branch."""
+        if owner:
+            self._superseded_owners.add(owner)
+
+    def is_execution_owner_active(self, owner: str | None) -> bool:
+        """Return whether tool results for an owner should enter the active flow."""
+        if not owner:
+            return True
+        if owner in self._superseded_owners:
+            return False
+        return owner == self._execution_owner
 
     def get_turn_state(self, turn_id: str) -> TurnState | None:
         """Return runtime state for a turn, if it exists."""
@@ -138,52 +179,42 @@ class ChatGatewayModel(Model):
         """Return True if any tool still requires approval before execution."""
         return payload.model.needs_permission()
 
-    @staticmethod
-    def pending_permission_tool_names(payload: ToolUsePayload) -> list[str]:
-        """Tool names that are awaiting permission."""
-        return payload.model.pending_permission_tool_names()
-
-    def register_permission_request(
+    def register_pending_tool_use(
         self,
         payload: ToolUsePayload,
+        review: dict[str, Any],
         pending_indices: list[int] | None = None,
-    ) -> PermissionRequestState:
-        """Store a pending permission request and return its state."""
-        indices = pending_indices or self.pending_permission_indices(payload)
+    ) -> PendingToolUseState:
+        """Store a pending tool review and return its state."""
+        indices = pending_indices or payload.model.pending_permission_indices()
         payload.model.apply_permission_request(indices)
-        request = ToolPermissionRequest.from_payload(payload)
-        state = PermissionRequestState(
+        state = PendingToolUseState(
             payload=payload,
-            request=request,
+            review=review,
             pending_indices=indices,
         )
-        self._permission_requests.append(state)
+        self._pending_tool_uses.append(state)
         return state
 
-    @staticmethod
-    def pending_permission_indices(payload: ToolUsePayload) -> list[int]:
-        """Return list indices for tool calls still awaiting permission."""
-        return payload.model.pending_permission_indices()
-
-    def get_permission_request(
-        self,
-        request: ToolPermissionRequest,
-    ) -> PermissionRequestState | None:
-        """Return a pending permission request, if it exists."""
-        for state in self._permission_requests:
-            if state.request is request:
+    def get_pending_tool_use(self, review: dict[str, Any]) -> PendingToolUseState | None:
+        """Return a pending tool review, if it exists."""
+        for state in self._pending_tool_uses:
+            if state.review is review:
                 return state
         return None
 
-    def pop_permission_request(
-        self,
-        request: ToolPermissionRequest,
-    ) -> PermissionRequestState | None:
-        """Remove and return a pending permission request."""
-        for index, state in enumerate(self._permission_requests):
-            if state.request is request:
-                return self._permission_requests.pop(index)
+    def pop_pending_tool_use(self, review: dict[str, Any]) -> PendingToolUseState | None:
+        """Remove and return a pending tool review."""
+        for index, state in enumerate(self._pending_tool_uses):
+            if state.review is review:
+                return self._pending_tool_uses.pop(index)
         return None
+
+    def pop_all_pending_tool_uses(self) -> list[PendingToolUseState]:
+        """Remove and return all pending tool reviews."""
+        states = list(self._pending_tool_uses)
+        self._pending_tool_uses.clear()
+        return states
 
     async def wait_for_assistant(self, turn_id: str) -> MessagePayload:
         """Wait until the assistant message for a turn is linked."""

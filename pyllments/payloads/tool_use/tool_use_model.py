@@ -9,8 +9,10 @@ import param
 
 from pyllments.base.model_base import Model
 
-TERMINAL_STATUSES = frozenset({"succeeded", "failed", "denied", "cancelled"})
-NON_EXECUTABLE_STATUSES = TERMINAL_STATUSES | frozenset({"awaiting_permission", "running"})
+TERMINAL_STATUSES = frozenset({"succeeded", "failed", "denied", "cancelled", "orphaned_completed"})
+NON_EXECUTABLE_STATUSES = TERMINAL_STATUSES | frozenset(
+    {"awaiting_permission", "running", "cancel_requested"}
+)
 
 
 class ToolUseModel(Model):
@@ -84,6 +86,11 @@ Result:
 {%- if record.permission and record.permission.reason %}
 Reason: {{ record.permission.reason }}
 {%- endif %}
+{%- elif record.status == 'cancelled' %}
+### Tool: {{ record.model_tool_name }} cancelled
+{%- if record.error and record.error.message %}
+{{ record.error.message }}
+{%- endif %}
 {%- endif %}
 {%- endfor %}""")
 
@@ -108,6 +115,8 @@ Reason: {{ record.permission.reason }}
         self.completed = False
         if "running" in statuses:
             self.status = "running"
+        elif "cancel_requested" in statuses:
+            self.status = "cancel_requested"
         elif "awaiting_permission" in statuses:
             self.status = "awaiting_permission"
         elif "approved" in statuses:
@@ -227,20 +236,80 @@ Reason: {{ record.permission.reason }}
         record["updated_at"] = time.time()
         self._touch()
 
-    def attach_result(self, index: int, result: dict[str, Any]):
+    def attach_result(
+        self,
+        index: int,
+        result: dict[str, Any],
+        *,
+        orphaned: bool = False,
+    ):
         record = self.tool_calls[index]
         record["result"] = result
         record["error"] = None
-        record["status"] = "succeeded"
+        record["status"] = "orphaned_completed" if orphaned else "succeeded"
+        if orphaned:
+            record["metadata"]["orphaned"] = True
         record["updated_at"] = time.time()
         self._touch()
 
-    def attach_error(self, index: int, error: dict[str, Any]):
+    def attach_error(
+        self,
+        index: int,
+        error: dict[str, Any],
+        *,
+        orphaned: bool = False,
+    ):
         record = self.tool_calls[index]
         record["error"] = error
         record["status"] = "failed"
+        if orphaned:
+            record["metadata"]["orphaned"] = True
         record["updated_at"] = time.time()
         self._touch()
+
+    def mark_cancel_requested(self, index: int):
+        """Mark a tool call as awaiting cooperative cancellation."""
+        record = self.tool_calls[index]
+        if record.get("status") in TERMINAL_STATUSES:
+            return
+        record["status"] = "cancel_requested"
+        record["updated_at"] = time.time()
+        self._touch()
+
+    def mark_cancelled(self, index: int, *, reason: str | None = None):
+        """Mark a tool call as cancelled with an optional reason."""
+        record = self.tool_calls[index]
+        record["status"] = "cancelled"
+        record["error"] = {
+            "type": "ToolCancelled",
+            "message": reason or "Tool invocation was cancelled",
+            "retryable": False,
+            "details": {},
+        }
+        record["updated_at"] = time.time()
+        self._touch()
+
+    def cancel_call(self, index: int, *, reason: str | None = None):
+        """Cancel one non-terminal tool call."""
+        if index < 0 or index >= len(self.tool_calls):
+            return
+        record = self.tool_calls[index]
+        if record.get("status") in TERMINAL_STATUSES:
+            return
+        if record.get("status") == "running":
+            self.mark_cancel_requested(index)
+            return
+        self.mark_cancelled(index, reason=reason)
+
+    def cancel_non_terminal_calls(
+        self,
+        indices: list[int] | None = None,
+        *,
+        reason: str | None = None,
+    ):
+        """Cancel all non-terminal tool calls in the selected subset."""
+        for index in self._iter_indices(indices):
+            self.cancel_call(index, reason=reason)
 
     def recover_stale_running(self):
         """Mark interrupted running calls as failed with retryable=true."""

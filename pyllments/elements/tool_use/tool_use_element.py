@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import dataclass
 from typing import Any, Literal, Union
 
 import param
@@ -12,7 +13,16 @@ from pyllments.common.pydantic_models import CleanModel
 from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload, ToolUsePayload
 from pyllments.runtime.scheduler import schedule_task
 
+from .tool_invocation_context import AbortSignal, ToolCancelled, ToolInvocationContext
 from .tool_use_model import ToolUseModel, build_adapters
+
+
+@dataclass
+class _ActiveInvocation:
+    payload_id: int
+    index: int
+    context: ToolInvocationContext
+    task: asyncio.Task | None
 
 
 class ToolUseElement(Element):
@@ -42,6 +52,7 @@ class ToolUseElement(Element):
             tools_requiring_permission=tools_requiring_permission,
         )
         self.model = ToolUseModel(adapters=adapter_list)
+        self._active_invocations: dict[tuple[int, int], _ActiveInvocation] = {}
         ToolUsePayload.register_executor(self)
         self._setup_ports()
         schedule_task(self._emit_latched_schema_outputs())
@@ -162,26 +173,94 @@ class ToolUseElement(Element):
     ) -> ToolUsePayload:
         """Execute approved tool records for a bound payload."""
         payload.model.recover_stale_running()
-        tasks = []
-        selected_indices = []
+        execution_owner = str(payload.model.metadata.get("execution_owner") or "")
+        tasks_info: list[tuple[int, ToolInvocationContext, asyncio.Task]] = []
+
         for index in payload.model._iter_indices(tool_call_indices):
             if not payload.model.can_execute(index):
                 continue
             record = payload.model.tool_calls[index]
             payload.model.mark_running(index)
-            selected_indices.append(index)
-            tasks.append(self.model.execute_tool_use(record))
 
-        if not tasks:
+            policy = record.get("metadata", {}).get("interrupt_policy", "drain")
+            context = ToolInvocationContext(
+                tool_call_index=index,
+                execution_owner=execution_owner,
+                abort_signal=AbortSignal(),
+                interrupt_policy=policy,
+            )
+            key = (id(payload), index)
+            placeholder = _ActiveInvocation(id(payload), index, context, task=None)  # type: ignore[arg-type]
+            self._active_invocations[key] = placeholder
+
+            async def run_call(
+                rec: dict[str, Any] = record,
+                ctx: ToolInvocationContext = context,
+            ):
+                try:
+                    return await self.model.execute_tool_use(rec, context=ctx)
+                except ToolCancelled:
+                    return {"cancelled": True}
+                except asyncio.CancelledError:
+                    return {"cancelled": True}
+
+            task = asyncio.create_task(run_call())
+            placeholder.task = task
+            tasks_info.append((index, context, task))
+
+        if not tasks_info:
             return payload
 
-        results = await asyncio.gather(*tasks)
-        for index, outcome in zip(selected_indices, results):
+        outcomes = await asyncio.gather(*(task for _, _, task in tasks_info), return_exceptions=True)
+        for (index, context, task), outcome in zip(tasks_info, outcomes):
+            self._active_invocations.pop((id(payload), index), None)
+            orphaned = context.abort_signal.is_cancelled()
+
+            if isinstance(outcome, asyncio.CancelledError) or (
+                isinstance(outcome, dict) and outcome.get("cancelled")
+            ):
+                payload.model.mark_cancelled(index)
+                continue
+            if isinstance(outcome, Exception):
+                payload.model.attach_error(
+                    index,
+                    {
+                        "type": "ToolExecutionError",
+                        "message": str(outcome),
+                        "retryable": False,
+                        "details": {},
+                    },
+                    orphaned=orphaned,
+                )
+                continue
             if "error" in outcome:
-                payload.model.attach_error(index, outcome["error"])
+                payload.model.attach_error(index, outcome["error"], orphaned=orphaned)
             else:
-                payload.model.attach_result(index, outcome["result"])
+                payload.model.attach_result(index, outcome["result"], orphaned=orphaned)
         return payload
+
+    async def cancel_execution_for_owner(
+        self,
+        execution_owner: str,
+        *,
+        interrupt_policy: Literal["cancel", "drain", "detach"] = "cancel",
+    ) -> None:
+        """Abort active tool invocations owned by a superseded execution branch."""
+        targeted: list[_ActiveInvocation] = []
+        for inv in list(self._active_invocations.values()):
+            if inv.context.execution_owner != execution_owner:
+                continue
+            inv.context.interrupt_policy = interrupt_policy
+            inv.context.abort_signal.cancel()
+            if interrupt_policy == "cancel" and inv.task is not None:
+                inv.task.cancel()
+            targeted.append(inv)
+
+        if targeted:
+            await asyncio.gather(
+                *(inv.task for inv in targeted if inv.task is not None),
+                return_exceptions=True,
+            )
 
     def _normalize_structured_requests(self, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [
@@ -260,7 +339,6 @@ class ToolUseElement(Element):
         async def unpack(payload: ToolUsePayload):
             if not payload.is_bound:
                 payload.bind_executor(self)
-            payload.model.approve()
             executed = await self.execute_tool_use_payload(payload)
             await self.ports.output["tool_result_output"].stage_emit(payload=executed)
 
@@ -272,8 +350,6 @@ class ToolUseElement(Element):
 
     def _denied_tool_use_input_setup(self):
         async def unpack(payload: ToolUsePayload):
-            reason = payload.model.metadata.get("denial_reason")
-            payload.model.deny(reason=reason)
             await self.ports.output["tool_result_output"].stage_emit(payload=payload)
 
         self.ports.add_input(

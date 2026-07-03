@@ -15,6 +15,7 @@ from pyllments.runtime.scheduler import resolve_loop, schedule_task
 from .function_tool_adapter import FunctionToolAdapter
 from .mcp_tool_adapter import MCPToolAdapter
 from .tool_adapter import ToolAdapter, ToolSpec
+from .tool_invocation_context import ToolCancelled, ToolInvocationContext
 
 
 class ToolUseModel(Model):
@@ -60,15 +61,23 @@ class ToolUseModel(Model):
             raise KeyError(f"Unknown model tool name: {model_tool_name}")
         return spec
 
-    async def execute_tool_use(self, record: dict[str, Any]) -> dict[str, Any]:
+    async def execute_tool_use(
+        self,
+        record: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> dict[str, Any]:
         adapter = self.get_adapter(record["adapter_name"])
         try:
             result = await adapter.call_tool(
                 provider_name=record.get("provider_name"),
                 tool_name=record["tool_name"],
                 parameters=record.get("parameters"),
+                context=context,
             )
             return {"result": result.to_dict()}
+        except ToolCancelled as exc:
+            return {"cancelled": True, "reason": str(exc)}
         except Exception as exc:
             return {
                 "error": {

@@ -241,13 +241,27 @@ def tool_stack():
     return _build
 
 
+def _wire_gateway_tools(gateway, tool_use_el, result_pipe=None):
+    """Wire gateway policy/execution ports for ToolUseElement integration tests."""
+    tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
+    gateway.ports.output["approved_tool_use_output"] > tool_use_el.ports.approved_tool_use_input
+    gateway.ports.output["denied_tool_use_output"] > tool_use_el.ports.denied_tool_use_input
+    tool_use_el.ports.tool_result_output > gateway.ports.tool_result_input
+    if result_pipe is not None:
+        gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
+
+
+def _tool_names(review: dict) -> list[str]:
+    return [tool["name"] for tool in review["tools"]]
+
+
 @pytest.mark.asyncio
 async def test_completed_tool_use_invokes_hook_only():
     result_pipe = PipeElement(name="result_pipe")
     hook_calls: list[list[str]] = []
 
-    def on_tool_use(notice):
-        hook_calls.append([tool.name for tool in notice.tools])
+    def on_tool_use(review):
+        hook_calls.append(_tool_names(review))
 
     gateway = ChatGatewayElement(on_tool_use=on_tool_use)
     gateway.ports.output["tool_result_output"].connect(result_pipe.ports.input["pipe_input"])
@@ -256,7 +270,7 @@ async def test_completed_tool_use_invokes_hook_only():
         gateway.ports.input["tool_use_input"]
     )
 
-    turn = await gateway.submit_message_async("Hello")
+    await gateway.submit_message_async("Hello")
     await gateway.ports.output["message_output"].drain()
 
     tools = _tool_use_payload(permission_required=False, completed=True)
@@ -266,7 +280,7 @@ async def test_completed_tool_use_invokes_hook_only():
     assert len(hook_calls) == 1
     assert hook_calls[0] == ["app_mcp_delete_record"]
     assert len(result_pipe.received_payloads) == 0
-    assert gateway.model._permission_requests == []
+    assert gateway.model._pending_tool_uses == []
 
 
 @pytest.mark.asyncio
@@ -277,17 +291,18 @@ async def test_no_permission_tool_use_auto_executes(tool_stack):
     result_pipe = PipeElement(name="result_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
 
-    tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
+    _wire_gateway_tools(gateway, tool_use_el, result_pipe)
     tools_pipe.ports.output["pipe_output"] > tool_use_el.ports.tool_request_structured_input
 
-    turn = await gateway.submit_message_async("run tool")
+    await gateway.submit_message_async("run tool")
     await gateway.ports.output["message_output"].drain()
 
     await tools_pipe.async_send_payload(
         StructuredPayload(data=[{"name": "functions_add", "parameters": {"a": 2, "b": 3}}])
     )
     await tool_use_el.ports.output["tool_use_output"].drain()
+    await gateway.ports.output["approved_tool_use_output"].drain()
+    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
     assert len(result_pipe.received_payloads) == 1
@@ -300,17 +315,19 @@ async def test_no_permission_tool_use_auto_executes(tool_stack):
 async def test_mixed_tool_use_executes_no_permission_and_waits_for_rest(tool_stack):
     tool_use_el = await tool_stack()
 
-    permission_requests = []
+    reviews: list[dict] = []
     tool_notices: list[list[str]] = []
     gateway = ChatGatewayElement(
-        on_tool_use=lambda notice: tool_notices.append([tool.name for tool in notice.tools]),
-        on_permission_request=lambda request: permission_requests.append(request),
+        on_tool_use=lambda review: (
+            reviews.append(review),
+            tool_notices.append(_tool_names(review)),
+            None,
+        )[2],
     )
     result_pipe = PipeElement(name="result_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
 
-    tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
+    _wire_gateway_tools(gateway, tool_use_el, result_pipe)
     tools_pipe.ports.output["pipe_output"] > gateway.ports.input["tool_use_input"]
 
     await gateway.submit_message_async("mixed")
@@ -318,6 +335,8 @@ async def test_mixed_tool_use_executes_no_permission_and_waits_for_rest(tool_sta
 
     payload = _mixed_tool_use_payload()
     await tools_pipe.async_send_payload(payload)
+    await gateway.ports.output["approved_tool_use_output"].drain()
+    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
     assert len(result_pipe.received_payloads) == 1
@@ -335,25 +354,26 @@ async def test_mixed_tool_use_executes_no_permission_and_waits_for_rest(tool_sta
     assert executed.model.tool_calls[ping_index]["status"] == "succeeded"
     assert executed.model.tool_calls[delete_index]["status"] == "awaiting_permission"
     assert tool_notices == [["functions_add", "app_mcp_delete_record"]]
-    assert len(permission_requests) == 1
-    assert [tool.name for tool in permission_requests[0].tools] == ["app_mcp_delete_record"]
+    assert len(reviews) == 1
+    assert _tool_names(reviews[0]) == ["functions_add", "app_mcp_delete_record"]
+    assert gateway.model.get_pending_tool_use(reviews[0]) is not None
 
 
 @pytest.mark.asyncio
 async def test_permission_required_creates_pending_request(permission_tool_stack):
     tool_use_el = await permission_tool_stack()
 
-    permission_requests = []
+    reviews: list[dict] = []
 
-    def on_permission_request(request):
-        permission_requests.append(request)
+    def on_tool_use(review):
+        reviews.append(review)
+        return None
 
-    gateway = ChatGatewayElement(on_permission_request=on_permission_request)
+    gateway = ChatGatewayElement(on_tool_use=on_tool_use)
     result_pipe = PipeElement(name="result_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
 
-    tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
+    _wire_gateway_tools(gateway, tool_use_el, result_pipe)
     tools_pipe.ports.output["pipe_output"] > gateway.ports.input["tool_use_input"]
 
     await gateway.submit_message_async("Delete this")
@@ -363,24 +383,28 @@ async def test_permission_required_creates_pending_request(permission_tool_stack
     await tools_pipe.async_send_payload(tools)
     await gateway.ports.output["tool_result_output"].drain()
 
-    assert len(permission_requests) == 1
-    assert [tool.name for tool in permission_requests[0].tools] == ["functions_secret"]
-    assert permission_requests[0].tools[0].parameters == {"value": "hidden"}
+    assert len(reviews) == 1
+    assert _tool_names(reviews[0]) == ["functions_secret"]
+    assert reviews[0]["tools"][0]["parameters"] == {"value": "hidden"}
     assert len(result_pipe.received_payloads) == 0
+    assert gateway.model.get_pending_tool_use(reviews[0]) is not None
 
 
 @pytest.mark.asyncio
-async def test_permission_request_object_approval_executes_and_emits(permission_tool_stack):
+async def test_policy_decisions_approval_executes_and_emits(permission_tool_stack):
     tool_use_el = await permission_tool_stack()
 
-    permission_requests = []
-    gateway = ChatGatewayElement()
-    gateway.model.on_permission_request = lambda request: permission_requests.append(request)
+    reviews: list[dict] = []
+    gateway = ChatGatewayElement(
+        on_tool_use=lambda review: (
+            reviews.append(review),
+            {"decisions": [{"decision": "approved"}]},
+        )[1],
+    )
     result_pipe = PipeElement(name="result_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
 
-    tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
+    _wire_gateway_tools(gateway, tool_use_el, result_pipe)
     tools_pipe.ports.output["pipe_output"] > gateway.ports.input["tool_use_input"]
 
     await gateway.submit_message_async("Delete this")
@@ -388,30 +412,26 @@ async def test_permission_request_object_approval_executes_and_emits(permission_
 
     tools = _permission_tool_use_payload()
     await tools_pipe.async_send_payload(tools)
-
-    request = permission_requests[0]
-    request.approve_all()
-    approved = await gateway.resolve_permission_request(request)
+    await gateway.ports.output["approved_tool_use_output"].drain()
+    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
-    assert approved is tools
     assert len(result_pipe.received_payloads) == 1
+    approved = result_pipe.received_payloads[0]
     assert any(record.get("status") == "succeeded" for record in approved.model.tool_calls)
-    assert gateway.model._permission_requests == []
+    assert gateway.model._pending_tool_uses == []
 
 
 @pytest.mark.asyncio
-async def test_permission_request_object_denial_emits_tool_use_payload(permission_tool_stack):
+async def test_delayed_policy_decisions_execute_and_emit(permission_tool_stack):
     tool_use_el = await permission_tool_stack()
 
-    permission_requests = []
-    gateway = ChatGatewayElement()
-    gateway.model.on_permission_request = lambda request: permission_requests.append(request)
+    reviews: list[dict] = []
+    gateway = ChatGatewayElement(on_tool_use=lambda review: reviews.append(review) or None)
     result_pipe = PipeElement(name="result_pipe")
     tools_pipe = PipeElement(name="tools_pipe")
 
-    tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
+    _wire_gateway_tools(gateway, tool_use_el, result_pipe)
     tools_pipe.ports.output["pipe_output"] > gateway.ports.input["tool_use_input"]
 
     await gateway.submit_message_async("Delete this")
@@ -420,15 +440,51 @@ async def test_permission_request_object_denial_emits_tool_use_payload(permissio
     tools = _permission_tool_use_payload()
     await tools_pipe.async_send_payload(tools)
 
-    request = permission_requests[0]
-    request.deny_all(reason="User declined")
-    denial = await gateway.resolve_permission_request(request)
+    review = reviews[0]
+    resolved = await gateway.resolve_tool_use(
+        review,
+        {"decisions": [{"decision": "approved"}]},
+    )
+    await gateway.ports.output["approved_tool_use_output"].drain()
+    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
-    assert isinstance(denial, ToolUsePayload)
-    assert denial.model.tool_calls[0]["permission"]["reason"] == "User declined"
+    assert resolved is tools
     assert len(result_pipe.received_payloads) == 1
-    assert result_pipe.received_payloads[0].model.status == "completed"
+    assert gateway.model._pending_tool_uses == []
+
+
+@pytest.mark.asyncio
+async def test_policy_decisions_denial_emits_tool_use_payload(permission_tool_stack):
+    tool_use_el = await permission_tool_stack()
+
+    result_notices: list[dict] = []
+    gateway = ChatGatewayElement(
+        on_tool_use=lambda review: {
+            "decisions": [{"decision": "denied", "reason": "User declined"}],
+        },
+        on_tool_result=lambda notice: result_notices.append(notice),
+    )
+    result_pipe = PipeElement(name="result_pipe")
+    tools_pipe = PipeElement(name="tools_pipe")
+
+    _wire_gateway_tools(gateway, tool_use_el, result_pipe)
+    tools_pipe.ports.output["pipe_output"] > gateway.ports.input["tool_use_input"]
+
+    await gateway.submit_message_async("Delete this")
+    await gateway.ports.output["message_output"].drain()
+
+    tools = _permission_tool_use_payload()
+    await tools_pipe.async_send_payload(tools)
+    await gateway.ports.output["denied_tool_use_output"].drain()
+    await tool_use_el.ports.output["tool_result_output"].drain()
+    await gateway.ports.output["tool_result_output"].drain()
+
+    assert len(result_pipe.received_payloads) == 1
+    denial = result_pipe.received_payloads[0]
+    assert denial.model.tool_calls[0]["permission"]["reason"] == "User declined"
+    assert denial.model.status == "completed"
+    assert len(result_notices) == 1
 
 
 @pytest.mark.asyncio

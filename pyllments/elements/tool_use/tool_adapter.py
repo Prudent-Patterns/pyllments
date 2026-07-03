@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyllments.elements.tool_use.tool_invocation_context import ToolInvocationContext
 
 
 @dataclass
@@ -67,6 +70,7 @@ class ToolAdapter(Protocol):
         provider_name: str | None,
         tool_name: str,
         parameters: dict | None,
+        context: ToolInvocationContext | None = None,
     ) -> ToolResult: ...
 
     async def close(self) -> None: ...

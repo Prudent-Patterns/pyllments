@@ -1,155 +1,149 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyllments.payloads import ToolUsePayload
 
-
-@dataclass
-class ToolCallHandle:
-    """Application-facing handle for one tool-call record."""
-
-    payload: ToolUsePayload
-    index: int
-
-    @property
-    def record(self) -> dict[str, Any]:
-        """Return the underlying mutable tool-call record."""
-        return self.payload.model.tool_calls[self.index]
-
-    @property
-    def name(self) -> str | None:
-        return self.record.get("model_tool_name")
-
-    @property
-    def adapter_name(self) -> str | None:
-        return self.record.get("adapter_name")
-
-    @property
-    def provider_name(self) -> str | None:
-        return self.record.get("provider_name")
-
-    @property
-    def tool_name(self) -> str | None:
-        return self.record.get("tool_name")
-
-    @property
-    def description(self) -> str:
-        return self.record.get("description", "")
-
-    @property
-    def parameters(self) -> dict:
-        return self.record.get("parameters", {})
-
-    @property
-    def status(self) -> str | None:
-        return self.record.get("status")
-
-    @property
-    def permission(self) -> dict:
-        return self.record.get("permission", {})
-
-    @property
-    def permission_required(self) -> bool:
-        return bool(self.record.get("permission_required"))
-
-    @property
-    def needs_permission(self) -> bool:
-        return self.permission_required and self.status == "awaiting_permission"
-
-    @property
-    def result(self) -> dict | None:
-        return self.record.get("result")
-
-    @property
-    def error(self) -> dict | None:
-        return self.record.get("error")
-
-    def approve(self, *, decided_by: str | None = None) -> None:
-        """Approve this tool call for execution."""
-        self.payload.model.approve([self.index], decided_by=decided_by)
-
-    def deny(
-        self,
-        reason: str | None = None,
-        *,
-        decided_by: str | None = None,
-    ) -> None:
-        """Deny this tool call and record the optional reason."""
-        self.payload.model.deny([self.index], reason=reason, decided_by=decided_by)
+DECISION_APPROVED = "approved"
+DECISION_DENIED = "denied"
 
 
-@dataclass
-class ToolUseNotice:
-    """Application-facing notification for every tool call in a payload."""
-
-    payload: ToolUsePayload
-    tools: list[ToolCallHandle]
-
-    @classmethod
-    def from_payload(cls, payload: ToolUsePayload) -> ToolUseNotice:
-        """Build handles for every tool call in order."""
-        return cls(
-            payload=payload,
-            tools=[
-                ToolCallHandle(payload=payload, index=index)
-                for index in range(len(payload.model.tool_calls))
-            ],
-        )
-
-    @property
-    def permission_tools(self) -> list[ToolCallHandle]:
-        """Return tools currently waiting for an application decision."""
-        return [tool for tool in self.tools if tool.needs_permission]
+def build_tool_call_view(record: dict[str, Any], index: int) -> dict[str, Any]:
+    """Build a serializable view of one tool-call record for application hooks."""
+    return {
+        "index": index,
+        "name": record.get("model_tool_name"),
+        "adapter_name": record.get("adapter_name"),
+        "provider_name": record.get("provider_name"),
+        "tool_name": record.get("tool_name"),
+        "description": record.get("description", ""),
+        "parameters": record.get("parameters", {}),
+        "permission_required": bool(record.get("permission_required")),
+        "status": record.get("status"),
+        "permission": dict(record.get("permission") or {}),
+        "result": record.get("result"),
+        "error": record.get("error"),
+    }
 
 
-@dataclass
-class ToolPermissionRequest:
-    """Application-facing request for tool calls requiring a decision."""
+def build_tool_use_review(payload: ToolUsePayload) -> dict[str, Any]:
+    """Build the uniform application gate payload for an arriving ToolUsePayload."""
+    return {
+        "tools": [
+            build_tool_call_view(record, index)
+            for index, record in enumerate(payload.model.tool_calls)
+        ],
+    }
 
-    payload: ToolUsePayload
-    tools: list[ToolCallHandle]
 
-    @classmethod
-    def from_payload(cls, payload: ToolUsePayload) -> ToolPermissionRequest:
-        """Build a request containing only calls awaiting permission."""
-        notice = ToolUseNotice.from_payload(payload)
-        return cls(payload=payload, tools=notice.permission_tools)
+def refresh_tool_use_review(review: dict[str, Any], payload: ToolUsePayload) -> dict[str, Any]:
+    """Refresh an existing review dict in place so application references stay valid."""
+    review["tools"] = [
+        build_tool_call_view(record, index)
+        for index, record in enumerate(payload.model.tool_calls)
+    ]
+    return review
 
-    @property
-    def pending_tools(self) -> list[ToolCallHandle]:
-        """Return tools still awaiting approval or denial."""
-        return [tool for tool in self.tools if tool.needs_permission]
 
-    @property
-    def approved_tools(self) -> list[ToolCallHandle]:
-        return [tool for tool in self.tools if tool.status == "approved"]
+def build_tool_result_notice(payload: ToolUsePayload) -> dict[str, Any]:
+    """Build a result notice after execution or denial for application display."""
+    return build_tool_use_review(payload)
 
-    @property
-    def denied_tools(self) -> list[ToolCallHandle]:
-        return [tool for tool in self.tools if tool.status == "denied"]
 
-    @property
-    def has_decisions(self) -> bool:
-        return bool(self.approved_tools or self.denied_tools)
+def pending_permission_indices(payload: ToolUsePayload) -> list[int]:
+    """Return list indices for tool calls still awaiting permission."""
+    return payload.model.pending_permission_indices()
 
-    @property
-    def is_complete(self) -> bool:
-        return not self.pending_tools
 
-    def approve_all(self, *, decided_by: str | None = None) -> None:
-        """Approve every still-pending tool in this request."""
-        for tool in self.pending_tools:
-            tool.approve(decided_by=decided_by)
+def normalize_policy_response(
+    response: Any,
+    pending_indices: list[int],
+) -> list[dict[str, Any]] | None:
+    """
+  Normalize an application policy response into per-tool decisions.
 
-    def deny_all(
-        self,
-        reason: str | None = None,
-        *,
-        decided_by: str | None = None,
-    ) -> None:
-        """Deny every still-pending tool in this request."""
-        for tool in self.pending_tools:
-            tool.deny(reason=reason, decided_by=decided_by)
+  Returns None when the application only acknowledges and defers decisions.
+  """
+    if response is None:
+        return None
+    if isinstance(response, dict):
+        decisions = response.get("decisions")
+        if decisions is None:
+            return None
+        if not isinstance(decisions, list):
+            raise TypeError("policy response decisions must be a list")
+        if len(decisions) != len(pending_indices):
+            raise ValueError(
+                "policy response decisions must match the number of pending tools"
+            )
+        return [normalize_decision(item) for item in decisions]
+    if isinstance(response, list):
+        if len(response) != len(pending_indices):
+            raise ValueError(
+                "policy response decisions must match the number of pending tools"
+            )
+        return [normalize_decision(item) for item in response]
+    raise TypeError("policy response must be None, a dict with decisions, or a list")
+
+
+def normalize_decision(item: Any) -> dict[str, Any]:
+    """Normalize one decision record to approved/denied with optional reason."""
+    if not isinstance(item, dict):
+        raise TypeError("each decision must be a dict")
+    decision = item.get("decision")
+    if decision not in {DECISION_APPROVED, DECISION_DENIED}:
+        raise ValueError("decision must be 'approved' or 'denied'")
+    normalized = {"decision": decision}
+    if item.get("reason") is not None:
+        normalized["reason"] = item["reason"]
+    if item.get("decided_by") is not None:
+        normalized["decided_by"] = item["decided_by"]
+    return normalized
+
+
+def apply_policy_decisions(
+    payload: ToolUsePayload,
+    pending_indices: list[int],
+    decisions: list[dict[str, Any]],
+) -> tuple[list[int], list[int]]:
+    """
+    Apply application decisions to pending tool calls.
+
+    Returns
+    -------
+    tuple[list[int], list[int]]
+        Approved and denied list indices.
+    """
+    approved: list[int] = []
+    denied: list[int] = []
+    for index, decision in zip(pending_indices, decisions):
+        if decision["decision"] == DECISION_APPROVED:
+            payload.model.approve(
+                [index],
+                decided_by=decision.get("decided_by"),
+            )
+            approved.append(index)
+        else:
+            payload.model.deny(
+                [index],
+                reason=decision.get("reason"),
+                decided_by=decision.get("decided_by"),
+            )
+            denied.append(index)
+    return approved, denied
+
+
+def review_tool_names(review: dict[str, Any]) -> list[str]:
+    """Return model tool names from a review notice."""
+    return [tool.get("name") for tool in review.get("tools", [])]
+
+
+def pending_review_tools(review: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return only tools in a review that still await permission."""
+    return [
+        tool
+        for tool in review.get("tools", [])
+        if tool.get("permission_required")
+        and tool.get("status") == "awaiting_permission"
+    ]

@@ -69,6 +69,20 @@ class ToolUsePayload(Payload):
         return _EXECUTOR_REGISTRY.get(name)
 
     @classmethod
+    async def cancel_execution_for_owner(
+        cls,
+        execution_owner: str,
+        *,
+        interrupt_policy: str = "cancel",
+    ) -> None:
+        """Request cancellation of active invocations across registered executors."""
+        for executor in list(_EXECUTOR_REGISTRY.values()):
+            cancel = getattr(executor, "cancel_execution_for_owner", None)
+            if cancel is None:
+                continue
+            await cancel(execution_owner, interrupt_policy=interrupt_policy)
+
+    @classmethod
     def clear_executor_registry(cls) -> None:
         """Clear all registered executors. Intended for test isolation."""
         _EXECUTOR_REGISTRY.clear()

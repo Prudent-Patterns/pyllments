@@ -74,17 +74,17 @@ async def test_hydrate_pending_tool_uses_restores_permission_hook():
             )
         )
 
-        restored_requests = []
+        restored_reviews = []
         gateway = ChatGatewayElement(
             pending_store=store,
-            on_pending_permission_restored=lambda request: restored_requests.append(request),
+            on_pending_tool_use_restored=lambda review: restored_reviews.append(review),
         )
         restored = await gateway.hydrate_pending_tool_uses()
 
         assert len(restored) == 1
-        assert len(restored_requests) == 1
-        assert restored_requests[0].tools[0].name == "functions_secret"
-        assert gateway.model.get_permission_request(restored_requests[0]) is not None
+        assert len(restored_reviews) == 1
+        assert restored_reviews[0]["tools"][0]["name"] == "functions_secret"
+        assert gateway.model.get_pending_tool_use(restored_reviews[0]) is not None
 
 
 @pytest.mark.asyncio

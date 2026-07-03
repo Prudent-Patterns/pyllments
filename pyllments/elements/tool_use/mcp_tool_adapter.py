@@ -74,6 +74,7 @@ class MCPToolAdapter:
         provider_name: str | None,
         tool_name: str,
         parameters: dict | None,
+        context=None,
     ) -> ToolResult:
         await self.await_ready()
         if provider_name is None:

@@ -4,7 +4,10 @@ from .pending_tool_use_store import (
     PendingToolUseStore,
     SQLitePendingToolUseStore,
 )
-from .tool_permission import ToolCallHandle, ToolPermissionRequest, ToolUseNotice
+from .tool_permission import (
+    build_tool_result_notice,
+    build_tool_use_review,
+)
 from .turn_handle import TurnHandle
 
 __all__ = [
@@ -12,8 +15,7 @@ __all__ = [
     "PendingToolUseRecord",
     "PendingToolUseStore",
     "SQLitePendingToolUseStore",
-    "ToolCallHandle",
-    "ToolPermissionRequest",
-    "ToolUseNotice",
+    "build_tool_result_notice",
+    "build_tool_use_review",
     "TurnHandle",
 ]
