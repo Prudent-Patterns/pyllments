@@ -22,7 +22,7 @@ class FileLoaderElement(Element):
         self.file_container_view = None
         self.file_loader_view = None
         self.file_send_view = None
-        self.model = FileLoaderModel(file_dir=file_dir)
+        self.model = FileLoaderModel(file_dir=file_dir, **params)
 
         self._file_output_setup()
 

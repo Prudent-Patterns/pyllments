@@ -39,4 +39,15 @@ And as we can see, the `LLMChatElement` is emitting a `MessagePayload` in return
 
 The Model of the `ChatInterfaceElement` is handling the storage of the received payloads, and the outer Element class is handling the integration of the Model, Ports, and Views.
 
+## Constructor parameters
+
+Elements are the public construction entrypoint. Clear, named arguments that belong to the element should be declared as Element params so they appear in `SomeElement.param`. Model configuration params are declared on the Model, but you typically pass them through the Element constructor:
+
+```python
+history_handler_el = HistoryHandlerElement(history_token_limit=3000)
+llm_chat_el = LLMChatElement(model_name="gpt-4o", output_mode="stream")
+```
+
+The element forwards `**params` to its model once during initialization. Element-only dependencies (for example `pending_store` on `ChatGatewayElement`) are element params and are not model state. Inspect `SomeElement.param` for element-owned params and the corresponding model class for model-owned params accepted through construction.
+
 

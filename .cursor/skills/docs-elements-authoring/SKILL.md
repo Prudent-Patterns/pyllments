@@ -14,8 +14,16 @@ description: Writes and updates Pyllments element documentation in Quarto using 
 ## Content expectations
 
 - Document constructor parameters with clear defaults and intent.
+- Include explicit element constructor args and forwarded model params (params declared on the model but accepted through element construction).
+- Treat every public named element constructor argument as an Element `param`; flag code/docs drift if one is accepted but missing from `SomeElement.param`.
 - Explain key views and interaction paths where relevant.
 - Reflect real behavior from code; avoid speculative docs.
+
+## Constructor documentation
+
+- List element-owned args first (explicit constructor parameters declared on the Element).
+- List model params users may pass through the element constructor (derive from the model's `param` declarations).
+- Note when an element uses local filtering for multiple backends or special wiring.
 
 ## Authoring checklist
 

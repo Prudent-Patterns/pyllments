@@ -25,11 +25,10 @@ Use it when your application owns the HTTP/WebSocket layer (FastAPI, SSE, custom
 
 **Arguments:**
 
-`default_aggregate_stream: bool = True`<br>
-<span class="tab">When assistant messages arrive in `stream` mode, whether `MessageModel.aggregate_stream` is enabled so `content` and `tool_calls` are updated during consumption. Keep `True` when `HistoryHandlerElement` (or similar) must await a completed message. Set `False` only if your app fully owns aggregation and history is handled separately.</span>
+Hook callbacks such as `on_tool_use`, `on_tool_result`, and `on_assistant_message` are passed at construction and stored on the gateway model.
 
-`pending_db_path: str, optional`<br>
-<span class="tab">SQLite path for pending tool permission requests. Use this when pending approvals should survive app refresh or backend restart.</span>
+`pending_store`, optional<br>
+<span class="tab">Application-owned store implementing `PendingToolUseStore`. Use this when pending tool approvals should survive app refresh or backend restart. The gateway loads, saves, and clears `PendingToolUseSnapshot` objects; it does not construct or assume any particular database backend.</span>
 
 ## Application API
 
@@ -96,9 +95,9 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
-| `assistant_message_input` | `MessagePayload` | Receives assistant responses (typically from `LLMChatElement.message_output`). Links payload to the pending turn and applies `default_aggregate_stream` for stream mode. |
-| `tool_use_input` | `ToolUsePayload` | Receives tool-use payloads from `ToolUseElement.tool_use_output`. Invokes the application policy gate before routing execution. |
-| `tool_result_input` | `ToolUsePayload` | Receives completed tool-use payloads from `ToolUseElement.tool_result_output`. |
+| `assistant_message_input` | `MessagePayload` | Receives assistant responses (typically from `LLMChatElement.message_output`). Links payload to the pending turn without mutating stream aggregation policy. |
+| `tool_use_input` | `ToolUsePayload` | Receives tool-use payloads from `ToolUseElement.tool_use_output`. Invokes the application policy gate, mutates the payload, and executes approved records directly. |
+| `tool_result_input` | `ToolUsePayload` | Optional compatibility input for completed payloads arriving from external `ToolUseElement.tool_result_output` wiring. |
 
 : {.hover}
 
@@ -107,27 +106,25 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 | Port Name | Payload Type | Behavior |
 |-----------|--------------|----------|
 | `message_output` | `MessagePayload` | Emits user messages into the flow (history, context builder, etc.). |
-| `approved_tool_use_output` | `ToolUsePayload` | Emits permissioned payloads to `ToolUseElement.approved_tool_use_input` for execution. |
-| `denied_tool_use_output` | `ToolUsePayload` | Emits denied payloads to `ToolUseElement.denied_tool_use_input` for terminal result emission. |
+| `approved_tool_use_output` | `ToolUsePayload` | Deprecated compatibility output. Gateway-controlled flows execute through `ToolUsePayload.execute_approved()` instead. |
+| `denied_tool_use_output` | `ToolUsePayload` | Deprecated compatibility output. Denials finalize on the payload and emit through `tool_result_output` instead. |
 | `tool_events_output` | `StructuredPayload` | Emits `{"tool_calls": list}` when a stream completes with tool calls. |
-| `tool_result_output` | `ToolUsePayload` | Emits executed or denied tool-use payloads for history/UI/context after `on_tool_result`. |
+| `tool_result_output` | `ToolUsePayload` | Emits one completed tool-use ledger for history/UI/context after `on_tool_result`. Results from superseded owners are not emitted here. |
 
 : {.hover}
 
 ## Tool-Use Policy and Execution Flow
 
-The gateway owns application policy and routing. Tool execution remains in
-``ToolUseElement``; hydrated payloads rebind automatically through
-``ToolUsePayload``'s name-based executor registry.
+The gateway owns application policy and direct payload execution. Approved records
+run through ``ToolUsePayload.execute_approved()`` against the bound
+``ToolUseElement`` executor; hydrated payloads rebind automatically through the
+name-based executor registry.
 
 ```python
 tool_use_el = ToolUseElement(name="main_tools", functions=[...])
 gateway = ChatGatewayElement()
 
 tool_use_el.ports.tool_use_output > gateway.ports.tool_use_input
-gateway.ports.approved_tool_use_output > tool_use_el.ports.approved_tool_use_input
-gateway.ports.denied_tool_use_output > tool_use_el.ports.denied_tool_use_input
-tool_use_el.ports.tool_result_output > gateway.ports.tool_result_input
 gateway.ports.tool_result_output > history_handler_el.ports.payload_emit_input
 ```
 
@@ -135,11 +132,15 @@ Every arriving `ToolUsePayload` follows the same application gate:
 
 1. `on_tool_use(review)` receives every tool call before execution.
 2. The application returns `None` to acknowledge non-permission tools, or returns decision data for permission-needed tools.
-3. The gateway routes approved payloads through `approved_tool_use_output`.
-4. The gateway routes denied-only payloads through `denied_tool_use_output`.
-5. `ToolUseElement` executes or finalizes the payload and returns it on `tool_result_output`.
-6. `on_tool_result(result_notice)` exposes the completed payload to the application.
-7. The gateway re-emits the payload on `tool_result_output` for history/context/model wiring.
+3. The gateway mutates the original payload, calls `execute_approved()` for approved records, and keeps partially pending mixed payloads registered until all records are terminal.
+4. `on_tool_result(result_notice)` exposes completed payloads to the application.
+5. The gateway emits one completed ledger on `tool_result_output` for active execution owners.
+
+Branch supersession still applies: each payload is stamped with an internal
+`execution_owner` token. When `cancel()` or a new user message supersedes that
+owner, pending reviews are cleared and running tools receive cooperative
+cancellation. Late results from superseded owners still reach `on_tool_result`
+with `orphaned: true`, but they are suppressed from `tool_result_output`.
 
 Review shape:
 
@@ -200,7 +201,7 @@ async def on_tool_result(result_notice):
     app.display_tool_results(result_notice["tools"])
 ```
 
-For cold start, configure `pending_db_path` or pass a `pending_store`, recreate the
+For cold start, pass a `pending_store` that implements `PendingToolUseStore`, recreate the
 `ToolUseElement` instances with the same `name` values stored on pending payloads,
 then call `await gateway.hydrate_pending_tool_uses()` to restore pending reviews via
 `on_pending_tool_use_restored(review)`.

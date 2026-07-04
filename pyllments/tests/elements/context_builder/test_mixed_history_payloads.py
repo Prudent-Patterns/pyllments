@@ -4,6 +4,23 @@ from pyllments.elements.context_builder.context_builder_element import ContextBu
 from pyllments.payloads import MessagePayload, ToolUsePayload
 
 
+def test_plain_message_list_converts_using_runtime_item_type():
+    cb = ContextBuilderElement(input_map={}, emit_order=[])
+    result = cb._convert_payload_to_message(
+        "history",
+        [
+            MessagePayload(role="user", content="hello"),
+            MessagePayload(role="assistant", content="hi"),
+        ],
+    )
+
+    assert len(result) == 2
+    assert result[0].model.role == "user"
+    assert result[0].model.content == "hello"
+    assert result[1].model.role == "assistant"
+    assert result[1].model.content == "hi"
+
+
 def test_mixed_payload_list_converts_per_item():
     cb = ContextBuilderElement(input_map={}, emit_order=[])
     msg = MessagePayload(role="user", content="hello")

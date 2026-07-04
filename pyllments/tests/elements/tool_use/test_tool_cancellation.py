@@ -116,9 +116,6 @@ def _permission_tool_use_payload() -> ToolUsePayload:
 
 def _wire_gateway_tools(gateway, tool_use_el, result_pipe=None):
     tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["approved_tool_use_output"] > tool_use_el.ports.approved_tool_use_input
-    gateway.ports.output["denied_tool_use_output"] > tool_use_el.ports.denied_tool_use_input
-    tool_use_el.ports.tool_result_output > gateway.ports.tool_result_input
     if result_pipe is not None:
         gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
 
@@ -181,8 +178,7 @@ async def test_gateway_suppresses_inactive_owner_results():
     )
     payload.model.metadata["execution_owner"] = owner
 
-    input_port = gateway.ports.input["tool_result_input"]
-    await input_port.unpack_payload_callback(payload)
+    await gateway._emit_tool_result_if_active(payload)
     await gateway.ports.output["tool_result_output"].drain()
 
     assert len(result_pipe.received_payloads) == 0

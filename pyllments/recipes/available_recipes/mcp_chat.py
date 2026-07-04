@@ -152,7 +152,7 @@ tool_use_el = ToolUseElement(name="main_tools", mcps={**mcp_args})
 tool_use_el.ports.tools_schema_output > structured_router_el.ports.tools_tools_schema_input
 structured_router_el.ports.tools_tools > tool_use_el.ports.tool_request_structured_input
 structured_router_el.ports.schema_output > initial_context_builder_el.ports.schema
-tool_use_el.ports.tool_result_output > chat_interface_el.ports.tool_use_emit_input
+tool_use_el.ports.tool_use_output > chat_interface_el.ports.tool_use_input
 
 final_context_builder_el = ContextBuilderElement(
     input_map={
@@ -170,7 +170,7 @@ final_context_builder_el = ContextBuilderElement(
             'payload_type': list[MessagePayload],
         },
         'tools': {
-            'ports': [chat_interface_el.ports.tool_use_output],
+            'ports': [chat_interface_el.ports.tool_result_output],
             'payload_type': ToolUsePayload,
         },
         'tools_template': { 
@@ -202,7 +202,7 @@ history_handler_el = HistoryHandlerElement()
 history_handler_el.ports.context_output > initial_context_builder_el.ports.history
 history_handler_el.ports.context_output > final_context_builder_el.ports.history
 chat_interface_el.ports.user_message_output > history_handler_el.ports.payload_input
-chat_interface_el.ports.tool_use_output > history_handler_el.ports.payload_input
+chat_interface_el.ports.tool_result_output > history_handler_el.ports.payload_input
 structured_router_el.ports.reply_message > history_handler_el.ports.payload_emit_input
 
 final_llm_chat_el = LLMChatElement(**llm_chat_args)

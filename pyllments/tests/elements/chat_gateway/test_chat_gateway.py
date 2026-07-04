@@ -1,12 +1,9 @@
 import asyncio
-import tempfile
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from pyllments.elements import ChatGatewayElement, PipeElement, ToolUseElement
-from pyllments.elements.chat_gateway.pending_tool_use_store import SQLitePendingToolUseStore
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 
 
@@ -244,9 +241,6 @@ def tool_stack():
 def _wire_gateway_tools(gateway, tool_use_el, result_pipe=None):
     """Wire gateway policy/execution ports for ToolUseElement integration tests."""
     tool_use_el.ports.tool_use_output > gateway.ports.input["tool_use_input"]
-    gateway.ports.output["approved_tool_use_output"] > tool_use_el.ports.approved_tool_use_input
-    gateway.ports.output["denied_tool_use_output"] > tool_use_el.ports.denied_tool_use_input
-    tool_use_el.ports.tool_result_output > gateway.ports.tool_result_input
     if result_pipe is not None:
         gateway.ports.output["tool_result_output"] > result_pipe.ports.pipe_input
 
@@ -301,8 +295,6 @@ async def test_no_permission_tool_use_auto_executes(tool_stack):
         StructuredPayload(data=[{"name": "functions_add", "parameters": {"a": 2, "b": 3}}])
     )
     await tool_use_el.ports.output["tool_use_output"].drain()
-    await gateway.ports.output["approved_tool_use_output"].drain()
-    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
     assert len(result_pipe.received_payloads) == 1
@@ -335,24 +327,21 @@ async def test_mixed_tool_use_executes_no_permission_and_waits_for_rest(tool_sta
 
     payload = _mixed_tool_use_payload()
     await tools_pipe.async_send_payload(payload)
-    await gateway.ports.output["approved_tool_use_output"].drain()
-    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
-    assert len(result_pipe.received_payloads) == 1
-    executed = result_pipe.received_payloads[0]
+    assert len(result_pipe.received_payloads) == 0
     ping_index = next(
         index
-        for index, record in enumerate(executed.model.tool_calls)
+        for index, record in enumerate(payload.model.tool_calls)
         if record["model_tool_name"] == "functions_add"
     )
     delete_index = next(
         index
-        for index, record in enumerate(executed.model.tool_calls)
+        for index, record in enumerate(payload.model.tool_calls)
         if record["model_tool_name"] == "app_mcp_delete_record"
     )
-    assert executed.model.tool_calls[ping_index]["status"] == "succeeded"
-    assert executed.model.tool_calls[delete_index]["status"] == "awaiting_permission"
+    assert payload.model.tool_calls[ping_index]["status"] == "succeeded"
+    assert payload.model.tool_calls[delete_index]["status"] == "awaiting_permission"
     assert tool_notices == [["functions_add", "app_mcp_delete_record"]]
     assert len(reviews) == 1
     assert _tool_names(reviews[0]) == ["functions_add", "app_mcp_delete_record"]
@@ -412,8 +401,6 @@ async def test_policy_decisions_approval_executes_and_emits(permission_tool_stac
 
     tools = _permission_tool_use_payload()
     await tools_pipe.async_send_payload(tools)
-    await gateway.ports.output["approved_tool_use_output"].drain()
-    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
     assert len(result_pipe.received_payloads) == 1
@@ -445,8 +432,6 @@ async def test_delayed_policy_decisions_execute_and_emit(permission_tool_stack):
         review,
         {"decisions": [{"decision": "approved"}]},
     )
-    await gateway.ports.output["approved_tool_use_output"].drain()
-    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
     assert resolved is tools
@@ -476,8 +461,6 @@ async def test_policy_decisions_denial_emits_tool_use_payload(permission_tool_st
 
     tools = _permission_tool_use_payload()
     await tools_pipe.async_send_payload(tools)
-    await gateway.ports.output["denied_tool_use_output"].drain()
-    await tool_use_el.ports.output["tool_result_output"].drain()
     await gateway.ports.output["tool_result_output"].drain()
 
     assert len(result_pipe.received_payloads) == 1
@@ -525,3 +508,49 @@ async def test_on_assistant_message_hook():
     await asyncio.sleep(0.05)
 
     assert hook_turns == [turn.turn_id]
+
+
+@pytest.mark.asyncio
+async def test_assistant_stream_aggregate_stream_not_mutated_by_gateway():
+    gateway = ChatGatewayElement()
+    llm_pipe = PipeElement(name="llm_pipe")
+    llm_pipe.ports.output["pipe_output"].connect(
+        gateway.ports.input["assistant_message_input"]
+    )
+
+    turn = await gateway.submit_message_async("Hello")
+    await gateway.ports.output["message_output"].drain()
+
+    assistant = MessagePayload(
+        role="assistant",
+        mode="stream",
+        aggregate_stream=False,
+        message_coroutine=_stream_chunks(),
+    )
+    assert assistant.model.aggregate_stream is False
+
+    await llm_pipe.async_send_payload(assistant)
+    await asyncio.sleep(0.05)
+
+    assert assistant.model.aggregate_stream is False
+    assert gateway.model.get_turn_state(turn.turn_id).assistant_message is assistant
+
+
+def test_gateway_params_are_passed_to_model():
+    gateway = ChatGatewayElement(name="gw")
+    assert gateway.name == "gw"
+    assert gateway.model.name == "gw"
+
+
+def test_gateway_hook_params_land_on_model():
+    def on_tool_use(review):
+        return None
+
+    gateway = ChatGatewayElement(on_tool_use=on_tool_use)
+    assert gateway.model.on_tool_use is on_tool_use
+
+
+def test_gateway_unknown_kwargs_are_not_forwarded_to_model():
+    gateway = ChatGatewayElement(name="gw", totally_unknown_kwarg="ignored")
+    assert gateway.name == "gw"
+    assert not hasattr(gateway.model, "totally_unknown_kwarg")

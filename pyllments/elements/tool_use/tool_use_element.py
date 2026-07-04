@@ -51,7 +51,7 @@ class ToolUseElement(Element):
             functions=functions,
             tools_requiring_permission=tools_requiring_permission,
         )
-        self.model = ToolUseModel(adapters=adapter_list)
+        self.model = ToolUseModel(adapters=adapter_list, **params)
         self._active_invocations: dict[tuple[int, int], _ActiveInvocation] = {}
         ToolUsePayload.register_executor(self)
         self._setup_ports()

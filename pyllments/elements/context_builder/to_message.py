@@ -122,7 +122,9 @@ def to_message_payload(payload, payload_message_mapping=payload_message_mapping,
       expected_type: Optional type to use for determining the conversion function.
       role (str, optional): Role override. None preserves existing roles or uses conversion defaults.
     """
-    # Determine the payload type, preferring the expected_type if provided
+    # Determine the payload type, preferring the expected_type if provided.
+    # Some ports can only advertise the container type (`list`) even though the
+    # runtime payload is a homogeneous list of message/tool payloads.
     payload_type = (expected_type or type(payload)) if expected_type is not Any else type(payload)
     # Normalize typing.List[...] to built-in list[...] for mapping lookup
     origin = get_origin(payload_type)
@@ -131,6 +133,10 @@ def to_message_payload(payload, payload_message_mapping=payload_message_mapping,
         if args:
             # Convert typing.List[T] to built-in list[T]
             payload_type = list[args[0]]
+    elif payload_type is list and isinstance(payload, list) and payload:
+        item_types = {type(item) for item in payload}
+        if len(item_types) == 1:
+            payload_type = list[next(iter(item_types))]
     try:
         conversion_function = payload_message_mapping[payload_type]
         # Non-message payloads use conversion defaults when role is None (e.g. tools -> system).

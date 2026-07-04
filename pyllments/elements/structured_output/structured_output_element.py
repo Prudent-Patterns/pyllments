@@ -35,7 +35,7 @@ class StructuredOutputElement(Element):
     def __init__(self, schema: type | None = None, auto_emit_schema: bool = True, **params):
         super().__init__(**params)
         # store schema in the model
-        self.model = StructuredOutputModel(schema=schema)
+        self.model = StructuredOutputModel(schema=schema, **params)
 
         self.json_view = None
 

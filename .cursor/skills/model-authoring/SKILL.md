@@ -19,7 +19,10 @@ description: Implements or refactors Pyllments models using param-based state an
 
 ## Element-model contract
 
-- Pass model params through Element initialization where appropriate.
+- Model params are declared on the Model and may be passed through Element construction.
+- The Element forwards `**params` to the Model once in `__init__`; the Model is the single owner of that state.
+- Do not mirror model params onto the Element unless they are genuinely element-owned.
+- `Model.__init__` ignores kwargs that are not declared on the model, so broad forwarding from elements is safe.
 - Keep methods composable (`do_something`) so Element wiring stays clean.
 - Preserve predictable behavior for port-triggered calls.
 
@@ -33,4 +36,4 @@ description: Implements or refactors Pyllments models using param-based state an
 ## References
 
 - `pyllments/base/model_base.py`
-- `pyllments/elements/chat_interface/chat_interface_model.py`
+- `pyllments/elements/chat_gateway/chat_gateway_model.py`

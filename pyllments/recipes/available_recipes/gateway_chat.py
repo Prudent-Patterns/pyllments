@@ -28,7 +28,7 @@ class Config:
     )
 
 
-gateway_el = ChatGatewayElement(default_aggregate_stream=True)
+gateway_el = ChatGatewayElement()
 llm_chat_el = LLMChatElement(
     model_name=config.model_name,
     output_mode='stream',

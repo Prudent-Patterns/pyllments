@@ -31,7 +31,7 @@ class PendingToolUseState:
     payload: ToolUsePayload
     review: dict[str, Any]
     pending_indices: list[int]
-    pending_record: Any = None
+    pending_snapshot: Any = None
 
 
 class ChatGatewayModel(Model):
