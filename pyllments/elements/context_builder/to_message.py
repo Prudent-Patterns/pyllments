@@ -1,6 +1,9 @@
 from typing import Any, Optional, get_origin, get_args
 
-from pyllments.payloads import ChunkPayload, MessagePayload, SchemaPayload, StructuredPayload, ToolUsePayload
+from pyllments.payloads.chunk import ChunkPayload
+from pyllments.payloads.message import MessagePayload
+from pyllments.payloads.structured import StructuredPayload
+from pyllments.payloads.tool_use import ToolUsePayload
 from pyllments.payloads.structured.summary_contract import SUMMARY_ARTIFACT_TYPE, summary_artifact_content
 
 
@@ -101,10 +104,15 @@ payload_message_mapping = {
     list[MessagePayload]: message_list2message,
     ToolUsePayload: tool_use2message,
     list[ToolUsePayload]: tool_use_list2message,
-    SchemaPayload: schema2message,
     StructuredPayload: structured2message,
-
 }
+
+
+def _schema_payload_type():
+    # Lazy: SchemaPayload imports pydantic, which the Worker entropy patch
+    # cannot load during ContextBuilder import.
+    from pyllments.payloads.schema import SchemaPayload
+    return SchemaPayload
 
 def to_message_payload(payload, payload_message_mapping=payload_message_mapping, expected_type=None, role: Optional[str] = None):
     """
@@ -139,12 +147,16 @@ def to_message_payload(payload, payload_message_mapping=payload_message_mapping,
             payload_type = list[next(iter(item_types))]
     try:
         conversion_function = payload_message_mapping[payload_type]
-        # Non-message payloads use conversion defaults when role is None (e.g. tools -> system).
-        if role is None and payload_type not in (MessagePayload, list[MessagePayload]):
-            return conversion_function(payload)
-        return conversion_function(payload, role)
     except KeyError:
-        raise ValueError(f"No message payload mapping found for {payload_type}")
+        schema_type = _schema_payload_type()
+        if payload_type is schema_type:
+            conversion_function = schema2message
+        else:
+            raise ValueError(f"No message payload mapping found for {payload_type}")
+    # Non-message payloads use conversion defaults when role is None (e.g. tools -> system).
+    if role is None and payload_type not in (MessagePayload, list[MessagePayload]):
+        return conversion_function(payload)
+    return conversion_function(payload, role)
     
 # TODO: integrate with context builder and allow for a tiered port mapping with the payload_message_mapping 
 # as a default fallback.

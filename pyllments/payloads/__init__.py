@@ -20,11 +20,19 @@ PAYLOAD_MAPPING = {
     "StructuredPayload": ".structured",
 }
 
+# Submodule names so PEP 562 does not hide payloads.schema (and friends)
+# when Pyodide does getattr(package, "schema") during a relative import.
+_PAYLOAD_SUBMODULES = frozenset(PAYLOAD_MAPPING.values())
+
+
 def __getattr__(name):
     if name in PAYLOAD_MAPPING:
-        module_name = PAYLOAD_MAPPING[name]
-        module = importlib.import_module(module_name, __name__)
-        return getattr(module, name)
+        module = importlib.import_module(PAYLOAD_MAPPING[name], __name__)
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    if f".{name}" in _PAYLOAD_SUBMODULES:
+        return importlib.import_module(f".{name}", __name__)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 def __dir__():

@@ -6,8 +6,7 @@ import param
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads import MessagePayload, ToolUsePayload, StructuredPayload
-from pyllments.elements.llm_chat.openrouter_chat_model import OpenRouterChatModel
-from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
+from pyllments.elements.llm_chat.mock_chat_model import MockChatModel
 
 if TYPE_CHECKING:
     import panel as pn
@@ -17,7 +16,7 @@ class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
 
     backend = param.Selector(
-        objects=['openrouter', 'litellm'],
+        objects=['mock', 'openrouter', 'litellm'],
         default='openrouter',
         doc="Chat backend model implementation")
     generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
@@ -60,11 +59,17 @@ class LLMChatElement(Element):
         }
 
     def _create_model(self, backend: str, model_params: dict):
+        # Import HTTP backends only when selected so Worker mock mode can boot
+        # without litellm/openrouter wasm wheels.
+        if backend == 'mock':
+            return MockChatModel(**self._filter_model_params(MockChatModel, model_params))
         if backend == 'openrouter':
+            from pyllments.elements.llm_chat.openrouter_chat_model import OpenRouterChatModel
             params = dict(model_params)
             params.pop('base_url', None)
             return OpenRouterChatModel(**self._filter_model_params(OpenRouterChatModel, params))
         if backend == 'litellm':
+            from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
             return LiteLLMChatModel(**self._filter_model_params(LiteLLMChatModel, model_params))
         raise ValueError(f"Unsupported LLM backend: {backend}")
 

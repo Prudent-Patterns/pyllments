@@ -44,6 +44,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Headless Worker set proven on DuxMedic / Pyodide 314. Default
+# [project.dependencies] stays the current desktop (Panel) install.
+core = [
+    "loguru",
+    "param",
+    "python-dotenv",
+    "jinja2",
+    "tiktoken",
+    "sqlite-utils",
+]
 full = [
     "sentence-transformers[onnx-gpu]",
     "opencv-python",

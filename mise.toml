@@ -1,0 +1,8 @@
+# Host runtimes for this checkout. Binaries live in ~/.local/share/mise/;
+# this file only pins versions. Activate mise in the shell, then cd here.
+# When building the DuxMedic Worker wheel, use this same 3.14 line as
+# the Worker (do not lead with a newer host Python).
+
+[tools]
+python = "3.14"
+uv = "0.12.13"

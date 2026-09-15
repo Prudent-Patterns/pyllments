@@ -51,11 +51,17 @@ ELEMENT_MAPPING = {
     "SummarizerElement": ".summarizer",
 }
 
+_ELEMENT_SUBMODULES = frozenset(ELEMENT_MAPPING.values())
+
+
 def __getattr__(name):
     if name in ELEMENT_MAPPING:
-        module_name = ELEMENT_MAPPING[name]
-        module = importlib.import_module(module_name, __name__)
-        return getattr(module, name)
+        module = importlib.import_module(ELEMENT_MAPPING[name], __name__)
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    if f".{name}" in _ELEMENT_SUBMODULES:
+        return importlib.import_module(f".{name}", __name__)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 def __dir__():

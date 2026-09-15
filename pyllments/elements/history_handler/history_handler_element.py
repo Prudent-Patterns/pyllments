@@ -63,8 +63,13 @@ class HistoryHandlerElement(Element):
         else:
             items = [payload]
         for item in items:
-            if hasattr(item, "model") and hasattr(item.model, "await_ready"):
-                await item.model.await_ready()
+            model = getattr(item, "model", None)
+            if model is None or not hasattr(model, "await_ready"):
+                continue
+            # Live streams are consumed by TurnHandle; blocking here deadlocks.
+            if getattr(model, "mode", None) == "stream" and not getattr(model, "ready", False):
+                continue
+            await model.await_ready()
         return items
 
     @staticmethod

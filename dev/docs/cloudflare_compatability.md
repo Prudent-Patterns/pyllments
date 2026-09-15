@@ -125,6 +125,8 @@ We should formalize package tiers so the dependency story becomes intentional.
 Suggested target tiers:
 
 - `core`: the minimal headless framework intended to install cleanly in Cloudflare Workers,
+  DuxMedic's Worker installs this extra (plus Pyodide pins). `pip install pyllments`
+  is still the fat default until a later PR slims `[project.dependencies]`.
 - `llm`: LiteLLM and other essentials for model-driven flows,
 - `ui`: Panel and Bokeh for local prototyping and visualization,
 - `serve`: FastAPI and serving helpers,

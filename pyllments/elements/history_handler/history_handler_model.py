@@ -88,9 +88,16 @@ class HistoryHandlerModel(Model):
         self._pending_delete_ids: List[str] = []
         self._pending_append_records: List[HistoryRecord] = []
         self._store_load_task = None
-
+        # Only prefetch when a loop is already running. Workers construct
+        # elements from sync code; an orphan task on a new unused loop hangs
+        # await_store_ready forever.
         if self._history_store is not None:
-            self._store_load_task = self._schedule_task(self.hydrate_from_store())
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+            else:
+                self._store_load_task = self._schedule_task(self.hydrate_from_store())
 
     @staticmethod
     def _schedule_task(coro):
@@ -125,9 +132,11 @@ class HistoryHandlerModel(Model):
             self._append_to_memory(entry, persist=False)
 
     async def await_store_ready(self):
-        """Wait for any scheduled startup hydration to complete."""
+        """Wait for startup hydration, or run it now if it was not scheduled."""
         if self._store_load_task is not None:
             await self._store_load_task
+            return
+        await self.hydrate_from_store()
 
     def _wrap_payload(self, payload: SupportedPayload) -> Optional[HistoryEntry]:
         if isinstance(payload, ToolUsePayload) and not payload.model.tool_calls:
