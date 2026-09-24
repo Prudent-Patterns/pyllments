@@ -122,21 +122,20 @@ Likely grouping:
 
 We should formalize package tiers so the dependency story becomes intentional.
 
-Suggested target tiers:
+Public editions:
 
-- `core`: the minimal headless framework intended to install cleanly in Cloudflare Workers,
-  DuxMedic's Worker installs this extra (plus Pyodide pins). `pip install pyllments`
-  is still the fat default until a later PR slims `[project.dependencies]`.
-- `llm`: LiteLLM and other essentials for model-driven flows,
-- `ui`: Panel and Bokeh for local prototyping and visualization,
-- `serve`: FastAPI and serving helpers,
-- `mcp`: MCP-specific support,
-- `integrations`: Discord, Telegram, and similar external service connectors,
-- `full`: the umbrella install for local power users.
+- `pyllments` (light / default): headless graph for Cloudflare Workers. No Panel,
+  LiteLLM, or OpenRouter. DuxMedic vendors this wheel plus its Pyodide pins.
+- `pyllments[standard]`: laptop stock — light plus LiteLLM, OpenRouter, Panel, and serve.
+- `pyllments[full]`: standard plus heavier local retrieval / embedding / document libs.
+
+Implementation extras (`llm`, `ui`, `serve`) exist so a host can install models
+without Panel. They are not public editions. There is no `core` extra; default
+*is* the light install.
 
 Key outcome:
 
-- the default install becomes small and Worker-oriented,
+- the default install is small and Worker-oriented,
 - optional capabilities remain available without being forced on every environment.
 
 ### 2. Make Panel Optional by Import Strategy, Not by Architecture Rewrite

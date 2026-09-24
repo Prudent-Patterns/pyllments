@@ -6,6 +6,7 @@ _BACKEND_EXPORTS = {
     "MockChatModel": ".mock_chat_model",
     "OpenRouterChatModel": ".openrouter_chat_model",
     "LiteLLMChatModel": ".litellm_chat_model",
+    "CloudflareAIGatewayChatModel": ".cloudflare_ai_gateway_chat_model",
 }
 
 __all__ = ["LLMChatElement", *_BACKEND_EXPORTS]

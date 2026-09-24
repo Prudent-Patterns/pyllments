@@ -16,7 +16,7 @@ class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
 
     backend = param.Selector(
-        objects=['mock', 'openrouter', 'litellm'],
+        objects=['mock', 'openrouter', 'litellm', 'cloudflare'],
         default='openrouter',
         doc="Chat backend model implementation")
     generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
@@ -43,7 +43,11 @@ class LLMChatElement(Element):
 
     def _capture_model_state(self) -> dict:
         state = {}
-        for key in ['model_name', 'model_args', 'output_mode', 'response_format', 'functions', 'tools', 'api_key', 'client_args']:
+        for key in [
+            'model_name', 'model_args', 'output_mode', 'response_format',
+            'functions', 'tools', 'api_key', 'client_args', 'account_id',
+            'gateway_id', 'gateway_headers',
+        ]:
             if hasattr(self.model, key):
                 state[key] = getattr(self.model, key)
         if hasattr(self.model, 'base_url'):
@@ -71,6 +75,13 @@ class LLMChatElement(Element):
         if backend == 'litellm':
             from pyllments.elements.llm_chat.litellm_chat_model import LiteLLMChatModel
             return LiteLLMChatModel(**self._filter_model_params(LiteLLMChatModel, model_params))
+        if backend == 'cloudflare':
+            from pyllments.elements.llm_chat.cloudflare_ai_gateway_chat_model import (
+                CloudflareAIGatewayChatModel,
+            )
+            return CloudflareAIGatewayChatModel(
+                **self._filter_model_params(CloudflareAIGatewayChatModel, model_params)
+            )
         raise ValueError(f"Unsupported LLM backend: {backend}")
 
     def _on_backend_change(self, event):

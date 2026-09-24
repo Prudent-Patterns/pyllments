@@ -4,7 +4,6 @@ import inspect
 from typing import Callable
 
 import param
-from dotenv import load_dotenv
 from loguru import logger
 
 from pyllments.ports.ports import Ports
@@ -40,7 +39,8 @@ class Element(Component):
         if 'name' not in params or not params['name']:
             params['name'] = f"{cls.__name__}{count}"
         super().__init__(**params)
-        type(self).load_env(self.env_path)
+        if self.env_path:
+            type(self).load_env(self.env_path)
 
         # bind logger so every message carries this name
         self.logger = logger.bind(name=self.__class__.__module__, element=self.name)
@@ -204,8 +204,10 @@ class Element(Component):
 
     @classmethod
     def load_env(cls, path: str = None):
-        if path:
-            cls._env_path = path           
-            load_dotenv(cls._env_path)
-        else:
+        # dotenv stays optional at import time so Worker elements boot without it.
+        if not path:
             cls._env_path = "."
+            return
+        from dotenv import load_dotenv
+        cls._env_path = path
+        load_dotenv(cls._env_path)

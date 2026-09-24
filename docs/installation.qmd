@@ -12,18 +12,26 @@ python >= 3.11
 ## Using uv (Super duper fast)
 [Get uv](https://docs.astral.sh/uv/getting-started/installation/#pypi)
 
-**Lightweight Installation**
+**Light (default)**
 
-Essentials only.
+Headless graph only — Worker-safe. No Panel, LiteLLM, or OpenRouter.
 
 ```{.bash}
 uv pip install pyllments
 ```
 
-**Full Installation**
+**Standard**
 
-If you intend to use your own hardware for some heavy lifting and processing.
-Includes dependencies for retrieval, embedding, processing. (e.g. PyTorch, lancedb, sentence-transformers)
+Laptop stock: light plus model SDKs, Panel recipes, and serve.
+
+```{.bash}
+uv pip install pyllments[standard]
+```
+
+**Full**
+
+Standard plus local retrieval, embedding, and document processing
+(e.g. PyTorch, lancedb, sentence-transformers).
 
 ```{.bash}
 uv pip install pyllments[full]
@@ -31,18 +39,26 @@ uv pip install pyllments[full]
 
 ## Using pip (Not super duper fast)
 
-**Lightweight Installation**
+**Light (default)**
 
-Essentials only.
+Headless graph only — Worker-safe. No Panel, LiteLLM, or OpenRouter.
 
 ```{.bash}
 pip install pyllments
 ```
 
-**Full Installation**
+**Standard**
 
-If you intend to use your own hardware for some heavy lifting and processing.
-Includes dependencies for retrieval, embedding, processing. (e.g. PyTorch, lancedb, sentence-transformers)
+Laptop stock: light plus model SDKs, Panel recipes, and serve.
+
+```{.bash}
+pip install pyllments[standard]
+```
+
+**Full**
+
+Standard plus local retrieval, embedding, and document processing
+(e.g. PyTorch, lancedb, sentence-transformers).
 
 ```{.bash}
 pip install pyllments[full]

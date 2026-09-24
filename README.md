@@ -3,7 +3,7 @@
 *Speedrun your Prototyping*
 
 ```bash
-uv pip install pyllments
+uv pip install pyllments[standard]
 ```
 [More info on installation](https://docs.pyllments.com/installation.html)
 

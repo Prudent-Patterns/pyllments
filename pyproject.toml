@@ -18,43 +18,50 @@ readme = "README.md"
 license = "Apache-2.0"
 license_file = "LICENSE"
 requires-python = ">=3.10"
+# Default is the light/Worker edition. Laptop stock is pyllments[standard].
 dependencies = [
-    "numpy",
-    "python-dotenv",
-    "bokeh",
-    "panel",
-    "langchain-text-splitters",
-    "jsonlines",
-    "tiktoken",
-    "pillow-heif",
-    "ruamel.yaml",
-    "fastapi[standard]",
-    "bokeh-fastapi",
-    "loguru",
-    "typer",
-    "litellm>=1.57.3",
-    "openrouter",
-    "discord-py>=2.4.0",
-    "python-telegram-bot>=21.10",
-    "telethon>=1.38.1",
-    "sqlite-utils>=3.38",
-    "jinja2",
-    "mcp>=1.3.0",
-    "pydantic>=2.11.5",
-]
-
-[project.optional-dependencies]
-# Headless Worker set proven on DuxMedic / Pyodide 314. Default
-# [project.dependencies] stays the current desktop (Panel) install.
-core = [
     "loguru",
     "param",
     "python-dotenv",
     "jinja2",
     "tiktoken",
-    "sqlite-utils",
+    "sqlite-utils>=3.38",
 ]
+
+[project.optional-dependencies]
+# Implementation extras — pulled by [standard], not advertised as editions.
+llm = [
+    "litellm>=1.57.3",
+    "openrouter",
+]
+ui = [
+    "panel",
+    "bokeh",
+]
+serve = [
+    "fastapi[standard]",
+    "typer",
+    "bokeh-fastapi",
+]
+# Public edition: light + model SDKs + Panel + serve + former default extras.
+standard = [
+    "pyllments[llm]",
+    "pyllments[ui]",
+    "pyllments[serve]",
+    "mcp>=1.3.0",
+    "discord-py>=2.4.0",
+    "python-telegram-bot>=21.10",
+    "telethon>=1.38.1",
+    "numpy",
+    "langchain-text-splitters",
+    "jsonlines",
+    "pillow-heif",
+    "ruamel.yaml",
+    "pydantic>=2.11.5",
+]
+# Public edition: standard plus local retrieval / embedding / document stack.
 full = [
+    "pyllments[standard]",
     "sentence-transformers[onnx-gpu]",
     "opencv-python",
     "pdfminer.six",
@@ -88,7 +95,6 @@ exclude = [
     "dev",
     "docs",
     "examples",
-    ".devcontainer",
     ".vscode",
     ".cursorrules",
     ".cursorignore",
