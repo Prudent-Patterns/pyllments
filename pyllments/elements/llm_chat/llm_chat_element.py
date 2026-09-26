@@ -7,6 +7,8 @@ from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads import MessagePayload, ToolUsePayload, StructuredPayload
 from pyllments.elements.llm_chat.mock_chat_model import MockChatModel
+from pyllments.elements.llm_chat.proposed_tool_use import proposed_tool_use_from_message
+from pyllments.runtime.scheduler import schedule_task
 
 if TYPE_CHECKING:
     import panel as pn
@@ -30,6 +32,7 @@ class LLMChatElement(Element):
         self.model = self._create_model(self.backend, self._model_init_params)
         self.param.watch(self._on_backend_change, 'backend')
         self._message_output_setup()
+        self._tool_use_output_setup()
         self._messages_emit_input_setup()
         self._tools_input_setup()
 
@@ -46,7 +49,7 @@ class LLMChatElement(Element):
         for key in [
             'model_name', 'model_args', 'output_mode', 'response_format',
             'functions', 'tools', 'api_key', 'client_args', 'account_id',
-            'gateway_id', 'gateway_headers',
+            'gateway_id', 'gateway_headers', 'ai_binding',
         ]:
             if hasattr(self.model, key):
                 state[key] = getattr(self.model, key)
@@ -96,6 +99,30 @@ class LLMChatElement(Element):
 
         self.ports.add_output(name='message_output', pack_payload_callback=pack)
 
+    def _tool_use_output_setup(self):
+        async def pack(payload: ToolUsePayload) -> ToolUsePayload:
+            return payload
+
+        self.ports.add_output(name='tool_use_output', pack_payload_callback=pack)
+
+    async def _emit_proposed_tool_use(self, response: MessagePayload) -> None:
+        """Emit tool_use_output only after the reply exists and only if it called tools.
+
+        Stream mode must not wait here on the caller's stack: the gateway consumes
+        the stream after this input returns. Atomic mode has no other consumer, so
+        it is finished before we look for tool calls.
+        """
+        model = response.model
+        if model.mode == 'atomic':
+            if model.message_coroutine is not None:
+                await model.aget_message()
+        elif model.mode == 'stream':
+            await model.await_ready()
+        payload = proposed_tool_use_from_message(response)
+        if payload is None:
+            return
+        await self.ports.output['tool_use_output'].stage_emit(payload=payload)
+
     def _messages_emit_input_setup(self):
         async def unpack(payload: Union[MessagePayload, List[Union[MessagePayload, ToolUsePayload]]]):
             """
@@ -118,6 +145,10 @@ class LLMChatElement(Element):
                 # Populate the message content before emitting
                 await response.model.aget_message()
             await self.ports.output['message_output'].stage_emit(message_payload=response)
+            if response.model.mode == 'stream':
+                schedule_task(self._emit_proposed_tool_use(response))
+            else:
+                await self._emit_proposed_tool_use(response)
 
         self.ports.add_input(
             name='messages_emit_input',

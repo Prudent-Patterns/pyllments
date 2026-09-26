@@ -114,6 +114,35 @@ async def test_cloudflare_atomic_response_populates_tool_calls(monkeypatch):
     assert response_payload.model.tool_calls[0]["function"]["name"] == "lookup"
 
 
+@pytest.mark.asyncio
+async def test_cloudflare_binding_skips_rest_and_wraps_workers_ai_text():
+    class _Binding:
+        def __init__(self):
+            self.calls = []
+
+        async def run(self, model, inputs, options):
+            self.calls.append((model, inputs, options))
+            return {"response": "from-binding"}
+
+    binding = _Binding()
+    model = CloudflareAIGatewayChatModel(
+        model_name="openai/gpt-4.1-mini",
+        gateway_id="default",
+        output_mode="stream",
+        ai_binding=binding,
+    )
+    response_payload = model.generate_response([_user_message("ping")])
+    chunks = []
+    async for event in response_payload.model.message_coroutine:
+        chunks.append(event)
+
+    assert binding.calls[0][0] == "openai/gpt-4.1-mini"
+    assert binding.calls[0][1]["stream"] is False
+    assert binding.calls[0][1]["messages"][0]["content"] == "ping"
+    assert binding.calls[0][2] == {"gateway": {"id": "default"}}
+    assert chunks[0].choices[0].delta.content == "from-binding"
+
+
 def test_cloudflare_model_requires_credentials(monkeypatch):
     monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
     monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)

@@ -59,6 +59,12 @@ class ToolUseModel(Model):
 
     @property
     def content(self) -> str:
+        # A proposed or not-yet-finished call has nothing to show a model.
+        # Rendering the results header anyway would pollute context.
+        records = list(self.tool_calls or [])
+        visible = {"succeeded", "failed", "denied", "cancelled", "orphaned_completed"}
+        if not any(record.get("status") in visible for record in records):
+            return ""
         if not self._content:
             self._content = self.template.render(tool_calls=self.tool_calls)
         return self._content
@@ -154,8 +160,9 @@ Reason: {{ record.permission.reason }}
         description: str = "",
         permission_required: bool = False,
         metadata: dict | None = None,
+        tool_call_id: str | None = None,
     ) -> int:
-        """Register a proposed tool call and return its list index."""
+        """Register a tool call that is ready to approve or run, and return its index."""
         now = time.time()
         status = "awaiting_permission" if permission_required else "approved"
         permission = self.default_permission(required=permission_required)
@@ -174,6 +181,42 @@ Reason: {{ record.permission.reason }}
             "created_at": now,
             "updated_at": now,
             "metadata": metadata or {},
+            "tool_call_id": tool_call_id,
+        }
+        self.tool_calls = [*self.tool_calls, record]
+        self._touch()
+        return len(self.tool_calls) - 1
+
+    def add_proposed_call(
+        self,
+        *,
+        model_tool_name: str,
+        parameters: dict | None = None,
+        tool_call_id: str | None = None,
+    ) -> int:
+        """Register a model tool call before any adapter or permission is known.
+
+        ``proposed`` is the first stage. ``ToolUseElement`` fills in adapter
+        fields later. A consumer such as a forced structured tool can read
+        ``parameters`` and never execute the call.
+        """
+        now = time.time()
+        record = {
+            "adapter_name": "",
+            "provider_name": None,
+            "tool_name": model_tool_name,
+            "model_tool_name": model_tool_name,
+            "description": "",
+            "parameters": parameters or {},
+            "permission_required": False,
+            "permission": self.default_permission(required=False),
+            "status": "proposed",
+            "result": None,
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+            "metadata": {},
+            "tool_call_id": tool_call_id,
         }
         self.tool_calls = [*self.tool_calls, record]
         self._touch()

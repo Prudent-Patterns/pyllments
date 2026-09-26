@@ -79,6 +79,7 @@ class ToolUseElement(Element):
         self._tools_output_setup()
         self._tool_request_structured_input_setup()
         self._tool_request_message_input_setup()
+        self._tool_use_input_setup()
         self._approved_tool_use_input_setup()
         self._denied_tool_use_input_setup()
         self._tool_use_output_setup()
@@ -134,6 +135,7 @@ class ToolUseElement(Element):
                 description=spec.description,
                 parameters=request.get("parameters") or {},
                 permission_required=spec.permission_required,
+                tool_call_id=request.get("tool_call_id"),
             )
         payload.bind_executor(self)
         return payload
@@ -159,6 +161,7 @@ class ToolUseElement(Element):
                 {
                     "name": function.get("name", ""),
                     "parameters": self._parse_tool_call_parameters(function.get("arguments")),
+                    "tool_call_id": tool_call.get("id"),
                 }
             )
         return requests
@@ -332,6 +335,56 @@ class ToolUseElement(Element):
         self.ports.add_input(
             name="tool_request_message_input",
             unpack_payload_callback=unpack,
+            readiness_check=self.model.await_ready,
+        )
+
+    def _tool_use_input_setup(self):
+        """Fill adapter and permission fields on a proposed ToolUsePayload.
+
+        The same payload continues through the lifecycle. An unknown tool name
+        fails that record instead of raising, so one bad call does not drop the rest.
+        """
+
+        async def unpack(payload: ToolUsePayload):
+            await self.model.await_ready()
+            payload.model.executor_element_name = self.name
+            payload.bind_executor(self)
+            for index, record in enumerate(list(payload.model.tool_calls)):
+                if record.get("status") != "proposed":
+                    continue
+                name = str(record.get("model_tool_name") or "")
+                try:
+                    spec = self.model.spec_for_model_tool(name)
+                except KeyError:
+                    payload.model.attach_error(
+                        index,
+                        {
+                            "type": "UnknownTool",
+                            "message": f"Unknown tool: {name}",
+                            "retryable": False,
+                            "details": {},
+                        },
+                    )
+                    continue
+                record["adapter_name"] = spec.adapter_name
+                record["provider_name"] = spec.provider_name
+                record["tool_name"] = spec.tool_name
+                record["model_tool_name"] = spec.model_tool_name
+                record["description"] = spec.description
+                record["permission_required"] = spec.permission_required
+                record["permission"] = payload.model.default_permission(
+                    required=spec.permission_required
+                )
+                record["status"] = (
+                    "awaiting_permission" if spec.permission_required else "approved"
+                )
+            payload.model._touch()
+            await self._emit_tool_use(payload)
+
+        self.ports.add_input(
+            name="tool_use_input",
+            unpack_payload_callback=unpack,
+            payload_type=ToolUsePayload,
             readiness_check=self.model.await_ready,
         )
 

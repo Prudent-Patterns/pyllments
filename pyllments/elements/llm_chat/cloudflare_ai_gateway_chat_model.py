@@ -56,6 +56,59 @@ def _parse_sse_line(line: str):
     return parsed if isinstance(parsed, dict) else None
 
 
+def _to_plain(value: Any) -> Any:
+    """Turn a Workers JS result into dicts and lists the rest of the model can read."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    to_py = getattr(value, "to_py", None)
+    if callable(to_py):
+        try:
+            return _to_plain(to_py())
+        except Exception:
+            pass
+    if isinstance(value, dict):
+        return {str(key): _to_plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_plain(item) for item in value]
+    keys = getattr(value, "keys", None)
+    if callable(keys):
+        try:
+            return {str(key): _to_plain(value[key]) for key in list(keys())}
+        except Exception:
+            pass
+    return value
+
+
+def _completion_from_binding(payload: Any) -> dict[str, Any]:
+    """Normalize a binding result onto the chat-completions shape MessageModel reads."""
+    plain = _to_plain(payload)
+    if isinstance(plain, dict) and plain.get("success") is False:
+        raise ValueError(f"Cloudflare AI binding request failed: {plain}")
+    if isinstance(plain, dict) and "choices" in plain:
+        return plain
+    if isinstance(plain, dict) and isinstance(plain.get("result"), dict):
+        inner = plain["result"]
+        if "choices" in inner:
+            return inner
+        plain = inner
+    text = ""
+    if isinstance(plain, dict):
+        raw = plain.get("response")
+        if raw is None:
+            raw = plain.get("content")
+        text = raw if isinstance(raw, str) else ""
+    elif isinstance(plain, str):
+        text = plain
+    return {
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": text, "tool_calls": []},
+                "finish_reason": "stop",
+            }
+        ]
+    }
+
+
 def _js_bytes(value: Any) -> bytes:
     if isinstance(value, (bytes, bytearray, memoryview)):
         return bytes(value)
@@ -117,6 +170,13 @@ class CloudflareAIGatewayChatModel(Model):
     client_args = param.Dict(
         default={},
         doc="Optional HTTP extras. `headers` / `defaultHeaders` are merged into the request.",
+    )
+    ai_binding = param.Parameter(
+        default=None,
+        doc=(
+            "Workers AI binding (env.AI). When set, inference uses binding.run "
+            "through the logged-in Wrangler session instead of a REST API token."
+        ),
     )
 
     MAJOR_PROVIDER_KEYS = ["openai", "anthropic", "google", "xai", "workers-ai"]
@@ -395,6 +455,51 @@ class CloudflareAIGatewayChatModel(Model):
             return await self._workers_http_post(fetch, url, headers, body, stream)
         return await self._stdlib_http_post(url, headers, body, stream)
 
+    def _binding_inputs(self, body: dict[str, Any]) -> dict[str, Any]:
+        inputs = dict(body)
+        inputs.pop("model", None)
+        # One JSON result. Stream mode below turns that into a single delta.
+        # Binding streams are a different shape from the REST SSE parser.
+        inputs["stream"] = False
+        return inputs
+
+    async def _binding_completion(self, body: dict[str, Any]) -> dict[str, Any]:
+        binding = self.ai_binding
+        if binding is None:
+            raise ValueError("Cloudflare AI binding is not set")
+        gateway_id = self.gateway_id or os.getenv("CLOUDFLARE_AI_GATEWAY_ID") or "default"
+        result = await binding.run(
+            self.normalize_model_name(self.model_name),
+            self._binding_inputs(body),
+            {"gateway": {"id": gateway_id}},
+        )
+        return _completion_from_binding(result)
+
+    async def _atomic_binding_response(self, body: dict[str, Any]):
+        return _wrap_json(await self._binding_completion(body))
+
+    async def _stream_binding_events(self, body: dict[str, Any]):
+        completion = await self._binding_completion(body)
+        message = {}
+        choices = completion.get("choices") or []
+        if choices and isinstance(choices[0], dict):
+            message = choices[0].get("message") or {}
+        content = message.get("content") or ""
+        tool_calls = message.get("tool_calls") or None
+        if content or tool_calls:
+            yield _wrap_json(
+                {
+                    "choices": [
+                        {
+                            "delta": {
+                                "content": content or None,
+                                "tool_calls": tool_calls,
+                            }
+                        }
+                    ]
+                }
+            )
+
     async def _atomic_response(self, body: dict[str, Any]):
         url, headers = self._build_request_target()
         payload = await self._http_post(url, headers, body, stream=False)
@@ -410,7 +515,26 @@ class CloudflareAIGatewayChatModel(Model):
             yield _wrap_json(chunk)
 
     def generate_response(self, messages: list[MessagePayload]) -> MessagePayload:
-        """Generate a response through AI Gateway completions and package it into MessagePayload."""
+        """Generate a response through AI Gateway and package it into MessagePayload.
+
+        The binding path is the Worker session (no API token). REST remains for
+        callers that pass account_id and api_key.
+        """
+        if self.ai_binding is not None:
+            body = self._build_request_body(messages, stream=False)
+            if self.output_mode == "atomic":
+                return MessagePayload(
+                    role="assistant",
+                    message_coroutine=self._atomic_binding_response(body),
+                    mode="atomic",
+                )
+            if self.output_mode == "stream":
+                return MessagePayload(
+                    role="assistant",
+                    message_coroutine=self._stream_binding_events(body),
+                    mode="stream",
+                )
+            raise ValueError(f"Invalid output mode: {self.output_mode}")
         if self.output_mode == "atomic":
             return MessagePayload(
                 role="assistant",
