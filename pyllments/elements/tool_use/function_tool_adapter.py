@@ -1,35 +1,47 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
+import json
 from typing import TYPE_CHECKING, Any, Callable
-
-from pydantic import BaseModel, create_model
 
 from pyllments.runtime.loop_registry import LoopRegistry
 
+from .signature_schema import parameters_schema, validate_arguments
 from .tool_adapter import ToolResult, ToolSpec
 from .tool_invocation_context import ToolCancelled
 
 if TYPE_CHECKING:
     from .tool_invocation_context import ToolInvocationContext
 
-CONTEXT_PARAM_NAMES = frozenset({"context", "invocation_context"})
 
-
-def _is_context_param(name: str, annotation: Any) -> bool:
-    if name in CONTEXT_PARAM_NAMES:
-        return True
-    if annotation is inspect._empty:
-        return False
-    if isinstance(annotation, str):
-        return annotation.endswith("ToolInvocationContext")
-    return getattr(annotation, "__name__", None) == "ToolInvocationContext"
+def result_text(result: Any) -> str:
+    """What the model reads: strings as they are, data as JSON, the rest as str."""
+    if result is None:
+        return ""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, (dict, list, tuple, int, float, bool)):
+        return json.dumps(result, default=str)
+    return str(result)
 
 
 class FunctionToolAdapter:
     """
     Local Python function tool adapter with schema extraction and validation.
+
+    Parameters
+    ----------
+    name : str
+        The adapter's name, and the prefix of each tool's model-facing name
+        when ``prefix_names`` is True.
+    functions : list or dict
+        The tools, by their own name or by the key given.
+    tools_requiring_permission : list of str
+        Function names the gateway must ask about before running.
+    prefix_names : bool
+        ``True`` exposes ``add`` as ``functions_add``, which keeps several
+        adapters apart. ``False`` exposes it as ``add``, for a flow whose tool
+        names are a contract of their own.
     """
 
     name = "functions"
@@ -40,8 +52,10 @@ class FunctionToolAdapter:
         name: str = "functions",
         functions: list[Callable] | dict[str, Callable] | None = None,
         tools_requiring_permission: list[str] | None = None,
+        prefix_names: bool = True,
     ):
         self.name = name
+        self.prefix_names = prefix_names
         self._functions: dict[str, Callable] = {}
         if isinstance(functions, dict):
             self._functions = dict(functions)
@@ -49,43 +63,29 @@ class FunctionToolAdapter:
             for func in functions:
                 self._functions[func.__name__] = func
         self._tools_requiring_permission = set(tools_requiring_permission or [])
-        self._arg_models: dict[str, type[BaseModel]] = {}
+        self._schemas: dict[str, dict[str, Any]] = {}
         self._accepts_context: dict[str, bool] = {}
         self._tools: dict[str, ToolSpec] = {}
         self._setup_complete = False
         self.loop = LoopRegistry.get_loop()
 
+    def model_tool_name(self, function_name: str) -> str:
+        return f"{self.name}_{function_name}" if self.prefix_names else function_name
+
     async def setup(self) -> None:
         self._tools.clear()
         for fname, func in self._functions.items():
-            sig = inspect.signature(func)
-            fields: dict[str, tuple[Any, Any]] = {}
-            accepts_context = False
-            for arg_name, param in sig.parameters.items():
-                ann = param.annotation if param.annotation is not inspect._empty else Any
-                if _is_context_param(arg_name, ann):
-                    accepts_context = True
-                    continue
-                default = param.default if param.default is not inspect._empty else ...
-                fields[arg_name] = (ann, default)
-            model_name = f"{fname}_Arguments"
-            arg_model = create_model(model_name, __base__=BaseModel, **fields)
-            schema = arg_model.model_json_schema()
-            parameters_schema = {
-                "type": "object",
-                "properties": schema.get("properties", {}),
-                "required": schema.get("required", []),
-            }
-            self._arg_models[fname] = arg_model
+            schema, accepts_context = parameters_schema(func)
+            self._schemas[fname] = schema
             self._accepts_context[fname] = accepts_context
-            model_tool_name = f"functions_{fname}"
+            model_tool_name = self.model_tool_name(fname)
             self._tools[model_tool_name] = ToolSpec(
                 adapter_name=self.name,
                 provider_name=None,
                 tool_name=fname,
                 model_tool_name=model_tool_name,
-                description=func.__doc__ or "",
-                parameters_schema=parameters_schema,
+                description=(func.__doc__ or "").strip(),
+                parameters_schema=schema,
                 permission_required=fname in self._tools_requiring_permission,
             )
         self._setup_complete = True
@@ -111,23 +111,20 @@ class FunctionToolAdapter:
         func = self._functions.get(tool_name)
         if func is None:
             raise KeyError(f"Unknown function tool: {tool_name}")
-        arg_model = self._arg_models[tool_name]
-        validated = arg_model(**(parameters or {}))
-        kwargs = validated.model_dump()
+        kwargs = validate_arguments(self._schemas[tool_name], parameters)
         if self._accepts_context.get(tool_name) and context is not None:
             kwargs["context"] = context
         try:
             # Sync tools run inline on the event loop; keep them lightweight/non-blocking.
             result = await func(**kwargs) if asyncio.iscoroutinefunction(func) else func(**kwargs)
-            text = str(result)
-            return ToolResult(
-                content=[{"type": "text", "text": text}],
-                raw={"value": text},
-            )
         except ToolCancelled:
             raise
         except Exception as exc:
             raise RuntimeError(str(exc)) from exc
+        return ToolResult(
+            content=[{"type": "text", "text": result_text(result)}],
+            raw={"value": result},
+        )
 
     async def close(self) -> None:
         return None

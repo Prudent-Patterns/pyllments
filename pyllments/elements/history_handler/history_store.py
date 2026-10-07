@@ -43,12 +43,22 @@ def register_payload_serializer(
 
 
 def _serialize_message(payload: MessagePayload) -> dict:
-    return {
-        "role": payload.model.role,
-        "content": payload.model.content,
-        "mode": payload.model.mode,
-        "timestamp": payload.model.timestamp,
+    model = payload.model
+    data = {
+        "role": model.role,
+        "content": model.content,
+        "mode": model.mode,
+        "timestamp": model.timestamp,
     }
+    # Tool fields are what pairs a call with its answer on replay; a message
+    # without them stays as small as before.
+    if model.tool_calls:
+        data["tool_calls"] = list(model.tool_calls)
+    if model.tool_call_id:
+        data["tool_call_id"] = model.tool_call_id
+    if model.tool_name:
+        data["tool_name"] = model.tool_name
+    return data
 
 
 def _deserialize_message(data: dict) -> MessagePayload:
@@ -57,6 +67,9 @@ def _deserialize_message(data: dict) -> MessagePayload:
         content=data["content"],
         mode=data.get("mode", "atomic"),
         timestamp=data["timestamp"],
+        tool_calls=list(data.get("tool_calls") or []),
+        tool_call_id=data.get("tool_call_id"),
+        tool_name=data.get("tool_name"),
     )
 
 

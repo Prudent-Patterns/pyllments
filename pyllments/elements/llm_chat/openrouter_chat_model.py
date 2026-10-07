@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
+from pyllments.payloads.message.chat_completions import to_chat_completions
 
 
 class OpenRouterChatModel(Model):
@@ -54,15 +55,9 @@ class OpenRouterChatModel(Model):
         'mistralai/mistral-small-3.1-24b-instruct',
     ]
 
-    def _messages_to_openrouter(self, messages: list[MessagePayload]) -> list[dict[str, str]]:
-        """Convert MessagePayload instances to OpenRouter chat message dictionaries."""
-        return [
-            {
-                'role': msg.model.role,
-                'content': msg.model.content
-            }
-            for msg in messages
-        ]
+    def _messages_to_openrouter(self, messages: list[MessagePayload]) -> list[dict]:
+        """Convert message and tool-use payloads to chat message dictionaries."""
+        return to_chat_completions(messages)
 
     @classmethod
     def normalize_model_name(cls, model_name: str) -> str:

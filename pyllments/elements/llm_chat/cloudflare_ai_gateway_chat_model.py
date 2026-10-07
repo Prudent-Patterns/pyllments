@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
+from pyllments.payloads.message.chat_completions import to_chat_completions
 
 _DONE = object()
 
@@ -92,21 +93,46 @@ def _completion_from_binding(payload: Any) -> dict[str, Any]:
             return inner
         plain = inner
     text = ""
+    tool_calls: list[dict[str, Any]] = []
     if isinstance(plain, dict):
         raw = plain.get("response")
         if raw is None:
             raw = plain.get("content")
         text = raw if isinstance(raw, str) else ""
+        tool_calls = _native_tool_calls(plain.get("tool_calls"))
     elif isinstance(plain, str):
         text = plain
     return {
         "choices": [
             {
-                "message": {"role": "assistant", "content": text, "tool_calls": []},
-                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": text, "tool_calls": tool_calls},
+                "finish_reason": "tool_calls" if tool_calls else "stop",
             }
         ]
     }
+
+
+def _native_tool_calls(raw: Any) -> list[dict[str, Any]]:
+    """Workers AI's ``{name, arguments}`` calls in the chat-completions shape, with ids."""
+    calls: list[dict[str, Any]] = []
+    for index, item in enumerate(raw or []):
+        if not isinstance(item, dict):
+            continue
+        function = item.get("function") if isinstance(item.get("function"), dict) else item
+        name = function.get("name")
+        if not name:
+            continue
+        arguments = function.get("arguments")
+        if not isinstance(arguments, str):
+            arguments = json.dumps(arguments if arguments is not None else {})
+        calls.append(
+            {
+                "id": item.get("id") or f"call_{index}",
+                "type": "function",
+                "function": {"name": name, "arguments": arguments},
+            }
+        )
+    return calls
 
 
 def _js_bytes(value: Any) -> bytes:
@@ -196,14 +222,8 @@ class CloudflareAIGatewayChatModel(Model):
         "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     ]
 
-    def _messages_to_completions(self, messages: list[MessagePayload]) -> list[dict[str, str]]:
-        return [
-            {
-                "role": msg.model.role,
-                "content": msg.model.content,
-            }
-            for msg in messages
-        ]
+    def _messages_to_completions(self, messages: list[MessagePayload]) -> list[dict[str, Any]]:
+        return to_chat_completions(messages)
 
     @classmethod
     def normalize_model_name(cls, model_name: str) -> str:

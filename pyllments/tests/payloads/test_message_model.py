@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from pyllments.payloads.message import MessagePayload
 from pyllments.payloads.message.message_model import MessageModel
 from pyllments.payloads.message.stream_events import MessageStreamEvent
 
@@ -138,3 +139,32 @@ async def test_cancel_stops_stream_early():
 
     assert model.cancelled is True
     assert "token" in collected
+
+
+def _indexless_chunk(call_id: str, name: str, arguments: str):
+    tc = SimpleNamespace(
+        id=call_id,
+        type="function",
+        function=SimpleNamespace(name=name, arguments=arguments),
+    )
+    tc.index = None
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content=None, tool_calls=[tc]))]
+    )
+
+
+async def _indexless_stream():
+    # A provider that repeats the whole id on every delta and sends no index.
+    yield _indexless_chunk("call_a", "get_weather", '{"loc":')
+    yield _indexless_chunk("call_a", "", ' "NYC"}')
+    yield _indexless_chunk("call_b", "get_time", "{}")
+
+
+@pytest.mark.asyncio
+async def test_indexless_deltas_with_repeated_ids_build_two_calls():
+    payload = MessagePayload(role="assistant", mode="stream", message_coroutine=_indexless_stream())
+    events = [event async for event in payload.model.aiter_events()]
+    done = events[-1]
+    assert done.type == "done"
+    assert [tc["id"] for tc in payload.model.tool_calls] == ["call_a", "call_b"]
+    assert payload.model.tool_calls[0]["function"]["arguments"] == '{"loc": "NYC"}'

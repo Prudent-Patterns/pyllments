@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, AsyncIterator
 
 from pyllments.payloads.message.stream_events import MessageStreamEvent
@@ -13,6 +12,11 @@ if TYPE_CHECKING:
 class TurnHandle:
     """
     Application-facing handle for a single chat turn.
+
+    One ``stream()`` covers the whole turn, round by round: the reply's events,
+    then ``tool_results`` when that reply called tools and the gateway ran
+    them, then the next reply, until a reply calls no tools and ``done`` ends
+    the turn.
 
     Parameters
     ----------
@@ -29,62 +33,93 @@ class TurnHandle:
         self.user_message = user_message
         self._gateway = gateway
         self._gateway_model = gateway.model
-        self._assistant_linked = asyncio.Event()
 
-    async def _wait_for_assistant(self) -> MessagePayload:
-        assistant = await self._gateway_model.wait_for_assistant(self.turn_id)
-        self._assistant_linked.set()
-        return assistant
+    def _terminal_event(self) -> MessageStreamEvent:
+        state = self._gateway_model.get_turn_state(self.turn_id)
+        if state is not None and state.error:
+            return MessageStreamEvent(type='error', error=state.error)
+        return MessageStreamEvent(type='cancelled')
+
+    async def _round_events(self, assistant: MessagePayload) -> AsyncIterator[MessageStreamEvent]:
+        """A reply's events, with its tool calls as one ``tool_calls_complete``."""
+        model = assistant.model
+        if model.mode == 'atomic':
+            await model.aget_message()
+            if model.content:
+                yield MessageStreamEvent(type='token', content_delta=model.content)
+            if model.tool_calls:
+                yield MessageStreamEvent(
+                    type='tool_calls_complete', tool_calls=[dict(tc) for tc in model.tool_calls]
+                )
+            return
+        async for event in model.aiter_events():
+            if event.type == 'done':
+                return
+            yield event
 
     async def stream(self) -> AsyncIterator[MessageStreamEvent]:
         """
-        Yield stream events from the assistant response for this turn.
+        Yield the turn's events across every round.
 
-        Raises
-        ------
-        asyncio.CancelledError
-            If the turn was cancelled before or during streaming.
-        RuntimeError
-            If the turn was cancelled and no assistant message arrives.
+        ``done`` arrives once, when the turn ends. A cancelled turn yields
+        ``cancelled``; a failed one (round budget) yields ``error``.
         """
-        if self._gateway_model.is_turn_cancelled(self.turn_id):
-            yield MessageStreamEvent(type='cancelled')
-            return
-
-        assistant = await self._wait_for_assistant()
-        if self._gateway_model.is_turn_cancelled(self.turn_id):
-            assistant.model.cancel()
-            yield MessageStreamEvent(type='cancelled')
-            return
-
-        async for event in assistant.model.aiter_events():
-            if self._gateway_model.is_turn_cancelled(self.turn_id):
-                assistant.model.cancel()
-                yield MessageStreamEvent(type='cancelled')
+        model = self._gateway_model
+        round_index = 0
+        while True:
+            if model.is_turn_cancelled(self.turn_id):
+                yield self._terminal_event()
                 return
-            if event.type == 'tool_calls_complete' and event.tool_calls:
-                await self._gateway.emit_tool_event(self.turn_id, event.tool_calls)
-            yield event
-            if event.type == 'cancelled':
+            assistant = await model.wait_for_round(self.turn_id, round_index)
+            if assistant is None:
+                yield self._terminal_event()
                 return
-            if event.type == 'done':
-                self._gateway_model.complete_turn(self.turn_id)
+
+            called_tools: list[dict] | None = None
+            async for event in self._round_events(assistant):
+                if model.is_turn_cancelled(self.turn_id):
+                    assistant.model.cancel()
+                    yield self._terminal_event()
+                    return
+                if event.type == 'tool_calls_complete' and event.tool_calls:
+                    called_tools = event.tool_calls
+                    await self._gateway.emit_tool_event(self.turn_id, event.tool_calls)
+                yield event
+                if event.type == 'cancelled':
+                    return
+            if assistant.model.tool_calls and called_tools is None:
+                # A reply read before (e.g. final_message after stream) reports its
+                # calls only on done; the round still continues.
+                called_tools = [dict(tc) for tc in assistant.model.tool_calls]
+
+            if not called_tools or not self._gateway.tools_wired:
+                model.complete_turn(self.turn_id)
+                yield MessageStreamEvent(type='done', tool_calls=called_tools)
+                return
+
+            results = await model.wait_for_tool_results(self.turn_id, round_index)
+            if results is None:
+                yield self._terminal_event()
+                return
+            yield MessageStreamEvent(
+                type='tool_results',
+                tool_results=[dict(record) for record in results.model.tool_calls],
+                raw=results,
+            )
+            round_index += 1
 
     async def final_message(self) -> MessagePayload:
         """
-        Return the assistant message payload after the stream completes.
+        Return the last assistant message after the turn completes.
 
-        Consumes the stream when it has not been read yet.
+        Consumes whatever of the stream has not been read yet.
         """
-        if self._gateway_model.is_turn_cancelled(self.turn_id):
-            raise RuntimeError(f"Turn {self.turn_id} was cancelled")
-
-        assistant = await self._wait_for_assistant()
-        if not assistant.model.streamed and not assistant.model.cancelled:
-            await assistant.model.aget_message()
-        await assistant.model.await_ready()
-        self._gateway_model.complete_turn(self.turn_id)
-        return assistant
+        async for event in self.stream():
+            if event.type in ('cancelled', 'error'):
+                raise RuntimeError(f"Turn {self.turn_id} ended: {event.error or 'cancelled'}")
+        state = self._gateway_model.get_turn_state(self.turn_id)
+        assert state is not None and state.assistant_message is not None
+        return state.assistant_message
 
     def cancel(self) -> None:
         """Cancel this turn and stop provider token generation when possible."""

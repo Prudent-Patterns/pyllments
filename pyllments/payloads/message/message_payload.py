@@ -16,6 +16,14 @@ class MessagePayload(Payload):
         super().__init__(**params)
         self.model = MessageModel(**params)
 
+    @property
+    def finished(self) -> bool:
+        """A streamed reply read to its end, or an atomic message with nothing left to await."""
+        model = self.model
+        if model.mode == 'stream':
+            return bool(model.streamed or model.ready or model.cancelled)
+        return model.message_coroutine is None
+
 
     @Component.view
     def create_static_view(

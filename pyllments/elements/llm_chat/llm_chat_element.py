@@ -106,11 +106,12 @@ class LLMChatElement(Element):
         self.ports.add_output(name='tool_use_output', pack_payload_callback=pack)
 
     async def _emit_proposed_tool_use(self, response: MessagePayload) -> None:
-        """Emit tool_use_output only after the reply exists and only if it called tools.
+        """Emit tool_use_output once the reply is finished, if it called tools.
 
-        Stream mode must not wait here on the caller's stack: the gateway consumes
-        the stream after this input returns. Atomic mode has no other consumer, so
-        it is finished before we look for tool calls.
+        This always runs after the reply's own delivery has returned, in both
+        modes. A tool round is a new arrival in the graph, never something nested
+        inside the delivery of the reply that asked for it: the history handler
+        and the context builder both process one arrival at a time.
         """
         model = response.model
         if model.mode == 'atomic':
@@ -145,10 +146,9 @@ class LLMChatElement(Element):
                 # Populate the message content before emitting
                 await response.model.aget_message()
             await self.ports.output['message_output'].stage_emit(message_payload=response)
-            if response.model.mode == 'stream':
+            self.ports.output['tool_use_output'].track_task(
                 schedule_task(self._emit_proposed_tool_use(response))
-            else:
-                await self._emit_proposed_tool_use(response)
+            )
 
         self.ports.add_input(
             name='messages_emit_input',

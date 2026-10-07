@@ -23,6 +23,7 @@ description: Implements or refactors Pyllments models using param-based state an
 - The Element forwards `**params` to the Model once in `__init__`; the Model is the single owner of that state.
 - Do not mirror model params onto the Element unless they are genuinely element-owned.
 - `Model.__init__` ignores kwargs that are not declared on the model, so broad forwarding from elements is safe.
+- A payload model (`MessageModel`, `ToolUseModel`) sets `strict_params = True`: callers build payloads with explicit keywords, so an unknown key raises `TypeError` instead of vanishing.
 - Keep methods composable (`do_something`) so Element wiring stays clean.
 - Preserve predictable behavior for port-triggered calls.
 

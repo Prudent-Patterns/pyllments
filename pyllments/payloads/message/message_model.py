@@ -58,6 +58,20 @@ class MessageModel(Model):
 
     tool_calls = param.List(default=[], item_type=dict, doc="List of tool calls from the model")
 
+    tool_call_id = param.String(
+        default=None,
+        allow_None=True,
+        doc="For role 'tool': the id of the assistant tool call this message answers",
+    )
+
+    tool_name = param.String(
+        default=None,
+        allow_None=True,
+        doc="For role 'tool': the name of the tool that produced the content",
+    )
+
+    strict_params = True
+
     def __init__(self, **params):
         super().__init__(**params)
         if params.get('loop', None) is None:
@@ -102,15 +116,25 @@ class MessageModel(Model):
 
     def _apply_tool_call_delta(self, tc_delta) -> dict:
         """Accumulate a tool-call delta and return a snapshot for event emission."""
-        index = tc_delta.index
-        if index >= len(self.tool_calls):
+        index = getattr(tc_delta, 'index', None)
+        delta_id = getattr(tc_delta, 'id', None)
+        if index is None:
+            # A provider that sends whole calls per chunk carries no index:
+            # continue the call with the same id, otherwise start a new one.
+            index = next(
+                (i for i, tc in enumerate(self.tool_calls) if delta_id and tc['id'] == delta_id),
+                len(self.tool_calls),
+            )
+        while index >= len(self.tool_calls):
             self.tool_calls.append({
                 'id': '',
                 'type': 'function',
                 'function': {'name': '', 'arguments': ''},
             })
-        if tc_delta.id:
-            self.tool_calls[index]['id'] += tc_delta.id
+        current_id = self.tool_calls[index]['id']
+        if delta_id and delta_id != current_id:
+            # OpenAI sends the id once; some providers repeat it on every delta.
+            self.tool_calls[index]['id'] = delta_id if not current_id else current_id + delta_id
         if tc_delta.type:
             self.tool_calls[index]['type'] = tc_delta.type
         if tc_delta.function:

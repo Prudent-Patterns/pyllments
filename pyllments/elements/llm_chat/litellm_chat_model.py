@@ -3,6 +3,7 @@ import param
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
+from pyllments.payloads.message.chat_completions import to_chat_completions
 
 
 class LiteLLMChatModel(Model):
@@ -49,15 +50,9 @@ class LiteLLMChatModel(Model):
     def _update_base_url(self, event):
         self.model_args['base_url'] = self.base_url
 
-    def _messages_to_litellm(self, messages: list[MessagePayload]) -> list[dict[str, str]]:
-        """Convert MessagePayload instances to LiteLLM chat message dictionaries."""
-        return [
-            {
-                'role': msg.model.role,
-                'content': msg.model.content
-            }
-            for msg in messages
-        ]
+    def _messages_to_litellm(self, messages: list[MessagePayload]) -> list[dict]:
+        """Convert message and tool-use payloads to chat message dictionaries."""
+        return to_chat_completions(messages)
 
     @classmethod
     def get_provider_model_catalog(

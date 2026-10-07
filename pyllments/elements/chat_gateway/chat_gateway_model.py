@@ -14,14 +14,40 @@ if TYPE_CHECKING:
 
 @dataclass
 class TurnState:
-    """Per-turn runtime state (not exposed via Param)."""
+    """
+    Per-turn runtime state (not exposed via Param).
+
+    A turn is one user message and the rounds that answer it: an assistant
+    reply, then, when that reply called tools, the results of those calls,
+    then the next reply. ``assistant_messages[i]`` is round ``i``'s reply and
+    ``tool_results[i]`` its results. The turn is done when a reply calls no
+    tools, is cancelled, or fails.
+    """
 
     turn_id: str
     user_message: MessagePayload
-    assistant_message: MessagePayload | None = None
+    assistant_messages: list = field(default_factory=list)
+    tool_results: list = field(default_factory=list)
+    replies_emitted: set = field(default_factory=set)
     cancelled: bool = False
     done: bool = False
-    assistant_event: asyncio.Event = field(default_factory=asyncio.Event)
+    error: str | None = None
+    changed: asyncio.Event = field(default_factory=asyncio.Event)
+
+    @property
+    def assistant_message(self) -> MessagePayload | None:
+        return self.assistant_messages[-1] if self.assistant_messages else None
+
+    @property
+    def rounds(self) -> int:
+        return len(self.assistant_messages)
+
+    @property
+    def open(self) -> bool:
+        return not self.done and not self.cancelled
+
+    def notify(self) -> None:
+        self.changed.set()
 
 
 @dataclass
@@ -34,13 +60,29 @@ class PendingToolUseState:
     pending_snapshot: Any = None
 
 
+def _assistant_finished(message: MessagePayload) -> bool:
+    return message.finished
+
+
 class ChatGatewayModel(Model):
     """
     Tracks turns and pending tool reviews for :class:`ChatGatewayElement`.
 
-    Assistant responses match turns in FIFO order. Tool reviews are held until
-    the outer application acknowledges or returns policy decisions.
+    An assistant reply joins the open turn whose last reply called tools and
+    has its results back; otherwise it matches the oldest pending turn in FIFO
+    order. Tool reviews are held until the outer application acknowledges or
+    returns policy decisions.
     """
+
+    max_tool_rounds = param.Integer(
+        default=6,
+        bounds=(0, None),
+        doc=(
+            "How many replies in one turn may run tools. The reply after the last "
+            "allowed one has its calls denied with a reason the model can read; a "
+            "further reply that still calls tools fails the turn."
+        ),
+    )
 
     on_user_message_submitted = param.Callable(
         default=None,
@@ -133,15 +175,39 @@ class ChatGatewayModel(Model):
         self._pending_turn_ids.append(turn_id)
         return state
 
+    def _turn_awaiting_next_round(self) -> TurnState | None:
+        """The newest open turn whose last reply called tools and has its results back."""
+        for turn_id in reversed(list(self._turn_states)):
+            state = self._turn_states[turn_id]
+            if not state.open or not state.assistant_messages:
+                continue
+            last = state.assistant_messages[-1]
+            if (
+                _assistant_finished(last)
+                and last.model.tool_calls
+                and len(state.tool_results) == state.rounds
+            ):
+                return state
+        return None
+
     def match_turn(self, assistant_message: MessagePayload) -> str | None:
         """
-        Bind an assistant payload to the oldest pending turn.
+        Bind an assistant payload to its turn.
+
+        A turn waiting on the reply to its tool results takes it as the next
+        round. Otherwise the oldest pending turn takes it as its first.
 
         Returns
         -------
         str or None
-            The matched turn id, or None if no pending turn exists.
+            The matched turn id, or None if no turn can take it.
         """
+        continuing = self._turn_awaiting_next_round()
+        if continuing is not None:
+            continuing.assistant_messages.append(assistant_message)
+            continuing.notify()
+            return continuing.turn_id
+
         if self._pending_turn_ids:
             turn_id = self._pending_turn_ids.pop(0)
         else:
@@ -153,8 +219,8 @@ class ChatGatewayModel(Model):
             assistant_message.model.cancel()
             return None
 
-        state.assistant_message = assistant_message
-        state.assistant_event.set()
+        state.assistant_messages.append(assistant_message)
+        state.notify()
         return turn_id
 
     def resolve_turn_id_for_tools(self, payload: ToolUsePayload) -> str | None:
@@ -163,15 +229,85 @@ class ChatGatewayModel(Model):
 
         Prefers the newest active (non-done, non-cancelled) turn.
         """
-        active_ids = [
-            tid
-            for tid in self._turn_states
-            if not self._turn_states[tid].cancelled and not self._turn_states[tid].done
-        ]
+        active_ids = [tid for tid in self._turn_states if self._turn_states[tid].open]
         if active_ids:
             return active_ids[-1]
         if self._pending_turn_ids:
             return self._pending_turn_ids[-1]
+        return None
+
+    def claim_reply_emission(self, turn_id: str, round_index: int) -> MessagePayload | None:
+        """
+        The reply to emit as finished for a round, once; None if already claimed.
+
+        Two paths can finish a round's reply, the watcher that sees it stream to
+        its end and the tool path that receives the calls it made. Whichever is
+        first emits; the other finds nothing to do.
+        """
+        state = self._turn_states.get(turn_id)
+        if state is None or state.cancelled or round_index >= len(state.assistant_messages):
+            return None
+        if round_index in state.replies_emitted:
+            return None
+        state.replies_emitted.add(round_index)
+        return state.assistant_messages[round_index]
+
+    def record_tool_results(self, turn_id: str, payload: ToolUsePayload) -> None:
+        """Attach a round's finished tool results to the turn and wake its reader."""
+        state = self._turn_states.get(turn_id)
+        if state is None:
+            return
+        state.tool_results.append(payload)
+        state.notify()
+
+    def tool_rounds_over_budget(self, turn_id: str) -> str | None:
+        """
+        Judge a tool request against the round budget.
+
+        Returns ``None`` when the call may run, ``"deny"`` when the budget is
+        spent and the model should answer, ``"fail"`` when it kept calling.
+        """
+        state = self._turn_states.get(turn_id)
+        if state is None or state.rounds <= self.max_tool_rounds:
+            return None
+        if state.rounds > self.max_tool_rounds + 1:
+            return "fail"
+        return "deny"
+
+    def fail_turn(self, turn_id: str, error: str) -> None:
+        """End a turn with an error its reader will see."""
+        state = self._turn_states.get(turn_id)
+        if state is None:
+            return
+        state.error = error
+        self.cancel_turn(turn_id)
+
+    async def _wait_until(self, state: TurnState, ready) -> bool:
+        """Wait for ``ready(state)``; False when the turn was cancelled first."""
+        while True:
+            if state.cancelled:
+                return False
+            if ready(state):
+                return True
+            state.changed.clear()
+            await state.changed.wait()
+
+    async def wait_for_round(self, turn_id: str, index: int) -> MessagePayload | None:
+        """The reply of round ``index``, or None when the turn was cancelled."""
+        state = self._turn_states.get(turn_id)
+        if state is None:
+            raise KeyError(f"Unknown turn id: {turn_id}")
+        if await self._wait_until(state, lambda s: len(s.assistant_messages) > index):
+            return state.assistant_messages[index]
+        return None
+
+    async def wait_for_tool_results(self, turn_id: str, index: int) -> ToolUsePayload | None:
+        """The results of round ``index``, or None when the turn was cancelled."""
+        state = self._turn_states.get(turn_id)
+        if state is None:
+            raise KeyError(f"Unknown turn id: {turn_id}")
+        if await self._wait_until(state, lambda s: len(s.tool_results) > index):
+            return state.tool_results[index]
         return None
 
     @staticmethod
@@ -217,18 +353,11 @@ class ChatGatewayModel(Model):
         return states
 
     async def wait_for_assistant(self, turn_id: str) -> MessagePayload:
-        """Wait until the assistant message for a turn is linked."""
-        state = self._turn_states.get(turn_id)
-        if state is None:
-            raise KeyError(f"Unknown turn id: {turn_id}")
-        if state.cancelled:
+        """Wait until the first assistant message for a turn is linked."""
+        message = await self.wait_for_round(turn_id, 0)
+        if message is None:
             raise RuntimeError(f"Turn {turn_id} was cancelled")
-        if state.assistant_message is not None:
-            return state.assistant_message
-        await state.assistant_event.wait()
-        if state.cancelled or state.assistant_message is None:
-            raise RuntimeError(f"Turn {turn_id} was cancelled")
-        return state.assistant_message
+        return message
 
     def is_turn_cancelled(self, turn_id: str) -> bool:
         """Return whether a turn has been cancelled."""
@@ -246,10 +375,11 @@ class ChatGatewayModel(Model):
             self._pending_turn_ids.remove(turn_id)
         if state.assistant_message is not None:
             state.assistant_message.model.cancel()
-        state.assistant_event.set()
+        state.notify()
 
     def complete_turn(self, turn_id: str) -> None:
         """Mark a turn as completed."""
         state = self._turn_states.get(turn_id)
         if state is not None:
             state.done = True
+            state.notify()
