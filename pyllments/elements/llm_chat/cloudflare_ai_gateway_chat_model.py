@@ -476,7 +476,8 @@ class CloudflareAIGatewayChatModel(Model):
         return await self._stdlib_http_post(url, headers, body, stream)
 
     def _binding_inputs(self, body: dict[str, Any]) -> dict[str, Any]:
-        inputs = dict(body)
+        # The binding call crosses into JavaScript; only JSON types survive it.
+        inputs = json.loads(json.dumps(body))
         inputs.pop("model", None)
         # One JSON result. Stream mode below turns that into a single delta.
         # Binding streams are a different shape from the REST SSE parser.

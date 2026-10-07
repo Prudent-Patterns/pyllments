@@ -24,7 +24,8 @@ def test_schema_reads_the_signature():
     assert not accepts_context
     assert schema["required"] == ["query"]
     assert schema["properties"]["query"] == {"type": "string"}
-    assert schema["properties"]["types"] == {"type": "array", "items": {"type": "string"}, "default": ()}
+    # A tuple default is written as a list: the schema must survive JSON and an RPC boundary.
+    assert schema["properties"]["types"] == {"type": "array", "items": {"type": "string"}, "default": []}
     assert schema["properties"]["limit"] == {"type": "integer", "default": 10}
     assert schema["properties"]["kind"] == {"enum": ["plan", "note"], "default": "plan"}
     assert schema["properties"]["cursor"]["anyOf"] == [{"type": "string"}, {"type": "null"}]

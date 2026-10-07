@@ -90,11 +90,20 @@ def parameters_schema(func: Callable) -> tuple[dict[str, Any], bool]:
             continue
         schema = type_schema(annotation)
         if parameter.default is not inspect._empty:
-            schema["default"] = parameter.default
+            schema["default"] = _json_default(parameter.default)
         else:
             required.append(name)
         properties[name] = schema
     return {"type": "object", "properties": properties, "required": required}, accepts_context
+
+
+def _json_default(value: Any) -> Any:
+    """A default as JSON allows it: tuples and sets become lists, so the schema crosses any boundary."""
+    if isinstance(value, (tuple, set, frozenset)):
+        return [_json_default(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _json_default(v) for k, v in value.items()}
+    return value
 
 
 _JSON_TYPES: dict[str, tuple[type, ...]] = {
