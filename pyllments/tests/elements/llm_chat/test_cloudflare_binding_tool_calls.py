@@ -27,16 +27,13 @@ def test_plain_text_result_still_normalizes():
     assert completion["choices"][0]["message"]["tool_calls"] == []
 
 
-def test_messages_take_workers_ai_shape_for_the_binding():
+def test_binding_messages_keep_openai_shape_but_never_null_content():
     native = _native_messages([
-        {"role": "system", "content": "Be brief."},
         {"role": "user", "content": "prednisone?"},
         {"role": "assistant", "content": None, "tool_calls": [
             {"id": "call_1", "type": "function", "function": {"name": "search", "arguments": "{\"query\": \"prednisone\"}"}}]},
         {"role": "tool", "content": "{\"items\": []}", "tool_call_id": "call_1", "name": "search"},
     ])
-    assert native[2] == {"role": "assistant", "content": "", "tool_calls": [{"name": "search", "arguments": {"query": "prednisone"}}]}
-    assert native[3] == {"role": "tool", "content": "{\"items\": []}", "name": "search"}
-    assert all(isinstance(m["content"], str) for m in native)
-    assert "tool_call_id" not in native[3]
-
+    assert native[1]["content"] == ""
+    assert native[1]["tool_calls"][0] == {"id": "call_1", "type": "function", "function": {"name": "search", "arguments": "{\"query\": \"prednisone\"}"}}
+    assert native[2] == {"role": "tool", "content": "{\"items\": []}", "tool_call_id": "call_1", "name": "search"}

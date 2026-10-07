@@ -113,31 +113,17 @@ def _completion_from_binding(payload: Any) -> dict[str, Any]:
 
 
 def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Chat-completions messages in Workers AI's own shape.
+    """Chat-completions messages as the Workers AI binding validates them.
 
-    The binding validates against Workers AI's schema, not OpenAI's: content is
-    always a string, an assistant's calls are ``{name, arguments}`` objects, and
-    a tool result names its tool instead of a call id.
+    The binding takes OpenAI's shape for tool calls and tool results, but its
+    schema has no null: an assistant message that only called tools carries an
+    empty string instead.
     """
     native: list[dict[str, Any]] = []
     for message in messages:
-        role = message.get("role")
-        content = message.get("content")
-        entry: dict[str, Any] = {"role": role, "content": content if isinstance(content, str) else ""}
-        if role == "assistant" and message.get("tool_calls"):
-            calls = []
-            for call in message["tool_calls"]:
-                function = call.get("function") or {}
-                arguments = function.get("arguments")
-                if isinstance(arguments, str):
-                    try:
-                        arguments = json.loads(arguments)
-                    except ValueError:
-                        arguments = {}
-                calls.append({"name": function.get("name") or "", "arguments": arguments or {}})
-            entry["tool_calls"] = calls
-        if role == "tool":
-            entry["name"] = message.get("name") or ""
+        entry = dict(message)
+        if entry.get("content") is None:
+            entry["content"] = ""
         native.append(entry)
     return native
 
