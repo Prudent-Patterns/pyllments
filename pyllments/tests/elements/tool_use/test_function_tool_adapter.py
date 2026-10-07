@@ -88,3 +88,13 @@ asyncio.run(main())
 """
     result = subprocess.run([sys.executable, "-c", script], cwd=_REPO_ROOT, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_json_text_arguments_are_read_as_the_values_they_spell():
+    # Llama-class models send `types` as the JSON text of a list; the call must still run.
+    schema, _ = parameters_schema(search)
+    out = validate_arguments(schema, {"query": "prednisone", "types": '["medication"]', "limit": "5"})
+    assert out["types"] == ["medication"] and out["limit"] == 5
+    with pytest.raises(ValueError, match="wrong type for: types"):
+        validate_arguments(schema, {"query": "x", "types": "medication"})
+

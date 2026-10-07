@@ -8,6 +8,7 @@ and the arguments the model sends are checked against it before the call.
 from __future__ import annotations
 
 import inspect
+import json
 import types
 import typing
 from typing import Any, Callable
@@ -117,6 +118,19 @@ _JSON_TYPES: dict[str, tuple[type, ...]] = {
 }
 
 
+def _decode_if_json(value: str, schema: dict[str, Any]) -> Any:
+    expected = schema.get("type")
+    options = [schema] if expected else schema.get("anyOf", [])
+    wants_json = any(o.get("type") in ("array", "object", "integer", "number", "boolean") for o in options)
+    if not wants_json:
+        return value
+    try:
+        decoded = json.loads(value)
+    except ValueError:
+        return value
+    return decoded if _matches(decoded, schema) else value
+
+
 def _matches(value: Any, schema: dict[str, Any]) -> bool:
     if "anyOf" in schema:
         return any(_matches(value, option) for option in schema["anyOf"])
@@ -142,6 +156,11 @@ def validate_arguments(schema: dict[str, Any], arguments: dict[str, Any] | None)
     """
     arguments = dict(arguments or {})
     properties = schema.get("properties", {})
+    # Models often send a list or object as the JSON text of one. Read it as
+    # the value it spells before judging its type.
+    for name, value in list(arguments.items()):
+        if name in properties and isinstance(value, str):
+            arguments[name] = _decode_if_json(value, properties[name])
     missing = [name for name in schema.get("required", []) if name not in arguments]
     unknown = [name for name in arguments if name not in properties]
     wrong = [

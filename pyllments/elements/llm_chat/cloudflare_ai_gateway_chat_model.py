@@ -112,6 +112,36 @@ def _completion_from_binding(payload: Any) -> dict[str, Any]:
     }
 
 
+def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Chat-completions messages in Workers AI's own shape.
+
+    The binding validates against Workers AI's schema, not OpenAI's: content is
+    always a string, an assistant's calls are ``{name, arguments}`` objects, and
+    a tool result names its tool instead of a call id.
+    """
+    native: list[dict[str, Any]] = []
+    for message in messages:
+        role = message.get("role")
+        content = message.get("content")
+        entry: dict[str, Any] = {"role": role, "content": content if isinstance(content, str) else ""}
+        if role == "assistant" and message.get("tool_calls"):
+            calls = []
+            for call in message["tool_calls"]:
+                function = call.get("function") or {}
+                arguments = function.get("arguments")
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except ValueError:
+                        arguments = {}
+                calls.append({"name": function.get("name") or "", "arguments": arguments or {}})
+            entry["tool_calls"] = calls
+        if role == "tool":
+            entry["name"] = message.get("name") or ""
+        native.append(entry)
+    return native
+
+
 def _native_tool_calls(raw: Any) -> list[dict[str, Any]]:
     """Workers AI's ``{name, arguments}`` calls in the chat-completions shape, with ids."""
     calls: list[dict[str, Any]] = []
@@ -479,6 +509,7 @@ class CloudflareAIGatewayChatModel(Model):
         # The binding call crosses into JavaScript; only JSON types survive it.
         inputs = json.loads(json.dumps(body))
         inputs.pop("model", None)
+        inputs["messages"] = _native_messages(inputs.get("messages") or [])
         # One JSON result. Stream mode below turns that into a single delta.
         # Binding streams are a different shape from the REST SSE parser.
         inputs["stream"] = False
