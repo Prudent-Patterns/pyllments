@@ -4,12 +4,22 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import jinja2
 import param
 
 from pyllments.base.model_base import Model
 
 if TYPE_CHECKING:
     from pyllments.payloads import MessagePayload, ToolUsePayload
+
+
+DEFAULT_TURN_NOTICE = (
+    "Tool round {{ round }} of {{ max_rounds }}; failed calls {{ failures }} of "
+    "{{ max_failures }}.\n"
+    "{% if tools_allowed %}After the last round, answer the person in words with what "
+    "you have.{% else %}Tools are off for this reply: answer the person in words now."
+    "{% endif %}"
+)
 
 
 @dataclass
@@ -30,6 +40,7 @@ class TurnState:
     tool_results: list = field(default_factory=list)
     replies_emitted: set = field(default_factory=set)
     failed_calls: int = 0
+    facts: dict = field(default_factory=dict)
     cancelled: bool = False
     done: bool = False
     error: str | None = None
@@ -91,6 +102,17 @@ class ChatGatewayModel(Model):
         doc=(
             "How many tool calls may fail in one turn before the next reply is made "
             "without tools, so the model answers with what it has and says what failed."
+        ),
+    )
+
+    turn_notice_template = param.String(
+        default=DEFAULT_TURN_NOTICE,
+        doc=(
+            "Jinja2 for the system message emitted on ``turn_notice_output`` before "
+            "every round. Variables: ``round`` (the reply about to be made, 1-based), "
+            "``max_rounds``, ``failures``, ``max_failures``, ``tools_allowed`` "
+            "(False when this reply is made without tools), plus the ``facts`` "
+            "given at submit time, such as today's date."
         ),
     )
 
@@ -178,9 +200,11 @@ class ChatGatewayModel(Model):
         self._turn_counter += 1
         return f"turn-{self._turn_counter}"
 
-    def register_turn(self, turn_id: str, user_message: MessagePayload) -> TurnState:
-        """Register a new pending turn."""
-        state = TurnState(turn_id=turn_id, user_message=user_message)
+    def register_turn(
+        self, turn_id: str, user_message: MessagePayload, facts: dict | None = None
+    ) -> TurnState:
+        """Register a new pending turn; ``facts`` feed its turn notices."""
+        state = TurnState(turn_id=turn_id, user_message=user_message, facts=dict(facts or {}))
         self._turn_states[turn_id] = state
         self._pending_turn_ids.append(turn_id)
         return state
@@ -277,6 +301,27 @@ class ChatGatewayModel(Model):
         """Has this turn a reply whose tool results have not come back yet?"""
         state = self._turn_states.get(turn_id or "")
         return bool(state and state.open and state.rounds > len(state.tool_results))
+
+    def turn_notice_facts(self, turn_id: str) -> dict[str, Any]:
+        """The state of the turn as the model should know it before its next reply."""
+        state = self._turn_states.get(turn_id)
+        if state is None:
+            return {}
+        return {
+            **state.facts,
+            "round": state.rounds + 1,
+            "max_rounds": self.max_tool_rounds,
+            "failures": state.failed_calls,
+            "max_failures": self.max_tool_failures,
+            "tools_allowed": not self.next_round_is_last(turn_id),
+        }
+
+    def render_turn_notice(self, turn_id: str) -> str:
+        """``turn_notice_template`` rendered for the next reply of this turn."""
+        template = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(
+            self.turn_notice_template
+        )
+        return template.render(**self.turn_notice_facts(turn_id)).strip()
 
     def next_round_is_last(self, turn_id: str) -> bool:
         """After these results, must the next reply be made without tools?"""
