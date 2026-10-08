@@ -51,25 +51,33 @@ def message_to_chat_completion(message: MessagePayload) -> dict[str, Any]:
     return entry
 
 
-def to_chat_completions(payloads: Iterable[Any]) -> list[dict[str, Any]]:
+def message_entries(payloads: Iterable[Any]) -> list[tuple[dict[str, Any], dict[str, Any] | None]]:
     """
-    Message and tool-use payloads, in order, as the ``messages`` list of a request.
+    Message and tool-use payloads, in order, as ``(message, reasoning)`` pairs.
 
-    A ToolUsePayload expands to one tool message per finished record, placed
-    where the payload sits, which is right after the assistant message that
-    made the calls when the ledger is append-only.
+    ``message`` is the chat-completions dict; ``reasoning`` is the reply's
+    provider record, for the backend of that provider to send back. A ToolUsePayload
+    expands to one tool message per finished record, placed where the payload
+    sits, which is right after the assistant message that made the calls when
+    the ledger is append-only.
     """
     from pyllments.payloads.tool_use.tool_use_payload import ToolUsePayload
 
-    messages: list[dict[str, Any]] = []
+    entries: list[tuple[dict[str, Any], dict[str, Any] | None]] = []
     for payload in payloads:
         if isinstance(payload, MessagePayload):
-            messages.append(message_to_chat_completion(payload))
+            entries.append((message_to_chat_completion(payload), payload.model.reasoning))
         elif isinstance(payload, ToolUsePayload):
-            messages.extend(message_to_chat_completion(m) for m in payload.to_messages())
+            entries.extend((message_to_chat_completion(m), None) for m in payload.to_messages())
         else:
             raise TypeError(
                 f"Cannot send a {type(payload).__name__} to a chat model; "
                 "convert it to MessagePayload first."
             )
-    return messages
+    return entries
+
+
+def to_chat_completions(payloads: Iterable[Any]) -> list[dict[str, Any]]:
+    """Message and tool-use payloads, in order, as the ``messages`` list of a request."""
+    return [message for message, _ in message_entries(payloads)]
+

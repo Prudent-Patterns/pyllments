@@ -1,11 +1,13 @@
 """
 A turn with tool rounds, driven by the gateway through the whole graph.
 
-One door per source into the history handler: the user message through
-``payload_pre_emit_input`` (projection out, then ingest), tool results through
-``payload_emit_input`` (ingest, then projection out), the assistant reply
-through ``payload_input`` (ingest only). The builder has two triggers: the
-user message for the first round, the tool results for every later one.
+One door per source into the history handler: the user message and the tool
+results through ``payload_emit_input`` (ingest, then projection out), the
+assistant reply through ``payload_input`` (ingest only), and the turn notice
+through ``payload_input`` too: its ``lifetime="turn"`` keeps it in place for the
+turn and drops it at the next, and it is never stored. The notice is
+each round's last arrival and the builder's one trigger, so every request is the
+previous one plus what was appended.
 """
 
 import json
@@ -45,23 +47,19 @@ def _graph(
     gateway.ports.request_options_output > llm.ports.request_options_input
 
     # The ledger takes each arrival before the builder sees it: connect these first.
-    gateway.ports.message_output > history.ports.payload_pre_emit_input
+    gateway.ports.message_output > history.ports.payload_emit_input
     gateway.ports.tool_result_output > history.ports.payload_emit_input
     llm.ports.message_output > gateway.ports.assistant_message_input
     gateway.ports.assistant_message_output > history.ports.payload_input
+    gateway.ports.turn_notice_output > history.ports.payload_input
 
     ContextBuilderElement(
         input_map={
             "system_constant": {"role": "system", "message": "Be brief."},
             "history": {"ports": [history.ports.context_output]},
-            "user_query": {"ports": [gateway.ports.message_output]},
-            "tool_results": {"ports": [gateway.ports.tool_result_output]},
             "turn_notice": {"ports": [gateway.ports.turn_notice_output]},
         },
-        trigger_map={
-            "user_query": ["system_constant", "[history]", "user_query", "[turn_notice]"],
-            "tool_results": ["system_constant", "history", "[turn_notice]"],
-        },
+        trigger_map={"turn_notice": ["system_constant", "history", "turn_notice"]},
         outgoing_input_ports=[llm.ports.messages_emit_input],
     )
     tools.ports.tools_output > llm.ports.tools_input
@@ -96,13 +94,13 @@ async def test_one_stream_carries_both_rounds(output_mode):
     state = gateway.model.get_turn_state(turn.turn_id)
     assert state.done and state.rounds == 2
 
-    # Every request ends with the turn notice; the rest is the conversation so far.
+    # Every request ends with the turn notice; round 1's notice stays where the model saw it.
     first, second = llm.model.requests
     assert [m["role"] for m in first] == ["system", "user", "system"]
-    assert [m["role"] for m in second] == ["system", "user", "assistant", "tool", "system"]
-    assert second[2]["tool_calls"][0]["id"] == second[3]["tool_call_id"]
-    assert json.loads(second[2]["tool_calls"][0]["function"]["arguments"]) == {"name": "prednisone"}
-    assert second[3]["content"] == "prednisone: found"
+    assert [m["role"] for m in second] == ["system", "user", "system", "assistant", "tool", "system"]
+    assert second[3]["tool_calls"][0]["id"] == second[4]["tool_call_id"]
+    assert json.loads(second[3]["tool_calls"][0]["function"]["arguments"]) == {"name": "prednisone"}
+    assert second[4]["content"] == "prednisone: found"
 
 
 @pytest.mark.asyncio
@@ -214,6 +212,33 @@ async def test_every_round_ends_with_a_notice_of_where_the_turn_stands():
         "Today is 2026-10-07. Round 2/2, failed 0. More later.",
         "Today is 2026-10-07. Round 3/2, failed 0. Words now.",
     ]
-    # The notice is the suffix: everything before it is the same request as last time.
-    assert llm.model.requests[1][:-1][: len(llm.model.requests[0]) - 1] == llm.model.requests[0][:-1]
+    # Each request is the last one plus what was appended, notices included.
+    first, second, third = llm.model.requests
+    assert second[: len(first)] == first
+    assert third[: len(second)] == second
+
+
+@pytest.mark.asyncio
+async def test_notices_stay_for_the_turn_and_leave_with_it():
+    gateway, llm, tools = _graph(
+        [_lookup_call(), "It is on your list.", "Nothing else."], output_mode="atomic",
+        turn_notice_template="Round {{ round }}.",
+    )
+    await tools.model.await_ready()
+    await tools.ports.output["tools_output"].drain()
+
+    first = await gateway.submit_message_async("Is prednisone on my list?")
+    async for _event in first.stream():
+        pass
+    # The finished reply reaches the ledger on the port's own task; an application drains it.
+    await gateway.ports.output["assistant_message_output"].drain()
+    second = await gateway.submit_message_async("Anything else?")
+    async for _event in second.stream():
+        pass
+
+    last_of_turn_one, turn_two = llm.model.requests[1], llm.model.requests[2]
+    assert [m["content"] for m in last_of_turn_one if m["role"] == "system"][1:] == ["Round 1.", "Round 2."]
+    # The new turn keeps the conversation and drops the old turn's notices.
+    assert [m["role"] for m in turn_two] == ["system", "user", "assistant", "tool", "assistant", "user", "system"]
+    assert turn_two[-1]["content"] == "Round 1."
 

@@ -62,6 +62,19 @@ class HistoryHandlerModel(Model):
         allow_None=True,
         doc="Numeric tier boundaries -> {payload_type: projector}.",
     )
+    trim_to_fraction = param.Number(
+        default=None,
+        allow_None=True,
+        bounds=(0.05, 1.0),
+        doc=(
+            "When set, the context window's first message stays fixed and moves only "
+            "when a user message starts a turn and the window has outgrown "
+            "context_token_limit: then it is cut to this fraction of the limit, opening "
+            "on a user message. Within a turn the window only grows, so a provider's "
+            "prompt cache and the turn's reasoning stay valid. Unset, the window slides "
+            "forward one message at a time."
+        ),
+    )
     summary_token_threshold = param.Integer(
         default=8000,
         bounds=(0, None),
@@ -87,6 +100,9 @@ class HistoryHandlerModel(Model):
 
         self._pending_delete_ids: List[str] = []
         self._pending_append_records: List[HistoryRecord] = []
+        self._next_seq = 0
+        self._window_start_seq = 0
+        self._turn = 0
         self._store_load_task = None
         # Only prefetch when a loop is already running. Workers construct
         # elements from sync code; an orphan task on a new unused loop hangs
@@ -159,19 +175,30 @@ class HistoryHandlerModel(Model):
                 f"({self.history_token_limit})."
             )
 
+        starts_turn = _is_user_message(entry.payload)
+        if starts_turn:
+            self._start_turn()
+        entry.turn = self._turn
+
         deleted_entries: List[HistoryEntry] = []
         while self.history_token_count + entry.raw_token_count > self.history_token_limit:
             popped = self.history.popleft()
             self.history_token_count -= popped.raw_token_count
             deleted_entries.append(popped)
 
+        self._next_seq += 1
+        entry.seq = self._next_seq
         self.history.append(entry)
         self.history_token_count += entry.raw_token_count
+        if starts_turn:
+            self._move_window_start()
 
         if persist and self._history_store is not None:
             for deleted in deleted_entries:
-                self._pending_delete_ids.append(deleted.entry_id)
-            record = payload_to_record(
+                if not _lives_for_turn(deleted.payload):
+                    self._pending_delete_ids.append(deleted.entry_id)
+            # A turn-lifetime message is never stored.
+            record = None if _lives_for_turn(entry.payload) else payload_to_record(
                 entry.entry_id,
                 entry.payload,
                 entry.raw_token_count,
@@ -224,6 +251,14 @@ class HistoryHandlerModel(Model):
                 self.update_history(wrapped)
         self.param.trigger("history")
 
+    def _start_turn(self):
+        """A user message starts a turn: the last turn's turn-lifetime messages leave."""
+        self._turn += 1
+        kept = deque(entry for entry in self.history if not _lives_for_turn(entry.payload))
+        if len(kept) != len(self.history):
+            self.history = kept
+            self.history_token_count = sum(entry.raw_token_count for entry in kept)
+
     def load_message(self, message: MessagePayload):
         self.load_entries([message])
 
@@ -274,6 +309,8 @@ class HistoryHandlerModel(Model):
     def _select_context_entries(self) -> List[tuple[HistoryEntry, Any]]:
         if not self.history or self.context_token_limit <= 0:
             return []
+        if self.trim_to_fraction is not None:
+            return self._select_fixed_start_window()
 
         selected: List[tuple[HistoryEntry, Any]] = []
         cumulative_distance = 0
@@ -299,8 +336,78 @@ class HistoryHandlerModel(Model):
         selected.reverse()
         return selected
 
+    def _project_newest_first(self, entries: List[HistoryEntry]) -> List[tuple[HistoryEntry, Any, int]]:
+        """(entry, projection, projected tokens) for ``entries``, newest first."""
+        projected_entries = []
+        cumulative_distance = 0
+        projected_total = 0
+        for entry_index, entry in enumerate(reversed(entries)):
+            remaining = self.context_token_limit - projected_total
+            projected, projected_tokens = self._project_entry(
+                entry, cumulative_distance, entry_index, remaining
+            )
+            projected_entries.append((entry, projected, projected_tokens))
+            projected_total += projected_tokens
+            cumulative_distance += entry.raw_token_count
+        return projected_entries
+
+    def _select_fixed_start_window(self) -> List[tuple[HistoryEntry, Any]]:
+        """Everything from the window's fixed start; only a new turn moves it."""
+        window = [entry for entry in self.history if entry.seq >= self._window_start_seq]
+        return [(entry, projected) for entry, projected, _ in reversed(self._project_newest_first(window))]
+
+    def _move_window_start(self):
+        """
+        At a turn's start, cut a window that has outgrown the limit.
+
+        The new start keeps the newest entries that fit in ``trim_to_fraction`` of
+        the limit, then moves to a user message, forward if there is one and back
+        otherwise, so the window never opens on a tool result whose call was cut off.
+        """
+        if self.trim_to_fraction is None or self.context_token_limit <= 0:
+            return
+        window = [entry for entry in self.history if entry.seq >= self._window_start_seq]
+        newest_first = self._project_newest_first(window)
+        if sum(tokens for _, _, tokens in newest_first) <= self.context_token_limit:
+            return
+
+        target = self.context_token_limit * self.trim_to_fraction
+        kept = 0
+        total = 0
+        for _, _, tokens in newest_first:
+            if kept and total + tokens > target:
+                break
+            kept += 1
+            total += tokens
+        start = len(window) - kept
+        user_start = next(
+            (index for index in range(start, len(window)) if _is_user_message(window[index].payload)),
+            None,
+        )
+        if user_start is None:
+            # None after the cut: open on the last one before it, if the window still fits.
+            for index in range(start - 1, -1, -1):
+                if _is_user_message(window[index].payload):
+                    tokens_from_there = sum(t for _, _, t in newest_first[: len(window) - index])
+                    if tokens_from_there <= self.context_token_limit:
+                        user_start = index
+                    break
+        if user_start is not None:
+            start = user_start
+        self._window_start_seq = window[start].seq
+
+    def _turn_view(self, entry: HistoryEntry, projected: Any) -> Any:
+        """Earlier turns are shown without their reasoning: it lives for its turn."""
+        if (
+            entry.turn < self._turn
+            and isinstance(projected, MessagePayload)
+            and projected.model.reasoning
+        ):
+            return projected.without_reasoning()
+        return projected
+
     def get_context_payloads(self) -> List[Any]:
-        return [projected for _, projected in self._select_context_entries()]
+        return [self._turn_view(entry, projected) for entry, projected in self._select_context_entries()]
 
     def _collect_summary_candidates(self) -> tuple[List[Any], List[str]]:
         if not self.history or self.summary_token_threshold <= 0:
@@ -317,6 +424,8 @@ class HistoryHandlerModel(Model):
         candidates: List[Any] = []
         candidate_entry_ids: List[str] = []
         for entry, distance in zip(entries_chronological, distances):
+            if _lives_for_turn(entry.payload):
+                continue
             if distance >= self.summary_token_threshold and not entry.summarized:
                 candidates.append(entry.payload)
                 candidate_entry_ids.append(entry.entry_id)
@@ -382,3 +491,11 @@ class HistoryHandlerModel(Model):
 
     def get_context_entries_for_view(self) -> List[HistoryEntry]:
         return [entry for entry, _ in self._select_context_entries()]
+
+
+def _is_user_message(payload: Any) -> bool:
+    return isinstance(payload, MessagePayload) and payload.model.role == "user"
+
+
+def _lives_for_turn(payload: Any) -> bool:
+    return isinstance(payload, MessagePayload) and payload.model.lifetime == "turn"

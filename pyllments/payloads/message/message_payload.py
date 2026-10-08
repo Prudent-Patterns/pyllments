@@ -16,6 +16,21 @@ class MessagePayload(Payload):
         super().__init__(**params)
         self.model = MessageModel(**params)
 
+    def without_reasoning(self) -> MessagePayload:
+        """A finished copy of this message with no reasoning: how an earlier turn is shown."""
+        model = self.model
+        return MessagePayload(
+            role=model.role,
+            content=model.content,
+            tool_calls=[dict(call) for call in model.tool_calls],
+            tool_call_id=model.tool_call_id,
+            tool_name=model.tool_name,
+            timestamp=model.timestamp,
+            usage=model.usage,
+            lifetime=model.lifetime,
+            mode='atomic',
+        )
+
     @property
     def finished(self) -> bool:
         """A streamed reply read to its end, or an atomic message with nothing left to await."""

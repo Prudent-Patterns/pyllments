@@ -29,6 +29,12 @@ class HistoryHandlerElement(Element):
     """
     Canonical timeline manager: raw ledger, tiered projection, summarization candidates.
 
+    A user message starts a turn. A message whose ``lifetime`` is ``"turn"`` (the
+    gateway's notice) stays where it arrived while its turn runs and leaves when
+    the next one starts; it is never stored. A reply's ``reasoning`` lives for its
+    turn too: the projection shows earlier turns as copies without it. Nothing a
+    turn has already shown the model changes while that turn runs.
+
     Ports
     -----
     payload_input : ingest without emission

@@ -108,8 +108,8 @@ class ChatGatewayModel(Model):
     turn_notice_template = param.String(
         default=DEFAULT_TURN_NOTICE,
         doc=(
-            "Jinja2 for the system message emitted on ``turn_notice_output`` before "
-            "every round. Variables: ``round`` (the reply about to be made, 1-based), "
+            "Jinja2 for the system message emitted on ``turn_notice_output`` as the "
+            "last arrival of every round. Variables: ``round`` (the reply about to be made, 1-based), "
             "``max_rounds``, ``failures``, ``max_failures``, ``tools_allowed`` "
             "(False when this reply is made without tools), plus the ``facts`` "
             "given at submit time, such as today's date."

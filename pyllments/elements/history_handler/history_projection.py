@@ -36,6 +36,10 @@ class HistoryEntry:
     entry_id: str = ""
     summarized: bool = False
     metadata: dict = field(default_factory=dict)
+    # The turn it arrived in; a user message starts the next one.
+    turn: int = 0
+    # Arrival order, assigned by the ledger; the window's fixed start points at one.
+    seq: int = 0
 
 
 @dataclass

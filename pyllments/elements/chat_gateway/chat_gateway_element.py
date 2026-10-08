@@ -76,12 +76,16 @@ class ChatGatewayElement(Element):
         end, or just before the results of the tools it called go out, whichever
         comes first. Wire ledgers such as HistoryHandler from here.
     turn_notice_output : out
-        A system ``MessagePayload`` stating where the turn stands, emitted before
-        every round: before the user message, and before each round's results.
-        Wire it as the last item of a context builder's order so it is the
-        suffix of the request and the cached prefix never changes. Words come
-        from ``turn_notice_template``; ``submit_message_async(facts=...)`` adds
-        application facts such as the date.
+        A system ``MessagePayload`` stating where the turn stands, finished, with
+        ``lifetime="turn"``, emitted once per round as its last arrival: after the
+        user message, and after each round's results. Wire it into the ledger's
+        ``HistoryHandler.payload_input`` first, so it stays in place for the rest
+        of the turn and leaves with it, then make it the context builder's
+        trigger, last in its order. Each request is then the previous one plus
+        what was appended, which keeps the provider's prompt cache and the
+        turn's reasoning valid.
+        Words come from ``turn_notice_template``;
+        ``submit_message_async(facts=...)`` adds application facts such as the date.
     request_options_output : out
         ``StructuredPayload`` for ``LLMChatElement.request_options_input``: sent
         just before a round's results when the next reply must be made without
@@ -150,7 +154,9 @@ class ChatGatewayElement(Element):
 
     async def _emit_turn_notice(self, turn_id: str) -> None:
         """Tell the model where the turn stands before its next reply."""
-        notice = MessagePayload(content=self.model.render_turn_notice(turn_id), role="system")
+        notice = MessagePayload(
+            content=self.model.render_turn_notice(turn_id), role="system", lifetime="turn"
+        )
         await self.ports.output["turn_notice_output"].stage_emit(payload=notice)
 
     def _assistant_message_output_setup(self):
@@ -385,8 +391,9 @@ class ChatGatewayElement(Element):
                     await self.ports.output["request_options_output"].stage_emit(
                         payload={"tool_choice": "none"}
                     )
-                await self._emit_turn_notice(turn_id)
             await self.ports.output["tool_result_output"].stage_emit(payload=payload)
+            if turn_id:
+                await self._emit_turn_notice(turn_id)
 
     async def _sync_pending_state(
         self,
@@ -670,8 +677,8 @@ class ChatGatewayElement(Element):
             user_message,
             turn_id,
         )
-        await self._emit_turn_notice(turn_id)
         await self.ports.output["message_output"].stage_emit(payload=user_message)
+        await self._emit_turn_notice(turn_id)
         return TurnHandle(turn_id=turn_id, user_message=user_message, gateway=self)
 
     def submit_message(
@@ -716,8 +723,8 @@ class ChatGatewayElement(Element):
                 user_message,
                 turn_id,
             )
-            await self._emit_turn_notice(turn_id)
             await self.ports.output["message_output"].stage_emit(payload=user_message)
+            await self._emit_turn_notice(turn_id)
 
         schedule_task(_emit())
         return TurnHandle(turn_id=turn_id, user_message=user_message, gateway=self)
