@@ -102,6 +102,12 @@ def _completion_from_binding(payload: Any) -> dict[str, Any]:
         tool_calls = _native_tool_calls(plain.get("tool_calls"))
     elif isinstance(plain, str):
         text = plain
+    if not tool_calls:
+        recovered = _tool_call_written_as_text(text)
+        if recovered is not None:
+            # A Workers AI model that could not emit a call wrote it as words; the
+            # words were never an answer, so they become the call they describe.
+            tool_calls, text = _native_tool_calls([recovered]), ""
     return {
         "choices": [
             {
@@ -126,6 +132,23 @@ def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
             entry["content"] = ""
         native.append(entry)
     return native
+
+
+def _tool_call_written_as_text(text: str) -> dict[str, Any] | None:
+    """``{"name": ..., "parameters"|"arguments": {...}}`` as the whole reply, or None."""
+    stripped = (text or "").strip()
+    if not stripped.startswith("{") or not stripped.endswith("}"):
+        return None
+    try:
+        data = json.loads(stripped)
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("name"), str):
+        return None
+    arguments = data.get("arguments", data.get("parameters"))
+    if not isinstance(arguments, dict):
+        return None
+    return {"name": data["name"], "arguments": arguments}
 
 
 def _native_tool_calls(raw: Any) -> list[dict[str, Any]]:

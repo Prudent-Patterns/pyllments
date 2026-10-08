@@ -79,3 +79,19 @@ def test_transient_classifier():
     assert not _is_transient(RuntimeError("401 unauthorized"))
     assert not _is_transient(RuntimeError("something else"))
 
+
+def test_a_call_written_as_text_becomes_a_call_and_no_words():
+    completion = _completion_from_binding({
+        "response": '{"name": "search", "parameters": {"query": "walking", "types": "[\\"plan\\"]"}}',
+    })
+    message = completion["choices"][0]["message"]
+    assert message["content"] == ""
+    assert message["tool_calls"][0]["function"]["name"] == "search"
+    assert json.loads(message["tool_calls"][0]["function"]["arguments"])["query"] == "walking"
+
+
+def test_ordinary_json_in_a_reply_is_left_alone():
+    completion = _completion_from_binding({"response": '{"answer": "yes", "count": 2}'})
+    assert completion["choices"][0]["message"]["tool_calls"] == []
+    assert completion["choices"][0]["message"]["content"].startswith("{")
+
