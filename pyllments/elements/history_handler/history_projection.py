@@ -7,6 +7,7 @@ per-payload-type projector callables without mutating stored originals.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
@@ -35,6 +36,10 @@ class HistoryEntry:
     entry_id: str = ""
     summarized: bool = False
     metadata: dict = field(default_factory=dict)
+    # The turn it arrived in; a user message starts the next one.
+    turn: int = 0
+    # Arrival order, assigned by the ledger; the window's fixed start points at one.
+    seq: int = 0
 
 
 @dataclass
@@ -123,13 +128,17 @@ def project_payload(
 
 
 def payload_token_count(payload: Any, tokenizer_model: str) -> int:
-    """Estimate tokens for a payload's string content."""
+    """Estimate tokens for what the model reads of a payload."""
     if isinstance(payload, MessagePayload):
-        return get_token_len(payload.model.content or "", tokenizer_model)
+        text = payload.model.content or ""
+        if payload.model.tool_calls:
+            text += json.dumps(payload.model.tool_calls)
+        return get_token_len(text, tokenizer_model)
     if isinstance(payload, ToolUsePayload):
         if not payload.model.tool_calls:
             return 0
-        return get_token_len(payload.model.content or "", tokenizer_model)
+        text = "\n".join(message.model.content or "" for message in payload.to_messages())
+        return get_token_len(text, tokenizer_model)
     if isinstance(payload, StructuredPayload):
         data = payload.model.data or {}
         if data.get("type") == SUMMARY_ARTIFACT_TYPE:

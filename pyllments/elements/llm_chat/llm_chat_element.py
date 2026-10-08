@@ -3,11 +3,14 @@ from __future__ import annotations
 from typing import Literal, Union, Optional, List, TYPE_CHECKING, cast
 
 import param
+from loguru import logger
 from pyllments.base.element_base import Element
 from pyllments.base.component_base import Component
 from pyllments.payloads import MessagePayload, ToolUsePayload, StructuredPayload
 from pyllments.elements.llm_chat.mock_chat_model import MockChatModel
+from pyllments.elements.llm_chat.model_routing import route_model
 from pyllments.elements.llm_chat.proposed_tool_use import proposed_tool_use_from_message
+from pyllments.elements.llm_chat.request_check import RequestTracker
 from pyllments.runtime.scheduler import schedule_task
 
 if TYPE_CHECKING:
@@ -18,9 +21,18 @@ class LLMChatElement(Element):
     """Responsible for using LLMs to respond to messages and sets of messages"""
 
     backend = param.Selector(
-        objects=['mock', 'openrouter', 'litellm', 'cloudflare'],
+        objects=['mock', 'openrouter', 'litellm', 'cloudflare', 'anthropic', 'openai', 'auto'],
         default='openrouter',
-        doc="Chat backend model implementation")
+        doc=(
+            "Chat backend model implementation. 'auto' picks it from model_name's "
+            "provider prefix (anthropic/, openai/, @cf/, cloudflare/); see set_model."
+        ))
+    provider_params = param.Dict(
+        default={},
+        doc=(
+            "With backend='auto': settings per backend, merged in when that backend is "
+            "built, e.g. {'anthropic': {'api_key': ...}, 'cloudflare': {'ai_binding': ...}}."
+        ))
     generate_content_on_emit = param.Boolean(default=False, doc="Whether to generate and populate the full message content before emitting it")
 
     def __init__(self, **params):
@@ -31,13 +43,16 @@ class LLMChatElement(Element):
         self._model_init_params = self._extract_model_params(params)
         self.model = self._create_model(self.backend, self._model_init_params)
         self.param.watch(self._on_backend_change, 'backend')
+        self._next_request_options: dict | None = None
+        self._requests = RequestTracker()
         self._message_output_setup()
         self._tool_use_output_setup()
         self._messages_emit_input_setup()
         self._tools_input_setup()
+        self._request_options_input_setup()
 
     def _extract_model_params(self, params: dict) -> dict:
-        element_param_names = {'backend', 'generate_content_on_emit'}
+        element_param_names = {'backend', 'generate_content_on_emit', 'provider_params'}
         return {
             key: value
             for key, value in params.items()
@@ -68,6 +83,14 @@ class LLMChatElement(Element):
     def _create_model(self, backend: str, model_params: dict):
         # Import HTTP backends only when selected so Worker mock mode can boot
         # without litellm/openrouter wasm wheels.
+        if backend == 'auto':
+            routed, model_name = route_model(model_params.get('model_name') or '')
+            routed_params = {
+                **model_params,
+                **(self.provider_params or {}).get(routed, {}),
+                'model_name': model_name,
+            }
+            return self._create_model(routed, routed_params)
         if backend == 'mock':
             return MockChatModel(**self._filter_model_params(MockChatModel, model_params))
         if backend == 'openrouter':
@@ -85,7 +108,29 @@ class LLMChatElement(Element):
             return CloudflareAIGatewayChatModel(
                 **self._filter_model_params(CloudflareAIGatewayChatModel, model_params)
             )
+        if backend == 'anthropic':
+            from pyllments.elements.llm_chat.anthropic_chat_model import AnthropicChatModel
+            return AnthropicChatModel(**self._filter_model_params(AnthropicChatModel, model_params))
+        if backend == 'openai':
+            from pyllments.elements.llm_chat.openai_chat_model import OpenAIChatModel
+            return OpenAIChatModel(**self._filter_model_params(OpenAIChatModel, model_params))
         raise ValueError(f"Unsupported LLM backend: {backend}")
+
+    def set_model(self, model_name: str) -> None:
+        """
+        Switch to another ``provider/model`` (backend='auto'); the tools carry over.
+
+        Switch between turns: the history then holds no reasoning, and only the
+        prompt cache starts over, since caches belong to one model.
+        """
+        if self.backend != 'auto':
+            raise ValueError("set_model needs backend='auto'; set backend to switch otherwise")
+        tools = getattr(self.model, 'tools', None)
+        self._model_init_params = {**self._model_init_params, 'model_name': model_name}
+        self.model = self._create_model('auto', self._model_init_params)
+        if tools:
+            self.model.tools = tools
+        self.model_selector_view = None
 
     def _on_backend_change(self, event):
         replacement_params = dict(self._model_init_params)
@@ -106,11 +151,12 @@ class LLMChatElement(Element):
         self.ports.add_output(name='tool_use_output', pack_payload_callback=pack)
 
     async def _emit_proposed_tool_use(self, response: MessagePayload) -> None:
-        """Emit tool_use_output only after the reply exists and only if it called tools.
+        """Emit tool_use_output once the reply is finished, if it called tools.
 
-        Stream mode must not wait here on the caller's stack: the gateway consumes
-        the stream after this input returns. Atomic mode has no other consumer, so
-        it is finished before we look for tool calls.
+        This always runs after the reply's own delivery has returned, in both
+        modes. A tool round is a new arrival in the graph, never something nested
+        inside the delivery of the reply that asked for it: the history handler
+        and the context builder both process one arrival at a time.
         """
         model = response.model
         if model.mode == 'atomic':
@@ -140,20 +186,63 @@ class LLMChatElement(Element):
                 payloads = payload
 
             # Directly generate and emit response from all incoming payloads
-            response = self.model.generate_response(payloads)
+            response = self._generate_with_options(payloads)
             if self.generate_content_on_emit:
                 # Populate the message content before emitting
                 await response.model.aget_message()
             await self.ports.output['message_output'].stage_emit(message_payload=response)
-            if response.model.mode == 'stream':
+            self.ports.output['tool_use_output'].track_task(
                 schedule_task(self._emit_proposed_tool_use(response))
-            else:
-                await self._emit_proposed_tool_use(response)
+            )
 
         self.ports.add_input(
             name='messages_emit_input',
             unpack_payload_callback=unpack,
             payload_type=Union[MessagePayload, List[Union[MessagePayload, ToolUsePayload]]]
+        )
+
+    def _generate_with_options(self, payloads):
+        """Call the backend, with any one-shot request options merged in for this call only.
+
+        The backend builds its request inside ``generate_response``, so a
+        temporary ``model_args`` is enough; the options never reach a later
+        call, and the tool list and prompt are untouched.
+        """
+        options = self._next_request_options
+        self._next_request_options = None
+        base = dict(getattr(self.model, 'model_args', None) or {})
+        report = self._requests.check(payloads, {
+            'model': (type(self.model).__name__, getattr(self.model, 'model_name', None)),
+            'tools': getattr(self.model, 'tools', None),
+            'options': {**base, **(options or {})},
+        })
+        if not options:
+            response = self.model.generate_response(payloads)
+        else:
+            self.model.model_args = {**base, **options}
+            try:
+                response = self.model.generate_response(payloads)
+            finally:
+                self.model.model_args = base
+        response.model.request_check = report
+        if report['same_turn'] and not report['appended']:
+            logger.warning(
+                "A request changed message {} of the last one within a turn: the prompt "
+                "cache misses from there, and returned reasoning may be dropped",
+                report['changed_at'],
+            )
+        return response
+
+    def _request_options_input_setup(self):
+        async def unpack(payload: StructuredPayload):
+            """Options for the next request only, e.g. ``{"tool_choice": "none"}``."""
+            data = payload.model.data
+            self._next_request_options = dict(data) if isinstance(data, dict) else None
+
+        self.ports.add_input(
+            name='request_options_input',
+            unpack_payload_callback=unpack,
+            payload_type=StructuredPayload,
         )
 
     def _tools_input_setup(self):

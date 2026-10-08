@@ -14,6 +14,8 @@ from .tool_use_model import ToolUseModel
 if TYPE_CHECKING:
     import panel as pn
 
+    from pyllments.payloads.message import MessagePayload
+
 __all__ = ["ToolUsePayload", "ToolUseExecutorNotBoundError"]
 
 _EXECUTOR_REGISTRY: weakref.WeakValueDictionary[str, ToolUseExecutor] = (
@@ -106,6 +108,31 @@ class ToolUsePayload(Payload):
             return False
         self.bind_executor(executor)
         return True
+
+    def to_messages(self) -> list[MessagePayload]:
+        """
+        The messages a model reads for this payload.
+
+        When every finished record carries the provider's ``tool_call_id``, each
+        becomes one ``role: tool`` message answering that call. Records that
+        came without ids (a structured request, a hand-built payload) cannot be
+        paired, so the whole payload renders as one system message from the
+        template, as it always has.
+        """
+        from pyllments.payloads.message import MessagePayload
+        from pyllments.payloads.tool_use.tool_messages import finished_records, tool_result_messages
+
+        finished = finished_records(self)
+        if not finished:
+            return []
+        if all(record.get("tool_call_id") for record in finished):
+            return tool_result_messages(self)
+        return [MessagePayload(role="system", content=self.model.content, timestamp=self.model.timestamp)]
+
+    @property
+    def finished(self) -> bool:
+        """Every record is terminal: succeeded, failed, denied or cancelled."""
+        return bool(self.model.tool_calls) and self.model.completed
 
     @property
     def is_bound(self) -> bool:

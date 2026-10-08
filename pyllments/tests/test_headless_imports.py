@@ -14,16 +14,20 @@ from pyllments.elements.chat_gateway import ChatGatewayElement
 from pyllments.elements.context_builder import ContextBuilderElement
 from pyllments.elements.history_handler import HistoryHandlerElement
 from pyllments.elements.llm_chat import LLMChatElement
+from pyllments.elements.tool_use import ToolUseElement
 from pyllments.payloads.message import MessagePayload
+from pyllments.payloads.tool_use import ToolUsePayload
 
-forbidden = {"panel", "litellm", "openrouter"}
+forbidden = {"panel", "litellm", "openrouter", "mcp", "pydantic"}
 loaded = forbidden & set(sys.modules)
 assert not loaded, loaded
 assert ChatGatewayElement is not None
 assert ContextBuilderElement is not None
 assert HistoryHandlerElement is not None
 assert LLMChatElement is not None
+assert ToolUseElement is not None
 assert MessagePayload is not None
+assert ToolUsePayload is not None
 """
 
 _ELEMENT_IMPORT_SKIPS_DOTENV = """

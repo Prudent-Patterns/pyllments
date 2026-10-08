@@ -153,6 +153,20 @@ class Port(param.Parameterized):
                  return False
 
 
+class ReentrantDeliveryError(RuntimeError):
+    """A payload arrived at a port from inside that port's own processing."""
+
+
+def _raise_if_reentrant(port, lock: asyncio.Lock, holder: asyncio.Task | None, kind: str) -> None:
+    current = asyncio.current_task()
+    if current is not None and lock.locked() and holder is current:
+        raise ReentrantDeliveryError(
+            f"{kind} port '{port.name}' received a payload from inside its own processing. "
+            "A cycle must come back through a different port (one door per source), or the "
+            "element that closes it must emit after its current delivery, not inside it."
+        )
+
+
 class InputPort(Port):
     """
     Asynchronous InputPort that receives payloads and processes them.
@@ -181,8 +195,11 @@ class InputPort(Port):
         # Cache for validated output ports (object identity, not hash/equality)
         self._validated_output_ports = []
         
-        # Sequential processing lock
+        # Sequential processing lock, and the task holding it. Delivery is direct,
+        # so an arrival from inside this port's own processing can only come
+        # from a cycle wired through one port; that is reported, not waited on.
         self._processing_lock = asyncio.Lock()
+        self._processing_task: asyncio.Task | None = None
         
         # Connections tracking
         self.output_ports = []
@@ -237,8 +254,11 @@ class InputPort(Port):
         # Log reception 
         log_receive(self, payload)
         
+        _raise_if_reentrant(self, self._processing_lock, self._processing_task, "input")
+
         # Process sequentially
         async with self._processing_lock:
+            self._processing_task = asyncio.current_task()
             try:
                 await self._fire_hook(
                     "received",
@@ -261,7 +281,9 @@ class InputPort(Port):
                     error=exc,
                 )
                 raise
-    
+            finally:
+                self._processing_task = None
+
     async def _validate_payload(self, payload) -> bool:
         """
         Validate payload against the expected type, safely handling parameterized generics.
@@ -402,6 +424,7 @@ class OutputPort(Port):
         super().__init__(containing_element=containing_element, hooks=hooks, **params)
         self.readiness_check = readiness_check  # Optional coroutine to await before emit
         self._emit_lock = asyncio.Lock()
+        self._emit_task: asyncio.Task | None = None
         self._scheduled_emit_tasks: set[asyncio.Task] = set()
         self._latched_payload = None
         self.input_ports = []
@@ -639,8 +662,11 @@ class OutputPort(Port):
                 f"Cannot emit from {self.name}: missing required items {missing_items}"
             )
 
+        _raise_if_reentrant(self, self._emit_lock, self._emit_task, "output")
+
         payload = None
         async with self._emit_lock:
+            self._emit_task = asyncio.current_task()
             try:
                 if self.readiness_check:
                     await self.readiness_check()
@@ -655,22 +681,26 @@ class OutputPort(Port):
                 await self._fire_hook("error", payload=payload, error=exc)
                 raise
             finally:
+                self._emit_task = None
                 self.emit_ready = False
                 for item in self.required_items.values():
                     item["value"] = None
 
         return payload
     
+    def track_task(self, task: asyncio.Task) -> asyncio.Task:
+        """Count a deferred emission task as this port's work, so ``drain()`` waits for it."""
+        self._scheduled_emit_tasks.add(task)
+        task.add_done_callback(self._scheduled_emit_tasks.discard)
+        return task
+
     def schedule_stage_emit(self, **kwargs) -> asyncio.Task:
         """
         Schedule ``stage_emit`` without blocking the caller.
 
         Fire-and-forget emissions are tracked so ``drain()`` can wait for them.
         """
-        task = schedule_task(self.stage_emit(**kwargs))
-        self._scheduled_emit_tasks.add(task)
-        task.add_done_callback(self._scheduled_emit_tasks.discard)
-        return task
+        return self.track_task(schedule_task(self.stage_emit(**kwargs)))
 
     async def stage_emit(self, **kwargs):
         """
@@ -732,9 +762,11 @@ class OutputPort(Port):
             pass
         while self._scheduled_emit_tasks:
             pending = list(self._scheduled_emit_tasks)
-            if not pending:
-                break
             await asyncio.gather(*pending, return_exceptions=True)
+            # Gathering tasks that are already done returns without a loop
+            # iteration, so their done-callbacks have not run yet; drop them
+            # here or this loop spins. Tasks they spawned stay for the next pass.
+            self._scheduled_emit_tasks.difference_update(pending)
 
     async def stage_emit_to(self, input_port, **kwargs):
         """

@@ -1,4 +1,4 @@
-from .history_handler_element import HistoryHandlerElement
+from .history_handler_element import HistoryHandlerElement, UnfinishedPayloadError
 from .history_handler_model import HistoryHandlerModel
 from .history_projection import (
     HistoryEntry,

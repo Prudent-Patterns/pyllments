@@ -199,3 +199,20 @@ def test_persisted_summary_payload_reloads():
             assert model2.history[0].payload.model.data["content"] == "stored summary"
 
         asyncio.run(_run())
+
+
+def test_tool_fields_survive_the_store():
+    assistant = MessagePayload(
+        role="assistant",
+        content="",
+        timestamp=1.0,
+        tool_calls=[{"id": "call_1", "type": "function",
+                     "function": {"name": "functions_lookup", "arguments": "{}"}}],
+    )
+    answer = MessagePayload(role="tool", content="found", timestamp=2.0,
+                            tool_call_id="call_1", tool_name="functions_lookup")
+    restored = [record_to_payload(payload_to_record(new_entry_id(), p, 3)) for p in (assistant, answer)]
+    assert restored[0].model.tool_calls[0]["id"] == "call_1"
+    assert restored[1].model.tool_call_id == "call_1"
+    assert restored[1].model.tool_name == "functions_lookup"
+    assert restored[1].model.role == "tool"

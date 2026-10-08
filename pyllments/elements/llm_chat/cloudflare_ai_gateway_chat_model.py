@@ -1,59 +1,17 @@
-import asyncio
-import codecs
 import json
 import os
-import urllib.error
-import urllib.request
-from typing import Any, AsyncIterator
+from typing import Any
 
 import param
 from dotenv import load_dotenv
 
-from pyllments.base.model_base import Model
+from pyllments.elements.llm_chat.http_chat_model import (
+    HttpChatModel,
+    is_transient as _is_transient,  # noqa: F401  (kept importable here for callers)
+    wrap_json as _wrap_json,
+)
 from pyllments.payloads.message import MessagePayload
-
-_DONE = object()
-
-
-class _AttrMap:
-    """Attribute access over a JSON object so MessageModel can read OpenAI-shaped chunks."""
-
-    __slots__ = ("_data",)
-
-    def __init__(self, data: dict[str, Any]):
-        object.__setattr__(self, "_data", data)
-
-    def __getattr__(self, name: str):
-        if name.startswith("_"):
-            raise AttributeError(name)
-        return _wrap_json(self._data.get(name))
-
-    def model_dump(self) -> dict[str, Any]:
-        return self._data
-
-
-def _wrap_json(value: Any):
-    if isinstance(value, dict):
-        return _AttrMap(value)
-    if isinstance(value, list):
-        return [_wrap_json(item) for item in value]
-    return value
-
-
-def _parse_sse_line(line: str):
-    stripped = line.strip()
-    if not stripped or stripped.startswith(":"):
-        return None
-    if not stripped.startswith("data:"):
-        return None
-    data = stripped[5:].strip()
-    if data == "[DONE]":
-        return _DONE
-    try:
-        parsed = json.loads(data)
-    except json.JSONDecodeError:
-        return None
-    return parsed if isinstance(parsed, dict) else None
+from pyllments.payloads.message.chat_completions import to_chat_completions
 
 
 def _to_plain(value: Any) -> Any:
@@ -92,38 +50,88 @@ def _completion_from_binding(payload: Any) -> dict[str, Any]:
             return inner
         plain = inner
     text = ""
+    tool_calls: list[dict[str, Any]] = []
     if isinstance(plain, dict):
         raw = plain.get("response")
         if raw is None:
             raw = plain.get("content")
         text = raw if isinstance(raw, str) else ""
+        tool_calls = _native_tool_calls(plain.get("tool_calls"))
     elif isinstance(plain, str):
         text = plain
+    if not tool_calls:
+        recovered = _tool_call_written_as_text(text)
+        if recovered is not None:
+            # A Workers AI model that could not emit a call wrote it as words; the
+            # words were never an answer, so they become the call they describe.
+            tool_calls, text = _native_tool_calls([recovered]), ""
     return {
         "choices": [
             {
-                "message": {"role": "assistant", "content": text, "tool_calls": []},
-                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": text, "tool_calls": tool_calls},
+                "finish_reason": "tool_calls" if tool_calls else "stop",
             }
         ]
     }
 
 
-def _js_bytes(value: Any) -> bytes:
-    if isinstance(value, (bytes, bytearray, memoryview)):
-        return bytes(value)
-    if hasattr(value, "to_py"):
-        converted = value.to_py()
-        if isinstance(converted, (bytes, bytearray, memoryview)):
-            return bytes(converted)
-        try:
-            return bytes(converted)
-        except Exception:
-            pass
-    return bytes(value)
+def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Chat-completions messages as the Workers AI binding validates them.
+
+    The binding takes OpenAI's shape for tool calls and tool results, but its
+    schema has no null: an assistant message that only called tools carries an
+    empty string instead.
+    """
+    native: list[dict[str, Any]] = []
+    for message in messages:
+        entry = dict(message)
+        if entry.get("content") is None:
+            entry["content"] = ""
+        native.append(entry)
+    return native
 
 
-class CloudflareAIGatewayChatModel(Model):
+def _tool_call_written_as_text(text: str) -> dict[str, Any] | None:
+    """``{"name": ..., "parameters"|"arguments": {...}}`` as the whole reply, or None."""
+    stripped = (text or "").strip()
+    if not stripped.startswith("{") or not stripped.endswith("}"):
+        return None
+    try:
+        data = json.loads(stripped)
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("name"), str):
+        return None
+    arguments = data.get("arguments", data.get("parameters"))
+    if not isinstance(arguments, dict):
+        return None
+    return {"name": data["name"], "arguments": arguments}
+
+
+def _native_tool_calls(raw: Any) -> list[dict[str, Any]]:
+    """Workers AI's ``{name, arguments}`` calls in the chat-completions shape, with ids."""
+    calls: list[dict[str, Any]] = []
+    for index, item in enumerate(raw or []):
+        if not isinstance(item, dict):
+            continue
+        function = item.get("function") if isinstance(item.get("function"), dict) else item
+        name = function.get("name")
+        if not name:
+            continue
+        arguments = function.get("arguments")
+        if not isinstance(arguments, str):
+            arguments = json.dumps(arguments if arguments is not None else {})
+        calls.append(
+            {
+                "id": item.get("id") or f"call_{index}",
+                "type": "function",
+                "function": {"name": name, "arguments": arguments},
+            }
+        )
+    return calls
+
+
+class CloudflareAIGatewayChatModel(HttpChatModel):
     """Chat model that calls Cloudflare AI Gateway via the REST completions API."""
 
     model_name = param.String(
@@ -178,6 +186,7 @@ class CloudflareAIGatewayChatModel(Model):
             "through the logged-in Wrangler session instead of a REST API token."
         ),
     )
+    error_label = "Cloudflare AI Gateway request failed"
 
     MAJOR_PROVIDER_KEYS = ["openai", "anthropic", "google", "xai", "workers-ai"]
     PROVIDER_KEY_TO_LABEL = {
@@ -196,14 +205,8 @@ class CloudflareAIGatewayChatModel(Model):
         "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     ]
 
-    def _messages_to_completions(self, messages: list[MessagePayload]) -> list[dict[str, str]]:
-        return [
-            {
-                "role": msg.model.role,
-                "content": msg.model.content,
-            }
-            for msg in messages
-        ]
+    def _messages_to_completions(self, messages: list[MessagePayload]) -> list[dict[str, Any]]:
+        return to_chat_completions(messages)
 
     @classmethod
     def normalize_model_name(cls, model_name: str) -> str:
@@ -339,10 +342,7 @@ class CloudflareAIGatewayChatModel(Model):
         return body
 
     def _raise_gateway_error(self, payload: Any, status: int | None = None) -> None:
-        prefix = "Cloudflare AI Gateway request failed"
-        if status is not None:
-            prefix = f"{prefix} ({status})"
-        raise ValueError(f"{prefix}: {payload}")
+        self._raise_http_error(payload, status)
 
     def _unwrap_completion(self, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
@@ -356,108 +356,11 @@ class CloudflareAIGatewayChatModel(Model):
             return result
         self._raise_gateway_error(payload)
 
-    async def _iter_response_lines(self, response) -> AsyncIterator[str]:
-        body = getattr(response, "body", None)
-        get_reader = getattr(body, "getReader", None) if body is not None else None
-        if get_reader is None:
-            text = await response.text()
-            for line in text.splitlines():
-                yield line
-            return
-
-        reader = get_reader()
-        decoder = codecs.getincrementaldecoder("utf-8")()
-        buffer = ""
-        try:
-            while True:
-                chunk = await reader.read()
-                done = bool(getattr(chunk, "done", False))
-                value = getattr(chunk, "value", None)
-                if value is not None:
-                    buffer += decoder.decode(_js_bytes(value), final=False)
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    yield line.rstrip("\r")
-                if done:
-                    buffer += decoder.decode(b"", final=True)
-                    if buffer:
-                        yield buffer.rstrip("\r")
-                    break
-        finally:
-            cancel = getattr(reader, "cancel", None)
-            if cancel is not None:
-                try:
-                    await cancel()
-                except Exception:
-                    pass
-
-    async def _iter_sse_payloads(self, lines: AsyncIterator[str]) -> AsyncIterator[dict[str, Any]]:
-        async for line in lines:
-            parsed = _parse_sse_line(line)
-            if parsed is None:
-                continue
-            if parsed is _DONE:
-                break
-            yield parsed
-
-    async def _workers_http_post(self, fetch, url: str, headers: dict[str, str], body: dict[str, Any], stream: bool):
-        response = await fetch(
-            url,
-            method="POST",
-            headers=headers,
-            body=json.dumps(body),
-        )
-        status = int(getattr(response, "status", 0) or 0)
-        if status >= 400:
-            text = await response.text()
-            try:
-                payload = json.loads(text) if text else text
-            except json.JSONDecodeError:
-                payload = text
-            self._raise_gateway_error(payload, status)
-        if stream:
-            return self._iter_sse_payloads(self._iter_response_lines(response))
-        text = await response.text()
-        return json.loads(text) if text else {}
-
-    async def _stdlib_http_post(self, url: str, headers: dict[str, str], body: dict[str, Any], stream: bool):
-        def _call() -> tuple[int, str]:
-            request = urllib.request.Request(
-                url,
-                data=json.dumps(body).encode("utf-8"),
-                headers=headers,
-                method="POST",
-            )
-            try:
-                with urllib.request.urlopen(request) as response:
-                    return int(response.status), response.read().decode("utf-8")
-            except urllib.error.HTTPError as exc:
-                err_body = exc.read().decode("utf-8", errors="replace")
-                raise ValueError(
-                    f"Cloudflare AI Gateway request failed ({exc.code}): {err_body}"
-                ) from exc
-
-        _status, text = await asyncio.to_thread(_call)
-        if stream:
-            async def _lines():
-                for line in text.splitlines():
-                    yield line
-
-            return self._iter_sse_payloads(_lines())
-        return json.loads(text) if text else {}
-
-    async def _http_post(self, url: str, headers: dict[str, str], body: dict[str, Any], *, stream: bool):
-        try:
-            from workers import fetch
-        except ImportError:
-            fetch = None
-        if fetch is not None:
-            return await self._workers_http_post(fetch, url, headers, body, stream)
-        return await self._stdlib_http_post(url, headers, body, stream)
-
     def _binding_inputs(self, body: dict[str, Any]) -> dict[str, Any]:
-        inputs = dict(body)
+        # The binding call crosses into JavaScript; only JSON types survive it.
+        inputs = json.loads(json.dumps(body))
         inputs.pop("model", None)
+        inputs["messages"] = _native_messages(inputs.get("messages") or [])
         # One JSON result. Stream mode below turns that into a single delta.
         # Binding streams are a different shape from the REST SSE parser.
         inputs["stream"] = False
@@ -468,11 +371,13 @@ class CloudflareAIGatewayChatModel(Model):
         if binding is None:
             raise ValueError("Cloudflare AI binding is not set")
         gateway_id = self.gateway_id or os.getenv("CLOUDFLARE_AI_GATEWAY_ID") or "default"
-        result = await binding.run(
-            self.normalize_model_name(self.model_name),
-            self._binding_inputs(body),
-            {"gateway": {"id": gateway_id}},
-        )
+        inputs = self._binding_inputs(body)
+        model_name = self.normalize_model_name(self.model_name)
+
+        async def attempt():
+            return await binding.run(model_name, inputs, {"gateway": {"id": gateway_id}})
+
+        result = await self._with_transport_retries(attempt)
         return _completion_from_binding(result)
 
     async def _atomic_binding_response(self, body: dict[str, Any]):

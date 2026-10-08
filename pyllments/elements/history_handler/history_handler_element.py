@@ -21,9 +21,19 @@ PayloadInput = Union[
 ]
 
 
+class UnfinishedPayloadError(ValueError):
+    """A live payload reached a ledger that accepts finished payloads only."""
+
+
 class HistoryHandlerElement(Element):
     """
     Canonical timeline manager: raw ledger, tiered projection, summarization candidates.
+
+    A user message starts a turn. A message whose ``lifetime`` is ``"turn"`` (the
+    gateway's notice) stays where it arrived while its turn runs and leaves when
+    the next one starts; it is never stored. A reply's ``reasoning`` lives for its
+    turn too: the projection shows earlier turns as copies without it. Nothing a
+    turn has already shown the model changes while that turn runs.
 
     Ports
     -----
@@ -58,18 +68,22 @@ class HistoryHandlerElement(Element):
 
     @staticmethod
     async def _normalize_payloads(payload: PayloadInput) -> List[Any]:
-        if isinstance(payload, list):
-            items = payload
-        else:
-            items = [payload]
+        """
+        The ledger takes finished payloads only.
+
+        A live payload (a reply still streaming, a tool call not yet run) belongs
+        to an uptake element such as the gateway, which emits the finished form.
+        Accepting it here would persist an empty record and wait on an event that
+        may never come.
+        """
+        items = payload if isinstance(payload, list) else [payload]
         for item in items:
-            model = getattr(item, "model", None)
-            if model is None or not hasattr(model, "await_ready"):
-                continue
-            # Live streams are consumed by TurnHandle; blocking here deadlocks.
-            if getattr(model, "mode", None) == "stream" and not getattr(model, "ready", False):
-                continue
-            await model.await_ready()
+            if not getattr(item, "finished", True):
+                raise UnfinishedPayloadError(
+                    f"HistoryHandler received an unfinished {type(item).__name__}. "
+                    "Wire the ledger from the element that finishes it (for a reply, "
+                    "ChatGatewayElement.assistant_message_output), not from the emitter."
+                )
         return items
 
     @staticmethod

@@ -47,6 +47,8 @@ class ToolUseModel(Model):
     template = param.ClassSelector(default=None, class_=jinja2.Template)
     completed = param.Boolean(default=False, doc="True when all tool calls are terminal")
 
+    strict_params = True
+
     def __init__(self, **params):
         super().__init__(**params)
         now = time.time()

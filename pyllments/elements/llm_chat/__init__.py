@@ -7,6 +7,8 @@ _BACKEND_EXPORTS = {
     "OpenRouterChatModel": ".openrouter_chat_model",
     "LiteLLMChatModel": ".litellm_chat_model",
     "CloudflareAIGatewayChatModel": ".cloudflare_ai_gateway_chat_model",
+    "AnthropicChatModel": ".anthropic_chat_model",
+    "OpenAIChatModel": ".openai_chat_model",
 }
 
 __all__ = ["LLMChatElement", *_BACKEND_EXPORTS]

@@ -24,6 +24,10 @@ The summarization loop intentionally uses `StructuredPayload` rather than
 dedicated summary payload classes. The summary-specific meaning lives in the
 `data["type"]` contract and `source_entry_ids`.
 
+## Turns and lifetimes
+
+A user message starts a turn, which is also how Anthropic and OpenAI count turns. A `MessagePayload` with `lifetime="turn"`, such as the [ChatGatewayElement](../ChatGatewayElement/index.qmd) notice, stays where it arrived while its turn runs and leaves when the next turn starts; it is never stored. A reply's `reasoning` lives for its turn too: the projection shows earlier turns as copies without it, and the ledger's own payloads never change. Nothing the model has seen in a turn changes while that turn runs, so each request only appends to the last.
+
 ## Instantiation
 
 **Arguments:**
@@ -38,6 +42,8 @@ dedicated summary payload classes. The summary-specific meaning lives in the
 <span class="tab">The max number of raw tokens to keep in the history ledger.</span>
 `context_token_limit: int = 16000`<br>
 <span class="tab">The max number of projected tokens to emit on `context_output`.</span>
+`trim_to_fraction: float = None`<br>
+<span class="tab">When set, the window's first message stays fixed and moves only when a user message starts a turn and the window has outgrown `context_token_limit`; then it is cut to this fraction of the limit, opening on a user message. Within a turn the window only grows, so a provider's prompt cache and the turn's reasoning stay valid. Unset, the window slides forward one message at a time.</span>
 `summary_token_threshold: int = 8000`<br>
 <span class="tab">Raw-token distance from the newest entry at which unsummarized entries become eligible for summarization. Set to `0` to disable summary candidates.</span>
 `projection_tiers: dict = None`<br>

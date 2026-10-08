@@ -23,12 +23,26 @@ When running recipes, pass your env file explicitly (for example `pyllments reci
 
 If you need broad provider routing via LiteLLM model registries or custom local endpoints, switch backend to `litellm`. LiteLLM uses its [standard model naming system](https://models.litellm.ai) and API key setup documented [here](https://docs.litellm.ai/docs/set_keys).
 
+##### Anthropic and OpenAI (direct)
+
+`backend='anthropic'` calls Anthropic's Messages API and `backend='openai'` calls OpenAI's Responses API, each over plain HTTP with no SDK (inside a Cloudflare Worker through the Workers `fetch`). Keys come from `api_key` or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`. Both cache prompts automatically: Anthropic through a top-level `cache_control` plus a fixed breakpoint after the leading system messages (`cache='off'` turns that off), OpenAI on its side. The OpenAI request is stateless (`store: false`); `base_url` points it at another host that speaks the Responses API. The Anthropic backend knows where Claude models differ: models before 4.6 get no adaptive thinking, and a forced tool call becomes a normal one on the models that reject it (Sonnet and Opus 5.5 on, Fable and Mythos 5.1 on).
+
+A reply that reasoned keeps it in `MessageModel.reasoning`, in the provider's own opaque form (Anthropic's signed thinking blocks, OpenAI's encrypted reasoning items), and a backend sends back the reasoning that came from its own provider. How long a reply keeps it is the history's business: [HistoryHandlerElement](../HistoryHandlerElement/index.qmd) shows it for its turn only. Every reply also carries `MessageModel.usage` (`input_tokens` for the whole prompt, `cached_input_tokens`, `cache_write_tokens`, `output_tokens`; `cache_share` divides them).
+
+##### One string for provider and model
+
+With `backend='auto'`, `model_name` names both: `anthropic/claude-haiku-5-5`, `openai/gpt-5.5`, `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (Workers AI) or `cloudflare/openai/gpt-5.5` (a third-party model through Cloudflare's AI Gateway). `provider_params` holds each backend's own settings, such as its key, and `set_model('openai/gpt-5.5')` switches between turns with the tools carried over. A cache belongs to one model, so the first request on a new model pays for its prompt once.
+
+##### Did the request only append?
+
+Each reply's `MessageModel.request_check` says whether its request was the previous one plus appended messages, which every provider's prompt cache needs: `appended`, `changed_at` (the first message that differs), `same_turn`, `settings_changed` (model, tools or request options). A change within a turn is logged as a warning: it costs a cache miss and, on Anthropic, the turn's reasoning.
+
 ##### Local
 Local model endpoints (`ollama`, `vLLM`, etc.) are supported through the `litellm` backend by supplying `model_name` and `base_url`. See [LiteLLM local provider docs](https://docs.litellm.ai/docs/providers/ollama).
 
 **Arguments:**
 
-`backend`: Literal['openrouter', 'litellm'] = 'openrouter'<br>
+`backend`: Literal['mock', 'openrouter', 'litellm', 'cloudflare', 'anthropic', 'openai', 'auto'] = 'openrouter'<br>
 <span class="tab">Selects which concrete chat backend model implementation is used under the hood.</span>
 `model_name`: str = 'openai/gpt-4o-mini'<br>
 <span class="tab">The name of the model to use for the LLM.</span>

@@ -8,6 +8,7 @@ MessageStreamEventType = Literal[
     "token",
     "tool_call_delta",
     "tool_calls_complete",
+    "tool_results",
     "done",
     "cancelled",
     "error",
@@ -24,5 +25,6 @@ class MessageStreamEvent:
     content_delta: str | None = None
     tool_call_delta: dict | None = None
     tool_calls: list[dict] | None = None
+    tool_results: list[dict] | None = None
     raw: Any | None = None
     error: str | None = None

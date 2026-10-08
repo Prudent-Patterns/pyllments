@@ -27,3 +27,5 @@ Use the ordered-boundary model when working on ports, elements, and recipes.
 - Sync flow callbacks should return emit coroutines; async flow callbacks should `await` emits.
 - Use `latched=True` on state/schema outputs so late connections can receive the latest payload.
 - Use `schedule_task(...)` or `schedule_stage_emit(...)` only for intentional background work.
+- One door per source. A cycle through an element is normal; a cycle back into the port that is still processing is a wiring error, and the runtime raises `ReentrantDeliveryError` naming the port instead of deadlocking. Give each source of traffic its own input port (the history handler's `payload_pre_emit_input`, `payload_emit_input`, `payload_input`).
+- A round that an element's output asks for (an LLM reply's tool calls) is emitted after that output's delivery returns, never inside it; `LLMChatElement` defers `tool_use_output` in both modes and tracks it so `drain()` covers it.

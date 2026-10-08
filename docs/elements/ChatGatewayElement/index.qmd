@@ -109,6 +109,7 @@ Cancelled turns discard or cancel late-arriving assistant messages.
 | `approved_tool_use_output` | `ToolUsePayload` | Deprecated compatibility output. Gateway-controlled flows execute through `ToolUsePayload.execute_approved()` instead. |
 | `denied_tool_use_output` | `ToolUsePayload` | Deprecated compatibility output. Denials finalize on the payload and emit through `tool_result_output` instead. |
 | `tool_events_output` | `StructuredPayload` | Emits `{"tool_calls": list}` when a stream completes with tool calls. |
+| `turn_notice_output` | `MessagePayload` (system, `lifetime="turn"`) | Where the turn stands, from `turn_notice_template`, emitted once per round as its last arrival: after the user message, then after each round's results. Wire it into `HistoryHandlerElement.payload_input` first, then make it the context builder's trigger, last in its order, so each request only appends to the last. |
 | `tool_result_output` | `ToolUsePayload` | Emits one completed tool-use ledger for history/UI/context after `on_tool_result`. Results from superseded owners are not emitted here. |
 
 : {.hover}

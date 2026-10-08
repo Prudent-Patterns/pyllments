@@ -1,16 +1,15 @@
-from __future__ import annotations
+# Annotations stay eager here: the schema port's types are imported inside the
+# method that builds it, so pydantic is not loaded by importing this module.
 
 import asyncio
 import json
 from dataclasses import dataclass
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 import param
-from pydantic import BaseModel, Field, RootModel, create_model
 
 from pyllments.base.element_base import Element
-from pyllments.common.pydantic_models import CleanModel
-from pyllments.payloads import MessagePayload, SchemaPayload, StructuredPayload, ToolUsePayload
+from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from pyllments.runtime.scheduler import schedule_task
 
 from .tool_invocation_context import AbortSignal, ToolCancelled, ToolInvocationContext
@@ -31,9 +30,20 @@ class ToolUseElement(Element):
 
     Owns tool schema aggregation, tool-call normalization, permission-aware routing,
     and execution of approved ToolUsePayload instances.
+
+    Parameters
+    ----------
+    functions : list or dict
+        Plain functions to expose as tools through a FunctionToolAdapter.
+    tools_requiring_permission : list of str
+        Function names the gateway must ask about before running.
+    prefix_names : bool
+        Expose ``add`` as ``functions_add`` (default) or as ``add``.
+    adapters, mcps
+        Other adapters, built or declared.
     """
 
-    _tools_schema = param.ClassSelector(default=None, class_=BaseModel, is_instance=False)
+    _tools_schema = param.Parameter(default=None, doc="Pydantic tool array schema, built on first use")
 
     def __init__(
         self,
@@ -42,6 +52,7 @@ class ToolUseElement(Element):
         mcps=None,
         functions=None,
         tools_requiring_permission=None,
+        prefix_names=True,
         **params,
     ):
         super().__init__(**params)
@@ -50,6 +61,7 @@ class ToolUseElement(Element):
             mcps=mcps,
             functions=functions,
             tools_requiring_permission=tools_requiring_permission,
+            prefix_names=prefix_names,
         )
         self.model = ToolUseModel(adapters=adapter_list, **params)
         self._active_invocations: dict[tuple[int, int], _ActiveInvocation] = {}
@@ -64,9 +76,17 @@ class ToolUseElement(Element):
             pass
 
     async def _emit_latched_schema_outputs(self):
-        """Emit tool schemas when adapter resources are ready."""
+        """Emit tool schemas when adapter resources are ready.
+
+        The pydantic tool-array schema is built only for a connected
+        ``tools_schema_output``: it is the one pydantic-backed port here, and a
+        flow that sends provider tool definitions never needs it.
+        """
         await self.model.await_ready()
-        await self.ports.output["tools_schema_output"].stage_emit(tools_schema=self.tools_schema)
+        if self.ports.output["tools_schema_output"].input_ports:
+            await self.ports.output["tools_schema_output"].stage_emit(
+                tools_schema=self.tools_schema
+            )
         await self.ports.output["tools_output"].stage_emit(
             tools_list=self._provider_tool_definitions()
         )
@@ -275,7 +295,9 @@ class ToolUseElement(Element):
         ]
 
     def _tools_schema_output_setup(self):
-        async def pack(tools_schema: type[BaseModel]) -> SchemaPayload:
+        from pyllments.payloads.schema import SchemaPayload
+
+        async def pack(tools_schema: Any) -> SchemaPayload:
             return SchemaPayload(schema=tools_schema)
 
         self.ports.add_output(
@@ -424,12 +446,18 @@ class ToolUseElement(Element):
         self.ports.add_output(name="tool_result_output", pack_payload_callback=pack)
 
     @property
-    def tools_schema(self) -> BaseModel:
+    def tools_schema(self):
         if not self._tools_schema:
             self._tools_schema = self.create_tools_schema(self.model.tool_specs)
         return self._tools_schema
 
     def create_tools_schema(self, tool_specs: dict):
+        from typing import Union
+
+        from pydantic import RootModel, create_model
+
+        from pyllments.common.pydantic_models import CleanModel
+
         tool_schema_list = []
         for model_tool_name, spec in tool_specs.items():
             tool_schema_list.append(
@@ -449,6 +477,10 @@ class ToolUseElement(Element):
         )
 
     def create_tool_model(self, tool_name, tool_data):
+        from pydantic import Field, create_model
+
+        from pyllments.common.pydantic_models import CleanModel
+
         model_args = {}
         model_args["name"] = (Literal[tool_name], ...)
         if properties := tool_data["parameters"].get("properties"):

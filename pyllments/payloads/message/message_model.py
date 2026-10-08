@@ -9,6 +9,7 @@ import param
 from pyllments.base.model_base import Model
 from pyllments.runtime.loop_registry import LoopRegistry
 from pyllments.payloads.message.stream_events import MessageStreamEvent
+from pyllments.payloads.message.usage import normalize_usage
 # from pyllments.common.tokenizers import get_token_len
 
 
@@ -58,6 +59,66 @@ class MessageModel(Model):
 
     tool_calls = param.List(default=[], item_type=dict, doc="List of tool calls from the model")
 
+    tool_call_id = param.String(
+        default=None,
+        allow_None=True,
+        doc="For role 'tool': the id of the assistant tool call this message answers",
+    )
+
+    tool_name = param.String(
+        default=None,
+        allow_None=True,
+        doc="For role 'tool': the name of the tool that produced the content",
+    )
+
+    usage = param.Dict(
+        default=None,
+        allow_None=True,
+        doc=(
+            "Token usage of this reply, set by the backend as it finishes: input_tokens "
+            "(the whole prompt), cached_input_tokens, cache_write_tokens, output_tokens. "
+            "None when the provider reported none."
+        ),
+    )
+
+    reasoning = param.Dict(
+        default=None,
+        allow_None=True,
+        doc=(
+            "The model's reasoning for this reply, in its provider's own opaque form, "
+            "set by the backend as the reply finishes: {'provider': 'anthropic', "
+            "'content': [...]} (the reply's thinking, text and tool_use blocks in order, "
+            "since Anthropic's signatures depend on position) or {'provider': 'openai', "
+            "'items': [...]} (its output items, reasoning encrypted). Only that provider's "
+            "backend sends it back. It lives for the turn: the history shows earlier "
+            "turns without it. content and tool_calls stay the form everything else reads."
+        ),
+    )
+
+    lifetime = param.Selector(
+        objects=["durable", "turn"],
+        default="durable",
+        doc=(
+            "How long the model should see this message. 'durable' is history. 'turn' "
+            "lasts until the next user message starts a new turn, such as the gateway's "
+            "notice: it stays in place while the turn runs, so each request only appends, "
+            "and is never stored."
+        ),
+    )
+
+    request_check = param.Dict(
+        default=None,
+        allow_None=True,
+        doc=(
+            "Set by LLMChatElement on the reply it requested: whether that request only "
+            "appended to the previous one, which every provider's prompt cache needs. "
+            "{'first_request', 'appended', 'changed_at' (first message index that differs, "
+            "or None), 'same_turn', 'settings_changed' (model, tools or request options)}."
+        ),
+    )
+
+    strict_params = True
+
     def __init__(self, **params):
         super().__init__(**params)
         if params.get('loop', None) is None:
@@ -102,15 +163,25 @@ class MessageModel(Model):
 
     def _apply_tool_call_delta(self, tc_delta) -> dict:
         """Accumulate a tool-call delta and return a snapshot for event emission."""
-        index = tc_delta.index
-        if index >= len(self.tool_calls):
+        index = getattr(tc_delta, 'index', None)
+        delta_id = getattr(tc_delta, 'id', None)
+        if index is None:
+            # A provider that sends whole calls per chunk carries no index:
+            # continue the call with the same id, otherwise start a new one.
+            index = next(
+                (i for i, tc in enumerate(self.tool_calls) if delta_id and tc['id'] == delta_id),
+                len(self.tool_calls),
+            )
+        while index >= len(self.tool_calls):
             self.tool_calls.append({
                 'id': '',
                 'type': 'function',
                 'function': {'name': '', 'arguments': ''},
             })
-        if tc_delta.id:
-            self.tool_calls[index]['id'] += tc_delta.id
+        current_id = self.tool_calls[index]['id']
+        if delta_id and delta_id != current_id:
+            # OpenAI sends the id once; some providers repeat it on every delta.
+            self.tool_calls[index]['id'] = delta_id if not current_id else current_id + delta_id
         if tc_delta.type:
             self.tool_calls[index]['type'] = tc_delta.type
         if tc_delta.function:
@@ -127,6 +198,25 @@ class MessageModel(Model):
                 'arguments': getattr(tc_delta.function, 'arguments', None) if tc_delta.function else None,
             },
         }
+
+    @property
+    def cache_share(self) -> float | None:
+        """Share of the prompt read from the provider's cache, or None without usage."""
+        usage = self.usage or {}
+        total = usage.get('input_tokens') or 0
+        return (usage.get('cached_input_tokens') or 0) / total if total else None
+
+    def _take_reply_extras(self, source) -> None:
+        """Keep the usage and provider record a backend attached to a chunk or response."""
+        usage = normalize_usage(getattr(source, 'usage', None))
+        if usage is not None:
+            self.usage = usage
+        reasoning = getattr(source, 'reasoning', None)
+        dump = getattr(reasoning, 'model_dump', None)
+        reasoning = dump() if callable(dump) else reasoning
+        # Only a backend's provider record; a provider's own 'reasoning' text is not one.
+        if isinstance(reasoning, dict) and reasoning.get('provider'):
+            self.reasoning = reasoning
 
     def _flush_content_buffer(self, buffer: str) -> str:
         """Apply buffered token text to model content when aggregating."""
@@ -181,7 +271,12 @@ class MessageModel(Model):
                         yield MessageStreamEvent(type='cancelled')
                         break
 
-                    delta = chunk.choices[0].delta
+                    self._take_reply_extras(chunk)
+                    choices = getattr(chunk, 'choices', None)
+                    if not choices:
+                        # A closing chunk may carry only usage or the provider record.
+                        continue
+                    delta = choices[0].delta
                     if delta.content:
                         buffer += delta.content
                         yield MessageStreamEvent(
@@ -294,6 +389,7 @@ class MessageModel(Model):
         if self.mode == 'atomic':
             if self.message_coroutine is not None:
                 response = await self.message_coroutine
+                self._take_reply_extras(response)
                 message = response.choices[0].message
                 self.content = message.content or ''
                 if hasattr(message, 'tool_calls') and message.tool_calls:

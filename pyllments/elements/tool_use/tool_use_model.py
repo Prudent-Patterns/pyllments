@@ -1,19 +1,13 @@
 from __future__ import annotations
 
-import asyncio
-import json
-from typing import Any, Literal, Union
+from typing import Any
 
 import param
-from pydantic import BaseModel, Field, RootModel, create_model
 
 from pyllments.base.model_base import Model
-from pyllments.common.pydantic_models import CleanModel
-from pyllments.payloads import ToolUsePayload
 from pyllments.runtime.scheduler import resolve_loop, schedule_task
 
 from .function_tool_adapter import FunctionToolAdapter
-from .mcp_tool_adapter import MCPToolAdapter
 from .tool_adapter import ToolAdapter, ToolSpec
 from .tool_invocation_context import ToolCancelled, ToolInvocationContext
 
@@ -99,6 +93,7 @@ def build_adapters(
     mcps: dict | None = None,
     functions: list | dict | None = None,
     tools_requiring_permission: list[str] | None = None,
+    prefix_names: bool = True,
 ) -> list[ToolAdapter]:
     """Expand convenience params into adapter instances."""
     built: list[ToolAdapter] = list(adapters or [])
@@ -111,6 +106,9 @@ def build_adapters(
     for name in function_specs:
         mcp_specs.pop(name, None)
     if mcp_specs:
+        # The MCP client is a host-only dependency; load it only when asked for.
+        from .mcp_tool_adapter import MCPToolAdapter
+
         built.append(MCPToolAdapter(mcps=mcp_specs))
     for name, spec in function_specs.items():
         built.append(
@@ -125,6 +123,7 @@ def build_adapters(
             FunctionToolAdapter(
                 functions=functions,
                 tools_requiring_permission=tools_requiring_permission,
+                prefix_names=prefix_names,
             )
         )
     return built

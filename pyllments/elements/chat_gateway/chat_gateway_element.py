@@ -58,6 +58,10 @@ class ChatGatewayElement(Element):
     from ``tool_result_output`` so history/context/model wiring does not act on
     stale tool output.
 
+    A turn spans rounds. When a reply calls tools and the finished results come
+    back through this gateway, the next assistant message joins the same turn,
+    and ``TurnHandle.stream()`` carries it all. ``max_tool_rounds`` bounds this.
+
     Ports
     -----
     message_output : out
@@ -65,7 +69,28 @@ class ChatGatewayElement(Element):
         ``submit_message()`` or ``submit_message_async()`` first supersedes prior
         pending/running tool work, then emits the new message.
     assistant_message_input : in
-        Assistant ``MessagePayload`` from ``LLMChatElement``.
+        Assistant ``MessagePayload`` from ``LLMChatElement``, live: a stream not
+        yet read, or an atomic reply not yet awaited. The gateway is its uptake.
+    assistant_message_output : out
+        The same reply, finished, once per round: when it has streamed to its
+        end, or just before the results of the tools it called go out, whichever
+        comes first. Wire ledgers such as HistoryHandler from here.
+    turn_notice_output : out
+        A system ``MessagePayload`` stating where the turn stands, finished, with
+        ``lifetime="turn"``, emitted once per round as its last arrival: after the
+        user message, and after each round's results. Wire it into the ledger's
+        ``HistoryHandler.payload_input`` first, so it stays in place for the rest
+        of the turn and leaves with it, then make it the context builder's
+        trigger, last in its order. Each request is then the previous one plus
+        what was appended, which keeps the provider's prompt cache and the
+        turn's reasoning valid.
+        Words come from ``turn_notice_template``;
+        ``submit_message_async(facts=...)`` adds application facts such as the date.
+    request_options_output : out
+        ``StructuredPayload`` for ``LLMChatElement.request_options_input``: sent
+        just before a round's results when the next reply must be made without
+        tools (``{"tool_choice": "none"}``), because the round or failure
+        budget is spent. Denial of further calls remains the fallback.
     tool_use_input : in
         ``ToolUsePayload`` from ``ToolUseElement.tool_use_output``. Every arriving
         payload passes through the application policy gate before execution.
@@ -91,6 +116,9 @@ class ChatGatewayElement(Element):
 
     def _setup_ports(self):
         self._message_output_setup()
+        self._assistant_message_output_setup()
+        self._request_options_output_setup()
+        self._turn_notice_output_setup()
         self._assistant_message_input_setup()
         self._tool_use_input_setup()
         self._tool_events_output_setup()
@@ -112,6 +140,46 @@ class ChatGatewayElement(Element):
 
         self.ports.add_output(name="message_output", pack_payload_callback=pack)
 
+    def _request_options_output_setup(self):
+        async def pack(payload: dict) -> StructuredPayload:
+            return StructuredPayload(data=payload)
+
+        self.ports.add_output(name="request_options_output", pack_payload_callback=pack)
+
+    def _turn_notice_output_setup(self):
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
+
+        self.ports.add_output(name="turn_notice_output", pack_payload_callback=pack)
+
+    async def _emit_turn_notice(self, turn_id: str) -> None:
+        """Tell the model where the turn stands before its next reply."""
+        notice = MessagePayload(
+            content=self.model.render_turn_notice(turn_id), role="system", lifetime="turn"
+        )
+        await self.ports.output["turn_notice_output"].stage_emit(payload=notice)
+
+    def _assistant_message_output_setup(self):
+        async def pack(payload: MessagePayload) -> MessagePayload:
+            return payload
+
+        self.ports.add_output(name="assistant_message_output", pack_payload_callback=pack)
+
+    async def _emit_finished_reply(self, turn_id: str, round_index: int) -> None:
+        """Emit a round's reply as finished, once, whichever path gets here first."""
+        reply = self.model.claim_reply_emission(turn_id, round_index)
+        if reply is None:
+            return
+        await self.ports.output["assistant_message_output"].stage_emit(payload=reply)
+
+    async def _watch_reply(self, turn_id: str, round_index: int, payload: MessagePayload) -> None:
+        """Wait for a live reply to finish, then emit it. Runs as the port's own task."""
+        if not payload.finished:
+            await payload.model.await_ready()
+        if payload.model.cancelled or self.model.is_turn_cancelled(turn_id):
+            return
+        await self._emit_finished_reply(turn_id, round_index)
+
     def _assistant_message_input_setup(self):
         async def unpack(payload: MessagePayload):
             turn_id = self.model.match_turn(payload)
@@ -126,6 +194,11 @@ class ChatGatewayElement(Element):
                 payload.model.cancel()
                 return
 
+            round_index = state.rounds - 1
+            self.ports.output["assistant_message_output"].track_task(
+                schedule_task(self._watch_reply(turn_id, round_index, payload))
+            )
+
             await self._invoke_hook(
                 self.model.on_assistant_message,
                 payload,
@@ -138,6 +211,11 @@ class ChatGatewayElement(Element):
             payload_type=MessagePayload,
         )
 
+    @property
+    def tools_wired(self) -> bool:
+        """Whether anything feeds ``tool_use_input``; without it a reply's calls end the turn."""
+        return bool(self.ports.input["tool_use_input"].output_ports)
+
     def _tool_use_input_setup(self):
         async def unpack(payload: ToolUsePayload):
             turn_id = self.model.resolve_turn_id_for_tools(payload)
@@ -145,6 +223,27 @@ class ChatGatewayElement(Element):
                 self.logger.warning(
                     "Received tool use payload with no resolvable turn; ignoring"
                 )
+                return
+            payload.model.metadata["turn_id"] = turn_id
+
+            verdict = self.model.tool_rounds_over_budget(turn_id)
+            if verdict == "fail":
+                self.model.fail_turn(
+                    turn_id,
+                    f"tool_round_budget_exhausted: the model kept calling tools past "
+                    f"{self.model.max_tool_rounds} rounds",
+                )
+                return
+            if verdict == "deny":
+                payload.model.deny(
+                    reason=(
+                        f"Tool round budget reached ({self.model.max_tool_rounds} rounds). "
+                        "Answer with what you have."
+                    ),
+                    decided_by="gateway",
+                )
+                await self._invoke_hook(self.model.on_tool_use, build_tool_use_review(payload))
+                await self._emit_tool_result_if_active(payload)
                 return
 
             await self._handle_tool_use_payload(payload)
@@ -169,6 +268,11 @@ class ChatGatewayElement(Element):
         response = await self._invoke_hook(self.model.on_tool_use, review)
 
         if payload.model.completed:
+            # Finished on arrival (every call failed to bind, say). A round waiting
+            # on it still needs its results; anything else is only reported.
+            if self.model.turn_awaits_results(payload.model.metadata.get("turn_id")):
+                payload.model.metadata["execution_owner"] = self.model.current_execution_owner()
+                await self._emit_tool_result_if_active(payload)
             return
 
         if not self._ensure_payload_bound(payload):
@@ -275,7 +379,21 @@ class ChatGatewayElement(Element):
             notice["orphaned"] = True
         await self._invoke_hook(self.model.on_tool_result, notice)
         if active:
+            turn_id = payload.model.metadata.get("turn_id")
+            if turn_id:
+                state = self.model.get_turn_state(turn_id)
+                if state is not None and state.rounds:
+                    await self._emit_finished_reply(turn_id, state.rounds - 1)
+                self.model.record_tool_results(turn_id, payload)
+                if self.model.next_round_is_last(turn_id):
+                    # The next reply answers from what it has: no tools on that one
+                    # request, and the prompt stays byte-identical for the cache.
+                    await self.ports.output["request_options_output"].stage_emit(
+                        payload={"tool_choice": "none"}
+                    )
             await self.ports.output["tool_result_output"].stage_emit(payload=payload)
+            if turn_id:
+                await self._emit_turn_notice(turn_id)
 
     async def _sync_pending_state(
         self,
@@ -532,10 +650,14 @@ class ChatGatewayElement(Element):
         self,
         content: str,
         role: str = "user",
+        facts: dict[str, Any] | None = None,
         **kwargs,
     ) -> TurnHandle:
         """
         Submit a user message and await its emission onto ``message_output``.
+
+        ``facts`` are the application's variables for this turn's notices
+        (``turn_notice_template``), such as today's date.
 
         Submission starts a new execution branch. Before the user message enters
         the graph, the gateway clears stale permission prompts and asks running
@@ -549,16 +671,19 @@ class ChatGatewayElement(Element):
             role=role,
             **kwargs,
         )
-        self.model.register_turn(turn_id, user_message)
+        self.model.register_turn(turn_id, user_message, facts)
         await self._invoke_hook(
             self.model.on_user_message_submitted,
             user_message,
             turn_id,
         )
         await self.ports.output["message_output"].stage_emit(payload=user_message)
+        await self._emit_turn_notice(turn_id)
         return TurnHandle(turn_id=turn_id, user_message=user_message, gateway=self)
 
-    def submit_message(self, content: str, role: str = "user", **kwargs) -> TurnHandle:
+    def submit_message(
+        self, content: str, role: str = "user", facts: dict[str, Any] | None = None, **kwargs
+    ) -> TurnHandle:
         """
         Inject a user message into the flow and return a turn handle.
 
@@ -573,6 +698,8 @@ class ChatGatewayElement(Element):
             Message text.
         role : str
             Message role (default ``user``).
+        facts : dict, optional
+            The application's variables for this turn's notices, such as the date.
         **kwargs
             Additional ``MessagePayload`` / ``MessageModel`` parameters.
 
@@ -587,7 +714,7 @@ class ChatGatewayElement(Element):
             role=role,
             **kwargs,
         )
-        self.model.register_turn(turn_id, user_message)
+        self.model.register_turn(turn_id, user_message, facts)
 
         async def _emit():
             await self._prepare_new_user_message()
@@ -597,6 +724,7 @@ class ChatGatewayElement(Element):
                 turn_id,
             )
             await self.ports.output["message_output"].stage_emit(payload=user_message)
+            await self._emit_turn_notice(turn_id)
 
         schedule_task(_emit())
         return TurnHandle(turn_id=turn_id, user_message=user_message, gateway=self)

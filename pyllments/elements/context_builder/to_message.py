@@ -56,24 +56,31 @@ def message_list2message(payload, role=None):
         ]
     return payload
 
-def tool_use2message(payload, role='system'):
+def tool_use2message(payload, role=None):
     """
-    Converts a ToolUsePayload into a MessagePayload.
+    Converts a ToolUsePayload into the messages a model reads.
 
-    Default role is 'system' but can be overridden.
+    Records with provider ids become ``role: tool`` messages; a payload without
+    ids renders as one system message. A role override applies only to that
+    fallback, since a tool message's role is fixed by the provider.
     """
-    return MessagePayload(content=payload.model.content, role=role)
+    messages = payload.to_messages()
+    if role is not None:
+        messages = [
+            MessagePayload(content=m.model.content, role=role, timestamp=m.model.timestamp)
+            if m.model.role == 'system' else m
+            for m in messages
+        ]
+    return messages
 
-def tool_use_list2message(payload, role='system'):
+def tool_use_list2message(payload, role=None):
     """
-    Converts a list of ToolUsePayloads into MessagePayloads.
-
-    Default role is 'system' but can be overridden.
+    Converts a list of ToolUsePayloads into MessagePayloads, in order.
     """
-    return [
-        MessagePayload(content=item.model.content, role=role)
-        for item in payload
-    ]
+    messages = []
+    for item in payload:
+        messages.extend(tool_use2message(item, role))
+    return messages
 
 def structured2message(payload, role='system'):
     """
@@ -133,6 +140,9 @@ def to_message_payload(payload, payload_message_mapping=payload_message_mapping,
     # Determine the payload type, preferring the expected_type if provided.
     # Some ports can only advertise the container type (`list`) even though the
     # runtime payload is a homogeneous list of message/tool payloads.
+    if isinstance(payload, list) and not payload:
+        # An empty projection (a fresh ledger) is a valid payload: no messages.
+        return []
     payload_type = (expected_type or type(payload)) if expected_type is not Any else type(payload)
     # Normalize typing.List[...] to built-in list[...] for mapping lookup
     origin = get_origin(payload_type)
