@@ -58,3 +58,15 @@ def test_forced_write_card_still_plays_when_advertised():
     )
     reply = model.generate_response([_user("we talked about sleep")])
     assert reply.model.tool_calls[0]["function"]["name"] == "write_card"
+
+
+@pytest.mark.asyncio
+async def test_a_scripted_failure_raises_as_a_provider_would():
+    model = MockChatModel(script=[{"error": "503 overloaded"}, "after"])
+    failing = model.generate_response([_user("a")])
+    with pytest.raises(RuntimeError, match="503"):
+        async for _ in failing.model.aiter_events():
+            pass
+    recovered = model.generate_response([_user("b")])
+    assert [e.type for e in [ev async for ev in recovered.model.aiter_events()]][-1] == "done"
+

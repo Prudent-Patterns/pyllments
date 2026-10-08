@@ -76,17 +76,28 @@ class TurnHandle:
                 return
 
             called_tools: list[dict] | None = None
-            async for event in self._round_events(assistant):
-                if model.is_turn_cancelled(self.turn_id):
-                    assistant.model.cancel()
-                    yield self._terminal_event()
-                    return
-                if event.type == 'tool_calls_complete' and event.tool_calls:
-                    called_tools = event.tool_calls
-                    await self._gateway.emit_tool_event(self.turn_id, event.tool_calls)
-                yield event
-                if event.type == 'cancelled':
-                    return
+            try:
+                async for event in self._round_events(assistant):
+                    if model.is_turn_cancelled(self.turn_id):
+                        assistant.model.cancel()
+                        yield self._terminal_event()
+                        return
+                    if event.type == 'tool_calls_complete' and event.tool_calls:
+                        called_tools = event.tool_calls
+                        await self._gateway.emit_tool_event(self.turn_id, event.tool_calls)
+                    if event.type == 'error':
+                        # The provider failed mid-reply: the turn ends here, as data.
+                        model.fail_turn(self.turn_id, str(event.error or 'provider_error'))
+                        yield event
+                        return
+                    yield event
+                    if event.type == 'cancelled':
+                        return
+            except Exception as exc:
+                if not model.is_turn_cancelled(self.turn_id):
+                    model.fail_turn(self.turn_id, str(exc))
+                yield MessageStreamEvent(type='error', error=str(exc))
+                return
             if assistant.model.tool_calls and called_tools is None:
                 # A reply read before (e.g. final_message after stream) reports its
                 # calls only on done; the round still continues.

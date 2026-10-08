@@ -75,6 +75,11 @@ class ChatGatewayElement(Element):
         The same reply, finished, once per round: when it has streamed to its
         end, or just before the results of the tools it called go out, whichever
         comes first. Wire ledgers such as HistoryHandler from here.
+    request_options_output : out
+        ``StructuredPayload`` for ``LLMChatElement.request_options_input``: sent
+        just before a round's results when the next reply must be made without
+        tools (``{"tool_choice": "none"}``), because the round or failure
+        budget is spent. Denial of further calls remains the fallback.
     tool_use_input : in
         ``ToolUsePayload`` from ``ToolUseElement.tool_use_output``. Every arriving
         payload passes through the application policy gate before execution.
@@ -101,6 +106,7 @@ class ChatGatewayElement(Element):
     def _setup_ports(self):
         self._message_output_setup()
         self._assistant_message_output_setup()
+        self._request_options_output_setup()
         self._assistant_message_input_setup()
         self._tool_use_input_setup()
         self._tool_events_output_setup()
@@ -121,6 +127,12 @@ class ChatGatewayElement(Element):
             return payload
 
         self.ports.add_output(name="message_output", pack_payload_callback=pack)
+
+    def _request_options_output_setup(self):
+        async def pack(payload: dict) -> StructuredPayload:
+            return StructuredPayload(data=payload)
+
+        self.ports.add_output(name="request_options_output", pack_payload_callback=pack)
 
     def _assistant_message_output_setup(self):
         async def pack(payload: MessagePayload) -> MessagePayload:
@@ -231,6 +243,11 @@ class ChatGatewayElement(Element):
         response = await self._invoke_hook(self.model.on_tool_use, review)
 
         if payload.model.completed:
+            # Finished on arrival (every call failed to bind, say). A round waiting
+            # on it still needs its results; anything else is only reported.
+            if self.model.turn_awaits_results(payload.model.metadata.get("turn_id")):
+                payload.model.metadata["execution_owner"] = self.model.current_execution_owner()
+                await self._emit_tool_result_if_active(payload)
             return
 
         if not self._ensure_payload_bound(payload):
@@ -343,6 +360,12 @@ class ChatGatewayElement(Element):
                 if state is not None and state.rounds:
                     await self._emit_finished_reply(turn_id, state.rounds - 1)
                 self.model.record_tool_results(turn_id, payload)
+                if self.model.next_round_is_last(turn_id):
+                    # The next reply answers from what it has: no tools on that one
+                    # request, and the prompt stays byte-identical for the cache.
+                    await self.ports.output["request_options_output"].stage_emit(
+                        payload={"tool_choice": "none"}
+                    )
             await self.ports.output["tool_result_output"].stage_emit(payload=payload)
 
     async def _sync_pending_state(

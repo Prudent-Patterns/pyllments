@@ -30,14 +30,15 @@ def _lookup_call(name: str = "prednisone") -> dict:
     return {"content": "", "tool_calls": [{"name": "lookup", "arguments": {"name": name}}]}
 
 
-def _graph(script, *, output_mode: str, max_tool_rounds: int = 6):
+def _graph(script, *, output_mode: str, max_tool_rounds: int = 6, max_tool_failures: int = 3):
     tools = ToolUseElement(name="tools", functions=[lookup], prefix_names=False)
     llm = LLMChatElement(backend="mock", output_mode=output_mode, script=script)
     history = HistoryHandlerElement(
         context_token_limit=8000, summary_token_threshold=0,
         projection_tiers={0: {}}, tokenizer_model="gpt-4o",
     )
-    gateway = ChatGatewayElement(max_tool_rounds=max_tool_rounds)
+    gateway = ChatGatewayElement(max_tool_rounds=max_tool_rounds, max_tool_failures=max_tool_failures)
+    gateway.ports.request_options_output > llm.ports.request_options_input
 
     # The ledger takes each arrival before the builder sees it: connect these first.
     gateway.ports.message_output > history.ports.payload_pre_emit_input
@@ -133,3 +134,54 @@ async def test_cancel_during_tool_round_ends_the_stream():
     turn.cancel()
     events = [event async for event in turn.stream()]
     assert [e.type for e in events] == ["cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_the_round_after_the_budget_runs_without_tools():
+    gateway, llm, tools = _graph(
+        [_lookup_call("a"), _lookup_call("b"), "done"], output_mode="atomic", max_tool_rounds=1,
+    )
+    await tools.model.await_ready()
+    await tools.ports.output["tools_output"].drain()
+
+    turn = await gateway.submit_message_async("look things up")
+    events = [event async for event in turn.stream()]
+
+    # Once the budget is spent, every later request is made without tools.
+    assert [args.get("tool_choice") for args in llm.model.request_args] == [None, "none", "none"]
+    # The mock ignores tool_choice and calls again, so the fallback denial still applies.
+    denied = [e for e in events if e.type == "tool_results"][1]
+    assert denied.tool_results[0]["status"] == "denied"
+    assert events[-1].type == "done"
+
+
+@pytest.mark.asyncio
+async def test_three_failed_calls_end_the_tool_rounds():
+    broken = {"content": "", "tool_calls": [
+        {"name": "nope", "arguments": {}}, {"name": "nope", "arguments": {}}, {"name": "nope", "arguments": {}},
+    ]}
+    gateway, llm, tools = _graph([broken, "I could not look that up."], output_mode="atomic")
+    await tools.model.await_ready()
+    await tools.ports.output["tools_output"].drain()
+
+    turn = await gateway.submit_message_async("hi")
+    events = [event async for event in turn.stream()]
+
+    results = next(e for e in events if e.type == "tool_results")
+    assert [r["status"] for r in results.tool_results] == ["failed"] * 3
+    assert llm.model.request_args[1] == {"tool_choice": "none"}
+    assert "Error: Unknown tool: nope" in llm.model.requests[1][-1]["content"]
+    assert events[-1].type == "done"
+
+
+@pytest.mark.asyncio
+async def test_a_provider_failure_ends_the_turn_with_an_error_event():
+    gateway, llm, tools = _graph([_lookup_call(), {"error": "503 overloaded"}], output_mode="stream")
+    await tools.model.await_ready()
+    await tools.ports.output["tools_output"].drain()
+
+    turn = await gateway.submit_message_async("hi")
+    events = [event async for event in turn.stream()]
+    assert events[-1].type == "error"
+    assert "503" in events[-1].error
+

@@ -31,10 +31,12 @@ class LLMChatElement(Element):
         self._model_init_params = self._extract_model_params(params)
         self.model = self._create_model(self.backend, self._model_init_params)
         self.param.watch(self._on_backend_change, 'backend')
+        self._next_request_options: dict | None = None
         self._message_output_setup()
         self._tool_use_output_setup()
         self._messages_emit_input_setup()
         self._tools_input_setup()
+        self._request_options_input_setup()
 
     def _extract_model_params(self, params: dict) -> dict:
         element_param_names = {'backend', 'generate_content_on_emit'}
@@ -141,7 +143,7 @@ class LLMChatElement(Element):
                 payloads = payload
 
             # Directly generate and emit response from all incoming payloads
-            response = self.model.generate_response(payloads)
+            response = self._generate_with_options(payloads)
             if self.generate_content_on_emit:
                 # Populate the message content before emitting
                 await response.model.aget_message()
@@ -154,6 +156,36 @@ class LLMChatElement(Element):
             name='messages_emit_input',
             unpack_payload_callback=unpack,
             payload_type=Union[MessagePayload, List[Union[MessagePayload, ToolUsePayload]]]
+        )
+
+    def _generate_with_options(self, payloads):
+        """Call the backend, with any one-shot request options merged in for this call only.
+
+        The backend builds its request inside ``generate_response``, so a
+        temporary ``model_args`` is enough; the options never reach a later
+        call, and the tool list and prompt are untouched.
+        """
+        options = self._next_request_options
+        self._next_request_options = None
+        if not options:
+            return self.model.generate_response(payloads)
+        base = dict(self.model.model_args or {})
+        self.model.model_args = {**base, **options}
+        try:
+            return self.model.generate_response(payloads)
+        finally:
+            self.model.model_args = base
+
+    def _request_options_input_setup(self):
+        async def unpack(payload: StructuredPayload):
+            """Options for the next request only, e.g. ``{"tool_choice": "none"}``."""
+            data = payload.model.data
+            self._next_request_options = dict(data) if isinstance(data, dict) else None
+
+        self.ports.add_input(
+            name='request_options_input',
+            unpack_payload_callback=unpack,
+            payload_type=StructuredPayload,
         )
 
     def _tools_input_setup(self):

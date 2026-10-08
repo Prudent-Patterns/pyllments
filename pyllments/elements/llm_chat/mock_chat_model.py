@@ -20,6 +20,7 @@ class MockChatModel(Model):
     """
 
     model_name = param.String(default="mock")
+    model_args = param.Dict(default={}, doc="Request options, as a real backend would merge them")
     tools = param.List(default=None, doc="Provider tool definitions, when the caller forced a tool")
     output_mode = param.Selector(
         objects=["atomic", "stream"],
@@ -31,12 +32,17 @@ class MockChatModel(Model):
         doc=(
             "Replies to play in order, one per request. Each is a str, or a dict "
             "``{'content': str, 'tool_calls': [{'name', 'arguments', 'id'?}]}`` "
-            "with ``arguments`` as a dict. Past the end, the echo reply plays."
+            "with ``arguments`` as a dict, or ``{'error': str}`` for a request that "
+            "fails at the provider. Past the end, the echo reply plays."
         ),
     )
     requests = param.List(
         default=[],
         doc="The chat-completions ``messages`` of every request so far, oldest first.",
+    )
+    request_args = param.List(
+        default=[],
+        doc="The ``model_args`` in force for every request so far, oldest first.",
     )
 
     def __init__(self, **params):
@@ -137,8 +143,29 @@ class MockChatModel(Model):
             choices=[SimpleNamespace(delta=SimpleNamespace(content=None, tool_calls=[delta]))]
         )
 
+    def _next_failure(self) -> str | None:
+        step = self.script[self._script_position] if self.script and self._script_position < len(self.script) else None
+        if isinstance(step, dict) and "error" in step:
+            self._script_position += 1
+            return str(step["error"])
+        return None
+
     def generate_response(self, messages: list[MessagePayload]) -> MessagePayload:
         self.requests = [*self.requests, to_chat_completions(messages)]
+        self.request_args = [*self.request_args, dict(self.model_args or {})]
+        failure = self._next_failure()
+        if failure is not None:
+            # The provider failed: an atomic reply raises when awaited, a stream raises on its first chunk.
+            async def _fail():
+                raise RuntimeError(failure)
+
+            async def _failing_stream():
+                raise RuntimeError(failure)
+                yield  # noqa: unreachable - makes this an async generator
+
+            if self.output_mode == "atomic":
+                return MessagePayload(role="assistant", message_coroutine=_fail(), mode="atomic")
+            return MessagePayload(role="assistant", message_coroutine=_failing_stream(), mode="stream")
         text, tool_calls = self._next_reply(messages)
 
         if self.output_mode == "atomic":

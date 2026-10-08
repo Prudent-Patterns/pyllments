@@ -151,6 +151,18 @@ def _native_tool_calls(raw: Any) -> list[dict[str, Any]]:
     return calls
 
 
+_TRANSIENT_MARKERS = ("429", "500", "502", "503", "504", "overload", "timeout", "timed out",
+                      "capacity", "temporar", "unavailable", "rate limit", "too many requests")
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """A failure worth one more try: the provider was busy or the line dropped, not a bad request."""
+    text = str(exc).lower()
+    if "400" in text or "bad request" in text or "validation" in text or "401" in text or "403" in text:
+        return False
+    return any(marker in text for marker in _TRANSIENT_MARKERS)
+
+
 def _js_bytes(value: Any) -> bytes:
     if isinstance(value, (bytes, bytearray, memoryview)):
         return bytes(value)
@@ -220,6 +232,15 @@ class CloudflareAIGatewayChatModel(Model):
             "through the logged-in Wrangler session instead of a REST API token."
         ),
     )
+    transport_retries = param.Integer(
+        default=2,
+        bounds=(0, None),
+        doc=(
+            "Retries of a request that failed before its first chunk arrived, on a rate "
+            "limit, an overload, a 5xx or a timeout. The model never sees these."
+        ),
+    )
+    retry_backoff = param.Number(default=0.5, doc="Seconds before the first retry; doubles each time")
 
     MAJOR_PROVIDER_KEYS = ["openai", "anthropic", "google", "xai", "workers-ai"]
     PROVIDER_KEY_TO_LABEL = {
@@ -487,9 +508,26 @@ class CloudflareAIGatewayChatModel(Model):
             from workers import fetch
         except ImportError:
             fetch = None
-        if fetch is not None:
-            return await self._workers_http_post(fetch, url, headers, body, stream)
-        return await self._stdlib_http_post(url, headers, body, stream)
+
+        async def attempt():
+            if fetch is not None:
+                return await self._workers_http_post(fetch, url, headers, body, stream)
+            return await self._stdlib_http_post(url, headers, body, stream)
+
+        return await self._with_transport_retries(attempt)
+
+    async def _with_transport_retries(self, attempt):
+        """Run ``attempt`` again on a transient failure, with backoff; safe because nothing
+        downstream has seen a chunk until it returns."""
+        delay = float(self.retry_backoff)
+        for tries_left in range(int(self.transport_retries), -1, -1):
+            try:
+                return await attempt()
+            except Exception as exc:
+                if tries_left == 0 or not _is_transient(exc):
+                    raise
+                await asyncio.sleep(delay)
+                delay *= 2
 
     def _binding_inputs(self, body: dict[str, Any]) -> dict[str, Any]:
         # The binding call crosses into JavaScript; only JSON types survive it.
@@ -506,11 +544,13 @@ class CloudflareAIGatewayChatModel(Model):
         if binding is None:
             raise ValueError("Cloudflare AI binding is not set")
         gateway_id = self.gateway_id or os.getenv("CLOUDFLARE_AI_GATEWAY_ID") or "default"
-        result = await binding.run(
-            self.normalize_model_name(self.model_name),
-            self._binding_inputs(body),
-            {"gateway": {"id": gateway_id}},
-        )
+        inputs = self._binding_inputs(body)
+        model_name = self.normalize_model_name(self.model_name)
+
+        async def attempt():
+            return await binding.run(model_name, inputs, {"gateway": {"id": gateway_id}})
+
+        result = await self._with_transport_retries(attempt)
         return _completion_from_binding(result)
 
     async def _atomic_binding_response(self, body: dict[str, Any]):

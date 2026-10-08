@@ -29,6 +29,7 @@ class TurnState:
     assistant_messages: list = field(default_factory=list)
     tool_results: list = field(default_factory=list)
     replies_emitted: set = field(default_factory=set)
+    failed_calls: int = 0
     cancelled: bool = False
     done: bool = False
     error: str | None = None
@@ -81,6 +82,15 @@ class ChatGatewayModel(Model):
             "How many replies in one turn may run tools. The reply after the last "
             "allowed one has its calls denied with a reason the model can read; a "
             "further reply that still calls tools fails the turn."
+        ),
+    )
+
+    max_tool_failures = param.Integer(
+        default=3,
+        bounds=(0, None),
+        doc=(
+            "How many tool calls may fail in one turn before the next reply is made "
+            "without tools, so the model answers with what it has and says what failed."
         ),
     )
 
@@ -258,7 +268,22 @@ class ChatGatewayModel(Model):
         if state is None:
             return
         state.tool_results.append(payload)
+        state.failed_calls += sum(
+            1 for record in payload.model.tool_calls if record.get("status") == "failed"
+        )
         state.notify()
+
+    def turn_awaits_results(self, turn_id: str | None) -> bool:
+        """Has this turn a reply whose tool results have not come back yet?"""
+        state = self._turn_states.get(turn_id or "")
+        return bool(state and state.open and state.rounds > len(state.tool_results))
+
+    def next_round_is_last(self, turn_id: str) -> bool:
+        """After these results, must the next reply be made without tools?"""
+        state = self._turn_states.get(turn_id)
+        if state is None:
+            return False
+        return state.rounds >= self.max_tool_rounds or state.failed_calls >= self.max_tool_failures
 
     def tool_rounds_over_budget(self, turn_id: str) -> str | None:
         """
@@ -268,9 +293,15 @@ class ChatGatewayModel(Model):
         spent and the model should answer, ``"fail"`` when it kept calling.
         """
         state = self._turn_states.get(turn_id)
-        if state is None or state.rounds <= self.max_tool_rounds:
+        if state is None:
             return None
-        if state.rounds > self.max_tool_rounds + 1:
+        over_rounds = state.rounds > self.max_tool_rounds
+        over_failures = state.failed_calls >= self.max_tool_failures
+        if not over_rounds and not over_failures:
+            return None
+        # One reply past a spent budget is denied with a reason; the next fails the turn.
+        limit = self.max_tool_rounds if over_rounds else state.rounds - 1
+        if state.rounds > limit + 1:
             return "fail"
         return "deny"
 
