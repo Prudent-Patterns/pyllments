@@ -156,11 +156,17 @@ def validate_arguments(schema: dict[str, Any], arguments: dict[str, Any] | None)
     """
     arguments = dict(arguments or {})
     properties = schema.get("properties", {})
-    # Models often send a list or object as the JSON text of one. Read it as
-    # the value it spells before judging its type.
+    required = set(schema.get("required", []))
+    # Models often send a list or object as the JSON text of one, and spell
+    # "not given" as "" or "null" for a parameter they do not use. Read both
+    # as what they mean before judging types.
     for name, value in list(arguments.items()):
-        if name in properties and isinstance(value, str):
-            arguments[name] = _decode_if_json(value, properties[name])
+        if name not in properties or not isinstance(value, str):
+            continue
+        if name not in required and value.strip().lower() in ("", "null", "none"):
+            del arguments[name]
+            continue
+        arguments[name] = _decode_if_json(value, properties[name])
     missing = [name for name in schema.get("required", []) if name not in arguments]
     unknown = [name for name in arguments if name not in properties]
     wrong = [

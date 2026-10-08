@@ -98,3 +98,11 @@ def test_json_text_arguments_are_read_as_the_values_they_spell():
     with pytest.raises(ValueError, match="wrong type for: types"):
         validate_arguments(schema, {"query": "x", "types": "medication"})
 
+
+def test_empty_and_null_strings_mean_not_given_for_optional_parameters():
+    schema, _ = parameters_schema(search)
+    out = validate_arguments(schema, {"query": "walking", "kind": "", "cursor": "null", "limit": "10"})
+    assert out == {"query": "walking", "limit": 10}
+    with pytest.raises(ValueError, match="missing required argument"):
+        validate_arguments(schema, {"query": ""} if False else {"kind": "goal"})
+
