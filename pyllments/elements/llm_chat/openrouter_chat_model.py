@@ -2,7 +2,7 @@ import os
 
 import param
 from openrouter import OpenRouter
-from dotenv import load_dotenv
+from pyllments.common.local_env import load_local_env
 
 from pyllments.base.model_base import Model
 from pyllments.payloads.message import MessagePayload
@@ -140,7 +140,7 @@ class OpenRouterChatModel(Model):
         so the selector remains usable.
         """
         try:
-            load_dotenv(override=False)
+            load_local_env()
             api_key = os.getenv('OPENROUTER_API_KEY')
             client_kwargs = {'api_key': api_key} if api_key else {}
             with OpenRouter(**client_kwargs) as client:
@@ -167,7 +167,7 @@ class OpenRouterChatModel(Model):
 
     def _build_client_kwargs(self) -> dict:
         # Ensure OPENROUTER_API_KEY from a local .env is discoverable at runtime.
-        load_dotenv(override=False)
+        load_local_env()
         client_kwargs = dict(self.client_args)
         api_key = self.api_key or os.getenv('OPENROUTER_API_KEY')
         if not api_key:

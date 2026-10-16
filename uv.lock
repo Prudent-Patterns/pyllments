@@ -19,6 +19,12 @@ resolution-markers = [
     "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
 ]
 
+[manifest]
+
+[[manifest.dependency-metadata]]
+name = "pypika"
+version = "0.48.9"
+
 [[package]]
 name = "aiofiles"
 version = "24.1.0"
@@ -3805,9 +3811,6 @@ dependencies = [
     { name = "jinja2" },
     { name = "loguru" },
     { name = "param" },
-    { name = "python-dotenv" },
-    { name = "sqlite-utils" },
-    { name = "tiktoken" },
 ]
 
 [package.optional-dependencies]
@@ -3832,9 +3835,11 @@ full = [
     { name = "pillow-heif" },
     { name = "pydantic" },
     { name = "pytesseract" },
+    { name = "python-dotenv" },
     { name = "python-telegram-bot" },
     { name = "ruamel-yaml" },
     { name = "sentence-transformers", extra = ["onnx-gpu"] },
+    { name = "sqlite-utils" },
     { name = "telethon" },
     { name = "typer" },
     { name = "unstructured" },
@@ -3862,8 +3867,10 @@ standard = [
     { name = "panel" },
     { name = "pillow-heif" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
     { name = "python-telegram-bot" },
     { name = "ruamel-yaml" },
+    { name = "sqlite-utils" },
     { name = "telethon" },
     { name = "typer" },
 ]
@@ -3928,16 +3935,17 @@ requires-dist = [
     { name = "pydantic", marker = "extra == 'full'", specifier = ">=2.11.5" },
     { name = "pydantic", marker = "extra == 'standard'", specifier = ">=2.11.5" },
     { name = "pytesseract", marker = "extra == 'full'" },
-    { name = "python-dotenv" },
+    { name = "python-dotenv", marker = "extra == 'full'" },
+    { name = "python-dotenv", marker = "extra == 'standard'" },
     { name = "python-telegram-bot", marker = "extra == 'full'", specifier = ">=21.10" },
     { name = "python-telegram-bot", marker = "extra == 'standard'", specifier = ">=21.10" },
     { name = "ruamel-yaml", marker = "extra == 'full'" },
     { name = "ruamel-yaml", marker = "extra == 'standard'" },
     { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'full'" },
-    { name = "sqlite-utils", specifier = ">=3.38" },
+    { name = "sqlite-utils", marker = "extra == 'full'", specifier = ">=3.38" },
+    { name = "sqlite-utils", marker = "extra == 'standard'", specifier = ">=3.38" },
     { name = "telethon", marker = "extra == 'full'", specifier = ">=1.38.1" },
     { name = "telethon", marker = "extra == 'standard'", specifier = ">=1.38.1" },
-    { name = "tiktoken" },
     { name = "typer", marker = "extra == 'full'" },
     { name = "typer", marker = "extra == 'serve'" },
     { name = "typer", marker = "extra == 'standard'" },

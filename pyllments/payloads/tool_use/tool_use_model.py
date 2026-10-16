@@ -14,6 +14,37 @@ NON_EXECUTABLE_STATUSES = TERMINAL_STATUSES | frozenset(
     {"awaiting_permission", "running", "cancel_requested"}
 )
 
+# Compiled once at import: every payload renders through the same template.
+_RESULTS_TEMPLATE = jinja2.Template("""The following tool results are available:
+{%- for record in tool_calls %}
+{%- if record.status == 'succeeded' and record.result %}
+### Tool: {{ record.model_tool_name }}
+{%- if record.parameters %}
+Parameters:
+{%- for param_name, param_value in record.parameters.items() %}
+- {{ param_name }}: {{ param_value }}
+{%- endfor %}
+{%- endif %}
+Result:
+{%- for item in record.result.content %}
+{{ item.text }}
+{%- endfor %}
+{%- elif record.status == 'failed' and record.error %}
+### Tool: {{ record.model_tool_name }} failed
+{{ record.error.message }}
+{%- elif record.status == 'denied' %}
+### Tool: {{ record.model_tool_name }} denied
+{%- if record.permission and record.permission.reason %}
+Reason: {{ record.permission.reason }}
+{%- endif %}
+{%- elif record.status == 'cancelled' %}
+### Tool: {{ record.model_tool_name }} cancelled
+{%- if record.error and record.error.message %}
+{{ record.error.message }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}""")
+
 
 class ToolUseModel(Model):
     """
@@ -72,35 +103,7 @@ class ToolUseModel(Model):
         return self._content
 
     def set_template(self):
-        self.template = jinja2.Template("""The following tool results are available:
-{%- for record in tool_calls %}
-{%- if record.status == 'succeeded' and record.result %}
-### Tool: {{ record.model_tool_name }}
-{%- if record.parameters %}
-Parameters:
-{%- for param_name, param_value in record.parameters.items() %}
-- {{ param_name }}: {{ param_value }}
-{%- endfor %}
-{%- endif %}
-Result:
-{%- for item in record.result.content %}
-{{ item.text }}
-{%- endfor %}
-{%- elif record.status == 'failed' and record.error %}
-### Tool: {{ record.model_tool_name }} failed
-{{ record.error.message }}
-{%- elif record.status == 'denied' %}
-### Tool: {{ record.model_tool_name }} denied
-{%- if record.permission and record.permission.reason %}
-Reason: {{ record.permission.reason }}
-{%- endif %}
-{%- elif record.status == 'cancelled' %}
-### Tool: {{ record.model_tool_name }} cancelled
-{%- if record.error and record.error.message %}
-{{ record.error.message }}
-{%- endif %}
-{%- endif %}
-{%- endfor %}""")
+        self.template = _RESULTS_TEMPLATE
 
     def _touch(self):
         self.updated_at = time.time()

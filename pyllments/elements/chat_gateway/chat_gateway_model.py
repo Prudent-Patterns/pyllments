@@ -4,10 +4,10 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-import jinja2
 import param
 
 from pyllments.base.model_base import Model
+from pyllments.common.jinja_cache import strict_template
 
 if TYPE_CHECKING:
     from pyllments.payloads import MessagePayload, ToolUsePayload
@@ -318,9 +318,7 @@ class ChatGatewayModel(Model):
 
     def render_turn_notice(self, turn_id: str) -> str:
         """``turn_notice_template`` rendered for the next reply of this turn."""
-        template = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(
-            self.turn_notice_template
-        )
+        template = strict_template(self.turn_notice_template)
         return template.render(**self.turn_notice_facts(turn_id)).strip()
 
     def next_round_is_last(self, turn_id: str) -> bool:

@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 import param
-from dotenv import load_dotenv
+from pyllments.common.local_env import load_local_env
 
 from pyllments.elements.llm_chat.http_chat_model import (
     HttpChatModel,
@@ -295,7 +295,7 @@ class CloudflareAIGatewayChatModel(HttpChatModel):
 
     def _build_request_target(self) -> tuple[str, dict[str, str]]:
         # Resolve token and account at call time so Worker env bindings stay out of import.
-        load_dotenv(override=False)
+        load_local_env()
         api_key = self.api_key or os.getenv("CLOUDFLARE_API_TOKEN")
         account_id = self.account_id or os.getenv("CLOUDFLARE_ACCOUNT_ID")
         if not api_key or not account_id:

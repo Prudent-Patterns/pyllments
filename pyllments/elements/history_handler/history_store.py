@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Type
 from uuid import uuid4
 
-from sqlite_utils import Database
-
 from pyllments.payloads import MessagePayload, StructuredPayload, ToolUsePayload
 from loguru import logger
 
@@ -188,6 +186,9 @@ class SQLiteHistoryStore:
         if path.suffix != ".db":
             path = path / f"{name}.db"
         self.db_path = str(path)
+        # Imported here: the light edition ships without sqlite-utils.
+        from sqlite_utils import Database
+
         self.db = Database(self.db_path)
         self.table = self.db[self.TABLE_NAME]
         self._ensure_schema()

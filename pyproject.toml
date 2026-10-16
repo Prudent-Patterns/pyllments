@@ -19,13 +19,11 @@ license = "Apache-2.0"
 license_file = "LICENSE"
 requires-python = ">=3.10"
 # Default is the light/Worker edition. Laptop stock is pyllments[standard].
+# Token counts are estimates (common/token_estimate.py); no tokenizer ships.
 dependencies = [
     "loguru",
     "param",
-    "python-dotenv",
     "jinja2",
-    "tiktoken",
-    "sqlite-utils>=3.38",
 ]
 
 [project.optional-dependencies]
@@ -48,6 +46,9 @@ standard = [
     "pyllments[llm]",
     "pyllments[ui]",
     "pyllments[serve]",
+    # Local .env loading and the SQLite history and pending-tool stores.
+    "python-dotenv",
+    "sqlite-utils>=3.38",
     "mcp>=1.3.0",
     "discord-py>=2.4.0",
     "python-telegram-bot>=21.10",
@@ -108,6 +109,12 @@ exclude = [
 
 [tool.uv]
 default-groups = ["dev"]
+# PyPika 0.48.9 (via chromadb, [full]) ships only an sdist whose setup.py uses
+# ast.Str, gone since Python 3.12, so uv cannot build it to read its metadata.
+# It has no dependencies.
+dependency-metadata = [
+    { name = "pypika", version = "0.48.9", requires-dist = [] },
+]
 
 [tool.hatch.version]
 source = "vcs"

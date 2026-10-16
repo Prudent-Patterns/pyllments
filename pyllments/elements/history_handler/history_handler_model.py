@@ -303,8 +303,10 @@ class HistoryHandlerModel(Model):
             remaining_context_budget=remaining_budget,
         )
         projected = project_payload(entry.payload, interval, ctx)
-        projected_tokens = payload_token_count(projected, self.tokenizer_model)
-        return projected, projected_tokens
+        # Unchanged by its tier, the payload was counted when it entered the ledger.
+        if projected is entry.payload:
+            return projected, entry.raw_token_count
+        return projected, payload_token_count(projected, self.tokenizer_model)
 
     def _select_context_entries(self) -> List[tuple[HistoryEntry, Any]]:
         if not self.history or self.context_token_limit <= 0:

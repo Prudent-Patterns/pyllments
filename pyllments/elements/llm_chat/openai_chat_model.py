@@ -2,7 +2,7 @@ import os
 from typing import Any
 
 import param
-from dotenv import load_dotenv
+from pyllments.common.local_env import load_local_env
 
 from pyllments.elements.llm_chat.http_chat_model import HttpChatModel, wrap_json
 from pyllments.payloads.message import MessagePayload
@@ -165,7 +165,7 @@ class OpenAIChatModel(HttpChatModel):
     error_label = "OpenAI request failed"
 
     def _request_target(self) -> tuple[str, dict[str, str]]:
-        load_dotenv(override=False)
+        load_local_env()
         api_key = self.api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError(
