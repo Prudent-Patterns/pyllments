@@ -35,7 +35,7 @@ A user message starts a turn, which is also how Anthropic and OpenAI count turns
 `show_tool_responses: bool = False`<br>
 <span class="tab">Whether to include tool response payload views in the context view.</span>
 `persist: bool = False`<br>
-<span class="tab">Whether to persist messages and tool responses to a SQLite database.</span>
+<span class="tab">Whether to persist messages and tool responses to a SQLite database. Needs `sqlite-utils`, which ships with `pyllments[standard]`.</span>
 `db_path: str = None`<br>
 <span class="tab">Custom path for the history database file when `persist=True`.</span>
 `history_token_limit: int = 32000`<br>
@@ -49,7 +49,7 @@ A user message starts a turn, which is also how Anthropic and OpenAI count turns
 `projection_tiers: dict = None`<br>
 <span class="tab">Optional tier configuration for projecting older entries before emitting context.</span>
 `tokenizer_model: str = 'gpt-4o'`<br>
-<span class="tab">The tokenizer model to use for token length estimation. (Using tiktoken)</span>
+<span class="tab">The vocabulary token counts are estimated for. Every model shares the o200k-calibrated estimate for now (no tokenizer ships).</span>
 
 ### Input Ports
 

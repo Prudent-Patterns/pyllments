@@ -93,7 +93,7 @@ async def test_openrouter_stream_response_wraps_async_iterator(monkeypatch):
 
 def test_openrouter_model_requires_api_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.setattr(openrouter_module, "load_dotenv", lambda *args, **kwargs: None)
+    monkeypatch.setattr(openrouter_module, "load_local_env", lambda: None)
     model = OpenRouterChatModel(model_name="openai/gpt-4o-mini")
 
     with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):

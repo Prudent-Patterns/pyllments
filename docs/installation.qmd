@@ -14,7 +14,7 @@ python >= 3.11
 
 **Light (default)**
 
-Headless graph only — Worker-safe. No Panel, LiteLLM, or OpenRouter.
+Headless graph only — Worker-safe. No Panel, LiteLLM, or OpenRouter, no SQLite stores or `.env` loading. Token counts are estimates.
 
 ```{.bash}
 uv pip install pyllments
@@ -41,7 +41,7 @@ uv pip install pyllments[full]
 
 **Light (default)**
 
-Headless graph only — Worker-safe. No Panel, LiteLLM, or OpenRouter.
+Headless graph only — Worker-safe. No Panel, LiteLLM, or OpenRouter, no SQLite stores or `.env` loading. Token counts are estimates.
 
 ```{.bash}
 pip install pyllments

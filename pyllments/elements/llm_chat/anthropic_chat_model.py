@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 import param
-from dotenv import load_dotenv
+from pyllments.common.local_env import load_local_env
 from loguru import logger
 
 from pyllments.elements.llm_chat.http_chat_model import HttpChatModel, wrap_json
@@ -268,7 +268,7 @@ class AnthropicChatModel(HttpChatModel):
     error_label = "Anthropic request failed"
 
     def _request_target(self, betas: list[str]) -> tuple[str, dict[str, str]]:
-        load_dotenv(override=False)
+        load_local_env()
         api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             raise ValueError(

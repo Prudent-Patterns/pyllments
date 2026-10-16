@@ -11,6 +11,7 @@ from pyllments.elements.flow_control import FlowController
 from pyllments.payloads.message import MessagePayload
 from pyllments.ports import InputPort, Ports
 from pyllments.base.element_base import Element
+from pyllments.common.jinja_cache import strict_template
 from .to_message import to_message_payload, payload_message_mapping
 
 
@@ -550,8 +551,7 @@ class ContextBuilderElement(Element):
             context[real_var] = msg.model.content if hasattr(msg, 'model') else str(msg)
 
         try:
-            env = jinja2.Environment(undefined=jinja2.StrictUndefined)
-            rendered = env.from_string(item.template_str).render(**context)
+            rendered = strict_template(item.template_str).render(**context)
             return MessagePayload(content=rendered, role=item.role)
         except jinja2.exceptions.UndefinedError as e:
             self.logger.debug("Template '{}' skipped (missing variable): {}", item.name, e)

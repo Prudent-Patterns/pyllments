@@ -18,7 +18,7 @@ from pyllments.elements.tool_use import ToolUseElement
 from pyllments.payloads.message import MessagePayload
 from pyllments.payloads.tool_use import ToolUsePayload
 
-forbidden = {"panel", "litellm", "openrouter", "mcp", "pydantic"}
+forbidden = {"panel", "litellm", "openrouter", "mcp", "pydantic", "tiktoken", "sqlite_utils", "dotenv"}
 loaded = forbidden & set(sys.modules)
 assert not loaded, loaded
 assert ChatGatewayElement is not None
@@ -99,6 +99,30 @@ def test_cloudflare_backend_does_not_load_host_llm_sdks():
 
 def test_element_import_does_not_load_dotenv():
     _run_fresh(_ELEMENT_IMPORT_SKIPS_DOTENV)
+
+
+# The light edition ships without python-dotenv, tiktoken and sqlite-utils:
+# block them as if absent, then build every Worker backend and its request.
+_WORKER_BACKENDS_WITHOUT_LAPTOP_PACKAGES = """
+import sys
+
+for name in ("dotenv", "tiktoken", "sqlite_utils"):
+    sys.modules[name] = None
+
+from pyllments.common.local_env import load_local_env
+from pyllments.elements.history_handler import HistoryHandlerElement
+from pyllments.elements.llm_chat import LLMChatElement
+
+load_local_env()
+HistoryHandlerElement(context_token_limit=100)
+LLMChatElement(backend="anthropic", api_key="key").model._request_target([])
+LLMChatElement(backend="openai", api_key="key").model._request_target()
+LLMChatElement(backend="cloudflare", account_id="acct", api_key="token").model._build_request_target()
+"""
+
+
+def test_worker_backends_run_without_laptop_packages():
+    _run_fresh(_WORKER_BACKENDS_WITHOUT_LAPTOP_PACKAGES)
 
 
 def test_component_view_works_when_panel_installed():
